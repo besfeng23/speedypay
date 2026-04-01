@@ -9,6 +9,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
+import { v4 as uuidv4 } from 'uuid';
+
 
 const SimulatePaymentInputSchema = z.object({
   scenarioType: z.enum(['success', 'payment_failed', 'settlement_failed', 'remittance_failed']).describe('The type of scenario to simulate: success, payment_failed, settlement_failed, or remittance_failed.'),
@@ -24,8 +26,8 @@ export type SimulatePaymentInput = z.infer<typeof SimulatePaymentInputSchema>;
 
 const PaymentRecordSchema = z.object({
   paymentId: z.string().describe('Unique identifier for the payment.'),
-  externalReference: z.string().describe('External reference for the payment.'),
-  bookingReferenceOrInvoiceReference: z.string().describe('Booking or invoice reference.'),
+  externalReference: z.string().describe('External reference for the payment, like from a payment gateway (e.g., ch_xxxxxxxx).'),
+  bookingReferenceOrInvoiceReference: z.string().describe('Booking or invoice reference (e.g., inv-2024-xxxx).'),
   customerName: z.string().describe('Name of the customer.'),
   customerEmail: z.string().email().describe('Email of the customer.'),
   merchantId: z.string().describe('ID of the merchant.'),
@@ -53,7 +55,7 @@ const SettlementRecordSchema = z.object({
   merchantNetAmount: z.number().describe('Net amount remitted to the merchant.'),
   settlementStatus: z.enum(['settlement pending', 'settlement processing', 'settlement completed', 'settlement failed']).describe('Current status of the settlement.'),
   remittanceStatus: z.enum(['remittance pending', 'remittance sent', 'remittance failed']).describe('Current status of remittance.'),
-  payoutReference: z.string().describe('Reference for the payout transaction.'),
+  payoutReference: z.string().describe('Reference for the payout transaction (e.g., po_xxxxxxxx).'),
   failureReason: z.string().optional().describe('Reason for settlement or remittance failure. Omit if not applicable.'),
   createdAt: z.string().datetime().describe('Timestamp when the settlement record was created.'),
   updatedAt: z.string().datetime().describe('Timestamp when the settlement record was last updated.'),
@@ -88,20 +90,24 @@ Here are the details for the simulation:
 {{#if description}}- Description: {{{description}}}{{/if}}
 
 Follow these rules for generating the output:
-1.  **Unique IDs:** Generate unique string IDs for 'paymentId' and 'settlementId' (if applicable), and 'externalReference', 'bookingReferenceOrInvoiceReference', 'payoutReference'.
-2.  **Dates:** Use current or slightly past ISO 8601 formatted timestamps for 'createdAt' and 'updatedAt'.
+1.  **Unique IDs:** Generate unique and realistic-looking string IDs:
+    - 'paymentId': "pay-" + 8 random hex characters.
+    - 'settlementId' (if applicable): "set-" + 8 random hex characters.
+    - 'externalReference': "ch_" + 12 random alphanumeric characters.
+    - 'bookingReferenceOrInvoiceReference': "inv-2024-" + 5 random digits.
+    - 'payoutReference': "po_" + 12 random alphanumeric characters.
+2.  **Dates:** Use current or slightly past ISO 8601 formatted timestamps for 'createdAt' and 'updatedAt'. 'updatedAt' should be slightly after 'createdAt'.
 3.  **Customer Email:** Generate a plausible customer email based on the 'customerName' (e.g., lowercase name, replace spaces with dots, add @example.com).
 4.  **Source Channel:** Choose a plausible source channel (e.g., 'Web', 'Mobile App', 'POS').
-5.  **Fee Calculation:**
-    - If 'feeType' is 'percentage', 'platformFeeAmount' = (grossAmount * feeValue / 100). This must be rounded to two decimal places.
-    - If 'feeType' is 'fixed', 'platformFeeAmount' = feeValue. This must be rounded to two decimal places.
-    - 'merchantNetAmount' = grossAmount - platformFeeAmount. This must be rounded to two decimal places.
-    - All currency amounts ('grossAmount', 'platformFeeAmount', 'merchantNetAmount') must be rounded to exactly two decimal places.
+5.  **Fee Calculation (CRITICAL):**
+    - Calculate 'platformFeeAmount' with precision. If 'feeType' is 'percentage', 'platformFeeAmount' = (grossAmount * feeValue / 100). If 'feeType' is 'fixed', 'platformFeeAmount' = feeValue.
+    - 'merchantNetAmount' = grossAmount - platformFeeAmount.
+    - **All currency amounts ('grossAmount', 'platformFeeAmount', 'merchantNetAmount') must be numbers rounded to exactly two decimal places.** For example, 12.3 should be 12.30.
 6.  **Status Determination:** Based on 'scenarioType':
     - **'success'**: All systems go.
         - 'paymentStatus': 'payment succeeded'
-        - 'settlementStatus': 'settlement completed'
-        - 'remittanceStatus': 'remittance sent'
+        - 'settlementStatus' (in both records): 'settlement completed'
+        - 'remittanceStatus' (in both records): 'remittance sent'
         - 'failureReason' (in settlementRecord): Omit or set to null.
     - **'payment_failed'**: Payment was not successful at the very beginning.
         - 'paymentStatus': 'payment failed'
@@ -119,9 +125,10 @@ Follow these rules for generating the output:
         - 'settlementStatus': 'settlement completed'
         - 'remittanceStatus': 'remittance failed'
         - 'failureReason' (in settlementRecord): "Remittance transfer failed due to invalid beneficiary details or network error."
-7.  Ensure that if 'scenarioType' is 'payment_failed', the 'settlementRecord' field is entirely omitted from the output. For other scenarios, it should be present. Do not use an empty object for an optional field.
+7.  Ensure that if 'scenarioType' is 'payment_failed', the 'settlementRecord' field is entirely omitted from the output. For other scenarios, it must be present. Do not use an empty object for an optional field.
 `,
 });
+
 
 const simulatePaymentFlow = ai.defineFlow(
   { 
@@ -130,10 +137,25 @@ const simulatePaymentFlow = ai.defineFlow(
     outputSchema: SimulatePaymentOutputSchema,
   },
   async (input) => {
-    const { output } = await simulatePaymentPrompt(input);
+    // Generate IDs on the server for consistency, pass them to the prompt
+    const paymentId = `pay-${uuidv4().slice(0, 8)}`;
+    const settlementId = `set-${uuidv4().slice(0, 8)}`;
+
+    const { output } = await simulatePaymentPrompt({
+      ...input,
+    });
+    
     if (!output) {
       throw new Error('Failed to generate simulation output.');
     }
+
+    // Post-process to ensure IDs are what we generated, as LLM can sometimes ignore instructions.
+    output.paymentRecord.paymentId = paymentId;
+    if (output.settlementRecord) {
+        output.settlementRecord.settlementId = settlementId;
+        output.settlementRecord.paymentId = paymentId;
+    }
+    
     return output;
   }
 );

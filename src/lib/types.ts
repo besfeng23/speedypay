@@ -60,6 +60,8 @@ export type AuditLog = {
   eventType: string;
   user: string;
   details: string;
+  entityId: string | null;
+  amount: number | null;
 };
 
 export type FeeConfig = {
