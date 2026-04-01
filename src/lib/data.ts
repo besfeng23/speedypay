@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 const now = new Date();
 
-export const merchants: Merchant[] = [
+export let merchants: Merchant[] = [
   {
     id: 'mer-1',
     businessName: 'Starlight Apartments',
@@ -102,7 +102,7 @@ export const merchants: Merchant[] = [
   },
 ];
 
-export const payments: Payment[] = [
+export let payments: Payment[] = [
   {
     id: 'pay-1',
     externalReference: 'ch_3Pq...V54',
@@ -205,9 +205,9 @@ export const payments: Payment[] = [
   },
 ];
 
-export const settlements: Settlement[] = [
+export let settlements: Settlement[] = [
   {
-    id: 'set-' + uuidv4().slice(0,8),
+    id: 'set-a1b2c3d4',
     paymentId: 'pay-1',
     merchantId: 'mer-1',
     grossAmount: 1250.00,
@@ -221,7 +221,7 @@ export const settlements: Settlement[] = [
     updatedAt: formatISO(subHours(now, 20)),
   },
   {
-    id: 'set-' + uuidv4().slice(0,8),
+    id: 'set-b2c3d4e5',
     paymentId: 'pay-2',
     merchantId: 'mer-2',
     grossAmount: 800.00,
@@ -235,7 +235,7 @@ export const settlements: Settlement[] = [
     updatedAt: formatISO(subHours(now, 4)),
   },
   {
-    id: 'set-' + uuidv4().slice(0,8),
+    id: 'set-c3d4e5f6',
     paymentId: 'pay-5',
     merchantId: 'mer-3',
     grossAmount: 1500.00,
@@ -249,7 +249,7 @@ export const settlements: Settlement[] = [
     updatedAt: formatISO(subDays(now, 7)),
   },
   {
-    id: 'set-' + uuidv4().slice(0,8),
+    id: 'set-d4e5f6g7',
     paymentId: 'pay-4',
     merchantId: 'mer-4',
     grossAmount: 49.99,
@@ -264,7 +264,7 @@ export const settlements: Settlement[] = [
   },
 ];
 
-export const auditLogs: AuditLog[] = [
+export let auditLogs: AuditLog[] = [
     {
         id: 'log-1',
         timestamp: formatISO(subMinutes(now, 15)),
@@ -286,7 +286,7 @@ export const auditLogs: AuditLog[] = [
     {
         id: 'log-3',
         timestamp: formatISO(subHours(now, 22)),
-        eventType: 'payment.status.change',
+        eventType: 'payment.status.succeeded',
         user: 'System',
         details: 'Payment status changed to succeeded.',
         entityId: 'pay-1',
@@ -304,7 +304,7 @@ export const auditLogs: AuditLog[] = [
     {
         id: 'log-5',
         timestamp: formatISO(subHours(now, 20)),
-        eventType: 'settlement.status.change',
+        eventType: 'settlement.status.completed',
         user: 'System',
         details: 'Settlement status changed to completed, remittance sent.',
         entityId: settlements.find(s => s.paymentId === 'pay-1')?.id || '',
@@ -322,7 +322,7 @@ export const auditLogs: AuditLog[] = [
      {
         id: 'log-7',
         timestamp: formatISO(subDays(now, 7)),
-        eventType: 'merchant.status.change',
+        eventType: 'merchant.status.suspended',
         user: 'System (Automated Risk)',
         details: 'Merchant suspended due to high chargeback rate.',
         entityId: 'mer-3',
@@ -331,7 +331,7 @@ export const auditLogs: AuditLog[] = [
      {
         id: 'log-8',
         timestamp: formatISO(subDays(now, 8)),
-        eventType: 'settlement.failed',
+        eventType: 'settlement.status.failed',
         user: 'System',
         details: 'Settlement failed. Reason: Merchant\'s account is suspended.',
         entityId: 'pay-5',
@@ -339,18 +339,19 @@ export const auditLogs: AuditLog[] = [
     }
 ];
 
+// --- Data Fetching Functions (Client-side) ---
+
 export const getDashboardStats = async (): Promise<DashboardStats> => {
   return {
     totalGrossVolume: 352649.99,
     totalPlatformFees: 12317.85,
     totalMerchantNetRemittances: 340332.14,
-    pendingSettlements: 1,
-    failedSettlements: 1,
-    activeMerchants: 3,
+    pendingSettlements: settlements.filter(s => s.settlementStatus === 'processing' || s.settlementStatus === 'pending').length,
+    failedSettlements: settlements.filter(s => s.settlementStatus === 'failed').length,
+    activeMerchants: merchants.filter(m => m.status === 'Active').length,
   }
 }
 
-// Mock API functions
 export const getMerchants = async (): Promise<Merchant[]> => {
   return new Promise(resolve => setTimeout(() => resolve(merchants), 300));
 }
@@ -411,7 +412,71 @@ export const getAuditLogs = async (): Promise<AuditLog[]> => {
 }
 
 export const getAuditLogsByEntity = async (entityId: string): Promise<AuditLog[]> => {
-    const entityLogs = auditLogs.filter(log => log.entityId === entityId || (log.entityId && settlements.some(s => s.id === log.entityId && s.paymentId === entityId)))
+    const relatedSettlement = settlements.find(s => s.paymentId === entityId);
+    const entityLogs = auditLogs.filter(log => log.entityId === entityId || (relatedSettlement && log.entityId === relatedSettlement.id))
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     return new Promise(resolve => setTimeout(() => resolve(entityLogs), 200));
+}
+
+
+// --- Data Mutation Functions (Server-side) ---
+// These functions simulate interactions that would happen on the server,
+// typically triggered by API calls or webhooks.
+
+export async function addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>): Promise<AuditLog> {
+    console.log('[Audit Log]', log.details);
+    const newLog: AuditLog = {
+        ...log,
+        id: `log-${uuidv4()}`,
+        timestamp: formatISO(new Date()),
+    };
+    auditLogs.unshift(newLog);
+    return newLog;
+}
+
+export async function updatePaymentStatus(
+    paymentId: string,
+    status: Payment['paymentStatus'],
+    settlementStatus?: Payment['settlementStatus']
+): Promise<Payment | null> {
+    const paymentIndex = payments.findIndex(p => p.id === paymentId);
+    if (paymentIndex > -1) {
+        payments[paymentIndex].paymentStatus = status;
+        if (settlementStatus) {
+            payments[paymentIndex].settlementStatus = settlementStatus;
+        }
+        payments[paymentIndex].updatedAt = formatISO(new Date());
+        console.log(`[Data Update] Payment ${paymentId} status updated to ${status}`);
+        return payments[paymentIndex];
+    }
+    return null;
+}
+
+export async function updateSettlementAndRemittanceStatus(
+    settlementId: string,
+    settlementStatus: Settlement['settlementStatus'],
+    remittanceStatus: Settlement['remittanceStatus'],
+    failureReason?: string | null
+): Promise<Settlement | null> {
+    const settlementIndex = settlements.findIndex(s => s.id === settlementId);
+    if (settlementIndex > -1) {
+        settlements[settlementIndex].settlementStatus = settlementStatus;
+        settlements[settlementIndex].remittanceStatus = remittanceStatus;
+        if (failureReason !== undefined) {
+             settlements[settlementIndex].failureReason = failureReason;
+        }
+        settlements[settlementIndex].updatedAt = formatISO(new Date());
+
+        // Also update the parent payment record
+        const payment = payments.find(p => p.id === settlements[settlementIndex].paymentId);
+        if (payment) {
+            payment.settlementStatus = settlementStatus;
+            payment.remittanceStatus = remittanceStatus;
+            payment.updatedAt = formatISO(new Date());
+        }
+
+        console.log(`[Data Update] Settlement ${settlementId} status updated to ${settlementStatus}`);
+        return settlements[settlementIndex];
+    }
+    return null;
 }

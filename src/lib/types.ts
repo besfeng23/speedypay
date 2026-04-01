@@ -47,7 +47,7 @@ export type Settlement = {
   platformFeeAmount: number;
   merchantNetAmount: number;
   settlementStatus: 'pending' | 'processing' | 'completed' | 'failed';
-  remittanceStatus: 'pending' | 'sent' | 'failed';
+  remittanceStatus: 'pending' | 'sent' | 'failed' | 'N/A';
   payoutReference: string;
   failureReason: string | null;
   createdAt: string;
@@ -61,7 +61,7 @@ export type AuditLog = {
   user: string;
   details: string;
   entityId: string | null;
-  amount: number | null;
+  amount?: number | null;
 };
 
 export type FeeConfig = {
