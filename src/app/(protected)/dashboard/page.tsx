@@ -22,13 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-} from "@/components/ui/chart";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/status-badge";
@@ -37,10 +30,10 @@ import {
   getRecentPayments,
   getRecentSettlements,
 } from "@/lib/data";
-import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 import type { ChartConfig } from "@/components/ui/chart";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { DashboardChart } from "@/components/dashboard-chart";
 
 const chartData = [
   { month: "January", volume: 18600, fees: 800 },
@@ -113,25 +106,7 @@ export default async function Dashboard() {
             <CardTitle>Overview</CardTitle>
           </CardHeader>
           <CardContent className="pl-2">
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <BarChart accessibilityLayer data={chartData}>
-                <CartesianGrid vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  tickLine={false}
-                  tickMargin={10}
-                  axisLine={false}
-                  tickFormatter={(value) => value.slice(0, 3)}
-                />
-                <ChartTooltip
-                  cursor={false}
-                  content={<ChartTooltipContent indicator="dot" />}
-                />
-                <ChartLegend content={<ChartLegendContent />} />
-                <Bar dataKey="volume" fill="var(--color-volume)" radius={4} />
-                <Bar dataKey="fees" fill="var(--color-fees)" radius={4} />
-              </BarChart>
-            </ChartContainer>
+            <DashboardChart data={chartData} config={chartConfig} />
           </CardContent>
         </Card>
         <Card className="lg:col-span-3">
