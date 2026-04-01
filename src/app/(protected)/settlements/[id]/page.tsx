@@ -92,6 +92,7 @@ export default async function SettlementDetailPage({
             <Card>
                 <CardHeader>
                     <CardTitle>Core Information</CardTitle>
+                    <CardDescription>Key identifiers and associations for this settlement.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <dl className="divide-y">
@@ -107,6 +108,7 @@ export default async function SettlementDetailPage({
             <Card>
                 <CardHeader>
                     <CardTitle>Financials</CardTitle>
+                    <CardDescription>The breakdown of funds for this settlement instruction.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <dl className="divide-y">
@@ -120,6 +122,7 @@ export default async function SettlementDetailPage({
             <Card>
                 <CardHeader>
                     <CardTitle>Event History</CardTitle>
+                    <CardDescription>The chronological log of events related to this settlement.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <EventTimeline events={events} />
@@ -130,6 +133,7 @@ export default async function SettlementDetailPage({
             <Card>
                 <CardHeader>
                     <CardTitle>Statuses</CardTitle>
+                    <CardDescription>Current state of the settlement and remittance process.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <DetailItem label="Settlement Status" value={<StatusBadge status={settlement.settlementStatus} />} />
