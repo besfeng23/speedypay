@@ -1,8 +1,6 @@
 "use client";
 
-import { useAuth } from "@/lib/firebase/hooks";
-import { useRouter } from "next/navigation";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { UserNav } from "@/components/user-nav";
 import { Button } from "@/components/ui/button";
@@ -21,41 +19,13 @@ import {
 import { Icons } from "@/components/icons";
 import Link from "next/link";
 import { DemoPaymentSimulator } from "@/components/demo-payment-simulator";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const auth = useAuth();
-  const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
-
-  useEffect(() => {
-    if (!auth.loading && !auth.user) {
-      router.replace("/login");
-    }
-  }, [auth.loading, auth.user, router]);
-
-  if (auth.loading || !auth.user) {
-    return (
-      <div className="flex min-h-screen w-full">
-        <div className="hidden md:block w-64 border-r p-4 space-y-4">
-            <Skeleton className="h-8 w-32" />
-            <div className="space-y-2">
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full" />
-            </div>
-        </div>
-        <div className="flex-1 p-8">
-            <Skeleton className="h-10 w-1/3 mb-8"/>
-            <Skeleton className="h-64 w-full" />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen w-full">

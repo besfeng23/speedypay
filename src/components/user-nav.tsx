@@ -16,11 +16,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/firebase/hooks";
-import { CreditCard, LogOut, User as UserIcon } from "lucide-react";
+import { CreditCard, User as UserIcon } from "lucide-react";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 
 export function UserNav() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const userAvatar = PlaceHolderImages.find(p => p.id === 'user-avatar-1');
 
   if (!user) {
@@ -73,11 +73,6 @@ export function UserNav() {
             <span>Billing</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={logout}>
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Log out</span>
-        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

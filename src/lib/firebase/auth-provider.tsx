@@ -1,9 +1,8 @@
 "use client";
 
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, type User } from 'firebase/auth';
-import { firebaseConfig } from './config';
+import React, { createContext, useContext } from 'react';
+import type { FirebaseApp } from 'firebase/app';
+import type { User } from 'firebase/auth';
 
 interface AuthContextType {
   app: FirebaseApp | null;
@@ -11,32 +10,42 @@ interface AuthContextType {
   loading: boolean;
 }
 
+// A mock user for when authentication is disabled.
+const mockUser: User = {
+  uid: 'mock-user-id',
+  email: 'admin@speedypay.com',
+  displayName: 'Admin User',
+  photoURL: 'https://picsum.photos/seed/user1/100/100',
+  emailVerified: true,
+  isAnonymous: false,
+  metadata: {},
+  providerData: [],
+  providerId: 'password',
+  tenantId: null,
+  delete: async () => {},
+  getIdToken: async () => 'mock-token',
+  getIdTokenResult: async () => ({ token: 'mock-token', claims: {}, authTime: '', expirationTime: '', issuedAtTime: '', signInProvider: null, signInSecondFactor: null }),
+  reload: async () => {},
+  toJSON: () => ({}),
+};
+
+
 const AuthContext = createContext<AuthContextType>({
   app: null,
-  user: null,
-  loading: true,
+  user: mockUser,
+  loading: false,
 });
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [app, setApp] = useState<FirebaseApp | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-    setApp(app);
-    const auth = getAuth(app);
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const value = {
+    app: null,
+    user: mockUser,
+    loading: false
+  }
 
   return (
-    <AuthContext.Provider value={{ app, user, loading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
