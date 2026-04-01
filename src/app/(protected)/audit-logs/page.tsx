@@ -42,7 +42,7 @@ export default async function AuditLogsPage() {
                     </TableHeader>
                     <TableBody>
                         {logs.map((log) => (
-                            <TableRow key={log.id}>
+                            <TableRow key={log.id} className="even:bg-muted/30">
                                 <TableCell className="whitespace-nowrap">
                                     <div className="font-medium">{format(new Date(log.timestamp), 'MMM d, yyyy, h:mm:ss a')}</div>
                                 </TableCell>

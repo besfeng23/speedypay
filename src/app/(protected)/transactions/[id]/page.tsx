@@ -98,6 +98,7 @@ export default async function TransactionDetailPage({
             <Card>
                 <CardHeader>
                     <CardTitle>Payment Summary</CardTitle>
+                    <CardDescription>Core details and references for this payment.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <dl className="divide-y">
@@ -116,6 +117,7 @@ export default async function TransactionDetailPage({
             <Card>
                 <CardHeader>
                     <CardTitle>Event History</CardTitle>
+                    <CardDescription>The chronological log of events related to this transaction.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <EventTimeline events={events} />
@@ -127,6 +129,7 @@ export default async function TransactionDetailPage({
             <Card>
                 <CardHeader>
                     <CardTitle>Status Timeline</CardTitle>
+                    <CardDescription>The end-to-end lifecycle of the funds.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex items-center gap-4">

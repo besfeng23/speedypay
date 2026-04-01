@@ -120,6 +120,7 @@ export default async function MerchantDetailPage({
           <Card>
             <CardHeader>
               <CardTitle>Business Information</CardTitle>
+              <CardDescription>Primary contact and legal entity details.</CardDescription>
             </CardHeader>
             <CardContent>
               <dl className="divide-y">
@@ -136,6 +137,7 @@ export default async function MerchantDetailPage({
           <Card>
             <CardHeader>
               <CardTitle>Settlement & Fees</CardTitle>
+              <CardDescription>Configuration for payouts and platform fee structure.</CardDescription>
             </CardHeader>
             <CardContent>
               <dl className="divide-y">
