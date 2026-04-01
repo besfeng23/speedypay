@@ -2,7 +2,7 @@
 // IMPORTANT: Replace the placeholder values with your actual Firebase project configuration.
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  apiKey: "AIzaSyD13IRHtCFRsi1VpnpPX4uvVkHaN6DoT3w",
   authDomain: "your-project-id.firebaseapp.com",
   projectId: "your-project-id",
   storageBucket: "your-project-id.appspot.com",
