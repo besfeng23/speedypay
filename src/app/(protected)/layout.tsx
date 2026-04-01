@@ -16,12 +16,13 @@ import {
   Banknote,
   FileClock,
   Settings,
+  AlertTriangle,
 } from "lucide-react";
 import { Icons } from "@/components/icons";
 import Link from "next/link";
 import { DemoPaymentSimulator } from "@/components/demo-payment-simulator";
 import { useAuth } from "@/lib/firebase/hooks";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 
 export default function ProtectedLayout({
   children,
@@ -41,7 +42,7 @@ export default function ProtectedLayout({
 
   if (loading || !user) {
     return (
-      <div className="flex items-center justify-center h-screen">
+      <div className="flex items-center justify-center h-screen bg-background">
         <div className="flex flex-col items-center gap-4">
             <Icons.logo className="h-8 w-8 animate-spin text-primary" />
             <p className="text-muted-foreground">Loading application...</p>
@@ -49,6 +50,8 @@ export default function ProtectedLayout({
       </div>
     );
   }
+
+  const isDemoMode = user?.uid === 'mock-user-id';
 
   return (
     <div className="min-h-screen w-full">
@@ -159,6 +162,12 @@ export default function ProtectedLayout({
             <div className="ml-auto flex-1 sm:flex-initial">
               {/* Future search bar */}
             </div>
+             {isDemoMode && (
+                <Badge variant="outline" className="hidden sm:flex items-center gap-2 border-orange-500/50 text-orange-600 bg-orange-500/10">
+                    <AlertTriangle className="h-3 w-3" />
+                    Demo Mode
+                </Badge>
+             )}
             <DemoPaymentSimulator />
             <UserNav />
           </div>

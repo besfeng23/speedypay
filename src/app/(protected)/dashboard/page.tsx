@@ -1,5 +1,4 @@
 import { DollarSign, Users, Activity, Banknote } from "lucide-react";
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
@@ -64,25 +63,25 @@ export default async function Dashboard() {
             title="Total Gross Volume"
             value={formatCurrency(stats.totalGrossVolume)}
             icon={<DollarSign />}
-            description="+20.1% from last month"
+            description="Total value of all payments processed."
           />
           <StatCard
             title="Platform Fees Earned"
             value={formatCurrency(stats.totalPlatformFees)}
             icon={<Activity />}
-            description="+18.3% from last month"
+            description="Your total revenue from transaction fees."
           />
           <StatCard
             title="Merchant Net Remittances"
             value={formatCurrency(stats.totalMerchantNetRemittances)}
             icon={<Banknote />}
-            description="Total amount paid out to merchants"
+            description="Total net amount paid out to merchants."
           />
           <StatCard
             title="Active Merchants"
-            value={`+${stats.activeMerchants}`}
+            value={`${stats.activeMerchants}`}
             icon={<Users />}
-            description="+5 since last month"
+            description="Merchants actively transacting on the platform."
           />
         </div>
 
@@ -91,6 +90,7 @@ export default async function Dashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>Financial Overview</CardTitle>
+                <CardDescription>Monthly gross volume and platform fees.</CardDescription>
               </CardHeader>
               <CardContent className="pl-2">
                 <DashboardChart data={chartData} config={chartConfig} />

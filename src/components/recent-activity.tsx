@@ -1,9 +1,10 @@
-import { getRecentPayments, getRecentSettlements } from "@/lib/data";
+import { getRecentPayments, getRecentSettlements, getMerchants } from "@/lib/data";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./ui/card";
 import { ArrowRightLeft, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { StatusBadge } from "./status-badge";
+import type { Merchant } from "@/lib/types";
 
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -13,8 +14,11 @@ const formatCurrency = (amount: number) => {
 };
 
 export async function RecentActivity() {
-    const recentPayments = await getRecentPayments(4);
-    const recentSettlements = await getRecentSettlements(4);
+    const recentPayments = await getRecentPayments(5);
+    const recentSettlements = await getRecentSettlements(5);
+    const merchants: Merchant[] = await getMerchants();
+    const merchantMap = new Map(merchants.map(m => [m.id, m.displayName]));
+
 
     const combinedActivity = [
         ...recentPayments.map(p => ({...p, type: 'payment' as const})),
@@ -30,7 +34,7 @@ export async function RecentActivity() {
             <CardContent>
                 {combinedActivity.length > 0 ? (
                     <div className="space-y-6">
-                        {combinedActivity.slice(0, 7).map(item => (
+                        {combinedActivity.slice(0, 8).map(item => (
                             <div key={`${item.type}-${item.id}`} className="flex items-center gap-4">
                                 <div className="p-2 bg-secondary rounded-full">
                                     {item.type === 'payment' ? <CreditCard className="h-4 w-4 text-muted-foreground" /> : <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />}
@@ -42,13 +46,13 @@ export async function RecentActivity() {
                                             <p className="text-xs text-muted-foreground">
                                                 <Link href={`/transactions/${item.id}`} className="hover:underline">{formatCurrency(item.grossAmount)}</Link>
                                                 <span className="mx-1">•</span>
-                                                <StatusBadge status={item.paymentStatus} />
+                                                <span>For {merchantMap.get(item.merchantId) || 'Unknown'}</span>
                                             </p>
                                         </>
                                     )}
                                     {item.type === 'settlement' && (
                                         <>
-                                            <p>Settlement to <span className="font-medium">{item.merchantId}</span></p>
+                                            <p>Settlement for <span className="font-medium">{merchantMap.get(item.merchantId) || 'Unknown'}</span></p>
                                             <p className="text-xs text-muted-foreground">
                                                 <Link href={`/settlements/${item.id}`} className="hover:underline">{formatCurrency(item.merchantNetAmount)}</Link>
                                                 <span className="mx-1">•</span>
@@ -57,7 +61,7 @@ export async function RecentActivity() {
                                         </>
                                     )}
                                 </div>
-                                <div className="text-xs text-muted-foreground text-right">
+                                <div className="text-xs text-muted-foreground text-right shrink-0">
                                     {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
                                 </div>
                             </div>
