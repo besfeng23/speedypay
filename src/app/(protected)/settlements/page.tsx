@@ -14,7 +14,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import type { Settlement, Merchant } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/empty-state";
+import { Banknote } from "lucide-react";
 
 export default async function SettlementsPage() {
   const settlements: Settlement[] = await getSettlements();
@@ -40,43 +41,51 @@ export default async function SettlementsPage() {
             <CardDescription>A list of all fund settlement instructions and their statuses.</CardDescription>
         </CardHeader>
         <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Settlement ID</TableHead>
-                        <TableHead>Merchant</TableHead>
-                        <TableHead className="text-right">Net Amount</TableHead>
-                        <TableHead>Settlement Status</TableHead>
-                        <TableHead>Remittance Status</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead><span className="sr-only">Actions</span></TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {settlements.map((settlement) => (
-                        <TableRow key={settlement.id}>
-                            <TableCell className="font-mono text-sm">
-                                <Link href={`/settlements/${settlement.id}`} className="hover:underline">
-                                    {settlement.id}
-                                </Link>
-                                <div className="text-xs text-muted-foreground font-sans">
-                                    Payment: <Link href={`/transactions/${settlement.paymentId}`} className="hover:underline font-medium text-primary">{settlement.paymentId}</Link>
-                                </div>
-                            </TableCell>
-                            <TableCell>{merchantMap.get(settlement.merchantId) || 'Unknown'}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(settlement.merchantNetAmount)}</TableCell>
-                            <TableCell><StatusBadge status={settlement.settlementStatus} /></TableCell>
-                            <TableCell><StatusBadge status={settlement.remittanceStatus} /></TableCell>
-                            <TableCell>{format(new Date(settlement.createdAt), 'MMM d, yyyy')}</TableCell>
-                            <TableCell className="text-right">
-                                <Link href={`/settlements/${settlement.id}`}>
-                                    <Button variant="outline" size="sm">Details</Button>
-                                </Link>
-                            </TableCell>
+           {settlements.length > 0 ? (
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Settlement ID</TableHead>
+                            <TableHead>Merchant</TableHead>
+                            <TableHead className="text-right">Net Amount</TableHead>
+                            <TableHead>Settlement Status</TableHead>
+                            <TableHead>Remittance Status</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead><span className="sr-only">Actions</span></TableHead>
                         </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+                    </TableHeader>
+                    <TableBody>
+                        {settlements.map((settlement) => (
+                            <TableRow key={settlement.id} className="even:bg-muted/30">
+                                <TableCell className="font-mono text-sm">
+                                    <Link href={`/settlements/${settlement.id}`} className="hover:underline">
+                                        {settlement.id}
+                                    </Link>
+                                    <div className="text-xs text-muted-foreground font-sans">
+                                        Payment: <Link href={`/transactions/${settlement.paymentId}`} className="hover:underline font-medium text-primary">{settlement.paymentId}</Link>
+                                    </div>
+                                </TableCell>
+                                <TableCell>{merchantMap.get(settlement.merchantId) || 'Unknown'}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(settlement.merchantNetAmount)}</TableCell>
+                                <TableCell><StatusBadge status={settlement.settlementStatus} /></TableCell>
+                                <TableCell><StatusBadge status={settlement.remittanceStatus} /></TableCell>
+                                <TableCell>{format(new Date(settlement.createdAt), 'MMM d, yyyy')}</TableCell>
+                                <TableCell className="text-right">
+                                    <Link href={`/settlements/${settlement.id}`}>
+                                        <Button variant="outline" size="sm">Details</Button>
+                                    </Link>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            ) : (
+                 <EmptyState
+                    icon={<Banknote />}
+                    title="No Settlements"
+                    description="No settlement records have been created yet."
+                />
+            )}
         </CardContent>
       </Card>
     </>

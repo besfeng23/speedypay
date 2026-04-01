@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -27,33 +26,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { getMerchantOnboardingSuggestions } from "@/ai/flows/merchant-onboarding-suggestions";
-import { Bot, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { Bot, Loader2, Sparkles } from "lucide-react";
+import { useState, useTransition } from "react";
+import { MerchantSchema, type MerchantFormValues } from "@/lib/schemas";
+import { createMerchant } from "@/lib/actions";
 
-const formSchema = z.object({
-  businessName: z.string().min(2, "Business name is too short"),
-  displayName: z.string().min(2, "Display name is too short"),
-  contactName: z.string().min(2, "Contact name is too short"),
-  email: z.string().email(),
-  mobile: z.string(),
-  settlementAccountName: z.string(),
-  settlementAccountNumberOrWalletId: z.string(),
-  settlementChannel: z.enum(["Bank Account", "Digital Wallet"]),
-  onboardingStatus: z.enum(["Completed", "Pending", "In Review", "Rejected"]),
-  defaultFeeType: z.enum(["percentage", "fixed"]),
-  defaultFeeValue: z.coerce.number().positive(),
-  notes: z.string().optional(),
-});
-
-type FormValues = z.infer<typeof formSchema>;
 
 export default function NewMerchantPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [isPending, startTransition] = useTransition();
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<MerchantFormValues>({
+    resolver: zodResolver(MerchantSchema),
     defaultValues: {
       businessName: "",
       displayName: "",
@@ -66,6 +52,7 @@ export default function NewMerchantPage() {
       onboardingStatus: "Pending",
       defaultFeeType: "percentage",
       defaultFeeValue: 2.9,
+      notes: "",
     },
   });
 
@@ -91,13 +78,23 @@ export default function NewMerchantPage() {
   }
 
 
-  function onSubmit(values: FormValues) {
-    console.log(values);
-    toast({
-      title: "Merchant Created",
-      description: `${values.businessName} has been added successfully.`,
+  function onSubmit(values: MerchantFormValues) {
+    startTransition(async () => {
+        const result = await createMerchant(values);
+        if (result.success) {
+            toast({
+              title: "Merchant Created",
+              description: `${values.businessName} has been added successfully.`,
+            });
+            router.push("/merchants");
+        } else {
+            toast({
+              variant: "destructive",
+              title: "Error Creating Merchant",
+              description: result.message || "An unknown error occurred.",
+            });
+        }
     });
-    router.push("/merchants");
   }
 
   return (
@@ -135,7 +132,7 @@ export default function NewMerchantPage() {
                     <FormField control={form.control} name="settlementAccountNumberOrWalletId" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>Account Number / Wallet ID</FormLabel> <FormControl> <Input placeholder="Enter account details" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
 
                     <FormField control={form.control} name="defaultFeeType" render={({ field }) => ( <FormItem> <FormLabel>Default Fee Type</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a fee type"/> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="percentage">Percentage</SelectItem> <SelectItem value="fixed">Fixed</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )}/>
-                    <FormField control={form.control} name="defaultFeeValue" render={({ field }) => ( <FormItem> <FormLabel>Default Fee Value</FormLabel> <FormControl> <Input type="number" step="0.1" placeholder="e.g., 2.9" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="defaultFeeValue" render={({ field }) => ( <FormItem> <FormLabel>Default Fee Value</FormLabel> <FormControl> <Input type="number" step="0.01" placeholder="e.g., 2.9" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                 </CardContent>
               </Card>
             </div>
@@ -147,9 +144,9 @@ export default function NewMerchantPage() {
                         <CardDescription>Get AI-powered suggestions for fee structures and KYC requirements.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <Button type="button" variant="outline" className="w-full" onClick={handleGetSuggestion} disabled={isSuggesting}>
-                           {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Bot className="mr-2 h-4 w-4"/>}
-                            {isSuggesting ? 'Analyzing...' : 'Get Suggestions'}
+                        <Button type="button" variant="outline" className="w-full" onClick={handleGetSuggestion} disabled={isSuggesting || isPending}>
+                           {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4 text-primary"/>}
+                            {isSuggesting ? 'Analyzing...' : 'Get AI Suggestions'}
                         </Button>
                     </CardContent>
                 </Card>
@@ -165,8 +162,11 @@ export default function NewMerchantPage() {
             </div>
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" type="button" onClick={() => router.back()}>Cancel</Button>
-            <Button type="submit">Create Merchant</Button>
+            <Button variant="outline" type="button" onClick={() => router.back()} disabled={isPending}>Cancel</Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isPending ? "Creating..." : "Create Merchant"}
+            </Button>
           </div>
         </form>
       </Form>

@@ -1,3 +1,5 @@
+"use client";
+
 import { PageHeader } from "@/components/page-header";
 import {
   Card,
@@ -17,9 +19,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { speedypayConfig, isSpeedyPayConfigured } from "@/lib/speedypay/config";
-import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle, AlertTriangle, Terminal } from "lucide-react";
-
+import { SystemReadiness } from "@/components/system-readiness";
+import { useAuth } from "@/lib/firebase/hooks";
 
 function IntegrationStatus() {
   const isConfigured = isSpeedyPayConfigured();
@@ -115,6 +117,9 @@ function ProviderConfig() {
 }
 
 export default function SettingsPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.claims?.role === 'admin';
+
   return (
     <>
       <PageHeader
@@ -129,6 +134,7 @@ export default function SettingsPage() {
           <TabsTrigger value="fees">Fee Configs</TabsTrigger>
           <TabsTrigger value="api">Platform API</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          {isAdmin && <TabsTrigger value="system">System</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
@@ -198,6 +204,11 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        {isAdmin && (
+            <TabsContent value="system" className="space-y-4">
+                <SystemReadiness />
+            </TabsContent>
+        )}
       </Tabs>
     </>
   );

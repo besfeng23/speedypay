@@ -14,6 +14,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import type { Payment, Merchant } from "@/lib/types";
+import { EmptyState } from "@/components/empty-state";
+import { ArrowRightLeft } from "lucide-react";
 
 export default async function TransactionsPage() {
   const payments: Payment[] = await getPayments();
@@ -39,41 +41,49 @@ export default async function TransactionsPage() {
             <CardDescription>A complete log of all payments processed through the system.</CardDescription>
         </CardHeader>
         <CardContent>
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Merchant</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead>Payment Status</TableHead>
-                        <TableHead>Settlement Status</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead><span className="sr-only">Actions</span></TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {payments.map((payment) => (
-                        <TableRow key={payment.id}>
-                            <TableCell className="font-medium">
-                                <Link href={`/transactions/${payment.id}`} className="hover:underline">
-                                    {payment.customerName}
-                                </Link>
-                                <div className="text-sm text-muted-foreground">{payment.bookingReferenceOrInvoiceReference}</div>
-                            </TableCell>
-                            <TableCell>{merchantMap.get(payment.merchantId) || 'Unknown'}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(payment.grossAmount)}</TableCell>
-                            <TableCell><StatusBadge status={payment.paymentStatus} /></TableCell>
-                            <TableCell><StatusBadge status={payment.settlementStatus} /></TableCell>
-                            <TableCell>{format(new Date(payment.createdAt), 'MMM d, yyyy')}</TableCell>
-                            <TableCell className="text-right">
-                                <Link href={`/transactions/${payment.id}`}>
-                                    <Button variant="outline" size="sm">Details</Button>
-                                </Link>
-                            </TableCell>
+            {payments.length > 0 ? (
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Merchant</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead>Payment Status</TableHead>
+                            <TableHead>Settlement Status</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead><span className="sr-only">Actions</span></TableHead>
                         </TableRow>
-                    ))}
-                </TableBody>
-            </Table>
+                    </TableHeader>
+                    <TableBody>
+                        {payments.map((payment) => (
+                            <TableRow key={payment.id} className="even:bg-muted/30">
+                                <TableCell className="font-medium">
+                                    <Link href={`/transactions/${payment.id}`} className="hover:underline">
+                                        {payment.customerName}
+                                    </Link>
+                                    <div className="text-sm text-muted-foreground">{payment.bookingReferenceOrInvoiceReference}</div>
+                                </TableCell>
+                                <TableCell>{merchantMap.get(payment.merchantId) || 'Unknown'}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(payment.grossAmount)}</TableCell>
+                                <TableCell><StatusBadge status={payment.paymentStatus} /></TableCell>
+                                <TableCell><StatusBadge status={payment.settlementStatus} /></TableCell>
+                                <TableCell>{format(new Date(payment.createdAt), 'MMM d, yyyy')}</TableCell>
+                                <TableCell className="text-right">
+                                    <Link href={`/transactions/${payment.id}`}>
+                                        <Button variant="outline" size="sm">Details</Button>
+                                    </Link>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            ) : (
+                <EmptyState
+                    icon={<ArrowRightLeft />}
+                    title="No Transactions"
+                    description="No payments have been processed yet."
+                />
+            )}
         </CardContent>
       </Card>
     </>

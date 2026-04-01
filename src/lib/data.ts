@@ -353,7 +353,8 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
 }
 
 export const getMerchants = async (): Promise<Merchant[]> => {
-  return new Promise(resolve => setTimeout(() => resolve(merchants), 300));
+  const sorted = [...merchants].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return new Promise(resolve => setTimeout(() => resolve(sorted), 300));
 }
 
 export const getMerchantById = async (id: string): Promise<Merchant | undefined> => {

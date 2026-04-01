@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { UserNav } from "@/components/user-nav";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,8 @@ import {
 import { Icons } from "@/components/icons";
 import Link from "next/link";
 import { DemoPaymentSimulator } from "@/components/demo-payment-simulator";
+import { useAuth } from "@/lib/firebase/hooks";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ProtectedLayout({
   children,
@@ -26,6 +29,26 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push(`/login?redirect=${pathname}`);
+    }
+  }, [user, loading, router, pathname]);
+
+  if (loading || !user) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="flex flex-col items-center gap-4">
+            <Icons.logo className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-muted-foreground">Loading application...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full">
