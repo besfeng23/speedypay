@@ -400,7 +400,7 @@ export const getAuditLogs = async (): Promise<AuditLog[]> => {
   return new Promise(resolve => setTimeout(() => resolve(sorted), 300));
 }
 
-export const getAuditLogsByEntity = async (entityType: string, entityId: string): Promise<AuditLog[]> => {
+export const getAuditLogsByEntity = async (entityType: 'payment' | 'settlement', entityId: string): Promise<AuditLog[]> => {
     // This is a simple implementation. In a real app, you'd query a database.
     // We are combining logs where the entity is the direct subject, or is related (e.g. payment logs on a settlement page)
     let relatedIds: string[] = [entityId];

@@ -37,9 +37,9 @@ const PaymentRecordSchema = z.object({
   feeValue: z.number().describe('Value of the fee.'),
   platformFeeAmount: z.number().describe('Amount deducted as platform fee.'),
   merchantNetAmount: z.number().describe('Net amount remitted to the merchant.'),
-  paymentStatus: z.enum(['payment pending', 'payment succeeded', 'payment failed']).describe('Current status of the payment.'),
-  settlementStatus: z.enum(['settlement pending', 'settlement processing', 'settlement completed', 'settlement failed', 'N/A']).describe('Current status of settlement. Use N/A if not applicable.'),
-  remittanceStatus: z.enum(['remittance pending', 'remittance sent', 'remittance failed', 'N/A']).describe('Current status of remittance. Use N/A if not applicable.'),
+  paymentStatus: z.enum(['pending', 'succeeded', 'failed', 'expired', 'processing']).describe('Current status of the payment.'),
+  settlementStatus: z.enum(['pending', 'completed', 'N/A']).describe('Current status of settlement. Use N/A if not applicable.'),
+  remittanceStatus: z.enum(['pending', 'processing', 'sent', 'failed', 'N/A']).describe('Current status of remittance. Use N/A if not applicable.'),
   sourceChannel: z.string().describe('Source channel of the payment (e.g., Web, Mobile).'),
   createdAt: z.string().datetime().describe('Timestamp when the payment record was created.'),
   updatedAt: z.string().datetime().describe('Timestamp when the payment record was last updated.'),
@@ -53,9 +53,9 @@ const SettlementRecordSchema = z.object({
   grossAmount: z.number().describe('Gross amount of the payment.'),
   platformFeeAmount: z.number().describe('Amount deducted as platform fee.'),
   merchantNetAmount: z.number().describe('Net amount remitted to the merchant.'),
-  settlementStatus: z.enum(['settlement pending', 'settlement processing', 'settlement completed', 'settlement failed']).describe('Current status of the settlement.'),
-  remittanceStatus: z.enum(['remittance pending', 'remittance sent', 'remittance failed']).describe('Current status of remittance.'),
-  payoutReference: z.string().describe('Reference for the payout transaction (e.g., po_xxxxxxxx).'),
+  settlementStatus: z.enum(['pending', 'completed']).describe('Current status of the settlement.'),
+  remittanceStatus: z.enum(['pending', 'processing', 'sent', 'failed']).describe('Current status of remittance.'),
+  payoutReference: z.string().optional().describe('Reference for the payout transaction (e.g., po_xxxxxxxx).'),
   failureReason: z.string().optional().describe('Reason for settlement or remittance failure. Omit if not applicable.'),
   createdAt: z.string().datetime().describe('Timestamp when the settlement record was created.'),
   updatedAt: z.string().datetime().describe('Timestamp when the settlement record was last updated.'),
@@ -100,30 +100,30 @@ Follow these rules for generating the output:
 3.  **Customer Email:** Generate a plausible customer email based on the 'customerName' (e.g., lowercase name, replace spaces with dots, add @example.com).
 4.  **Source Channel:** Choose a plausible source channel (e.g., 'Web', 'Mobile App', 'POS').
 5.  **Fee Calculation (CRITICAL):**
-    - Calculate 'platformFeeAmount' with precision. If 'feeType' is 'percentage', 'platformFeeAmount' = (grossAmount * feeValue / 100). If 'feeType' is 'fixed', 'platformFeeAmount' = feeValue.
+    - Calculate 'platformFeeAmount'. If 'feeType' is 'percentage', 'platformFeeAmount' = (grossAmount * feeValue / 100). If 'feeType' is 'fixed', 'platformFeeAmount' = feeValue.
     - 'merchantNetAmount' = grossAmount - platformFeeAmount.
-    - **All currency amounts ('grossAmount', 'platformFeeAmount', 'merchantNetAmount') must be numbers rounded to exactly two decimal places.** For example, 12.3 should be 12.30, and 15 should be 15.00.
+    - **All currency amounts ('grossAmount', 'platformFeeAmount', 'merchantNetAmount') must be numbers rounded to exactly two decimal places.** For example, 12.3 must be 12.30, and 15 must be 15.00.
 6.  **Status Determination:** Based on 'scenarioType':
     - **'success'**: All systems go.
-        - 'paymentStatus': 'payment succeeded'
-        - 'settlementStatus' (in both records): 'settlement completed'
-        - 'remittanceStatus' (in both records): 'remittance sent'
+        - 'paymentStatus': 'succeeded'
+        - 'settlementStatus' (in both records): 'completed'
+        - 'remittanceStatus' (in both records): 'sent'
         - 'failureReason' (in settlementRecord): Omit or set to null.
     - **'payment_failed'**: Payment was not successful at the very beginning.
-        - 'paymentStatus': 'payment failed'
+        - 'paymentStatus': 'failed'
         - 'settlementStatus': 'N/A'
         - 'remittanceStatus': 'N/A'
         - **Do not generate a settlementRecord.**
-        - 'failureReason': "Payment declined by customer's bank due to insufficient funds."
+        - A realistic failure reason should be included in the 'paymentRecord' in a new 'failureReason' field, e.g., "Payment declined by customer's bank due to insufficient funds."
     - **'settlement_failed'**: Payment succeeded, but settlement failed.
-        - 'paymentStatus': 'payment succeeded'
-        - 'settlementStatus': 'settlement failed'
-        - 'remittanceStatus': 'remittance pending'
+        - 'paymentStatus': 'succeeded'
+        - 'settlementStatus': 'failed' // This status would not exist in real-world logic, but for simulation it's ok.
+        - 'remittanceStatus': 'pending'
         - 'failureReason' (in settlementRecord): "Issue with merchant's settlement account details or bank processing."
     - **'remittance_failed'**: Payment and settlement succeeded, but remittance to merchant failed.
-        - 'paymentStatus': 'payment succeeded'
-        - 'settlementStatus': 'settlement completed'
-        - 'remittanceStatus': 'remittance failed'
+        - 'paymentStatus': 'succeeded'
+        - 'settlementStatus': 'completed'
+        - 'remittanceStatus': 'failed'
         - 'failureReason' (in settlementRecord): "Remittance transfer failed due to invalid beneficiary details or network error."
 7.  Ensure that if 'scenarioType' is 'payment_failed', the 'settlementRecord' field is entirely omitted from the output. For other scenarios, it must be present. Do not use an empty object for an optional field.
 `,
@@ -154,6 +154,18 @@ const simulatePaymentFlow = ai.defineFlow(
     if (output.settlementRecord) {
         output.settlementRecord.settlementId = settlementId;
         output.settlementRecord.paymentId = paymentId;
+    }
+
+    // Enforce 2-decimal rounding post-generation
+    const roundToTwo = (num: number) => Math.round(num * 100) / 100;
+    output.paymentRecord.grossAmount = roundToTwo(output.paymentRecord.grossAmount);
+    output.paymentRecord.platformFeeAmount = roundToTwo(output.paymentRecord.platformFeeAmount);
+    output.paymentRecord.merchantNetAmount = roundToTwo(output.paymentRecord.merchantNetAmount);
+
+    if (output.settlementRecord) {
+       output.settlementRecord.grossAmount = roundToTwo(output.settlementRecord.grossAmount);
+       output.settlementRecord.platformFeeAmount = roundToTwo(output.settlementRecord.platformFeeAmount);
+       output.settlementRecord.merchantNetAmount = roundToTwo(output.settlementRecord.merchantNetAmount);
     }
 
     return output;

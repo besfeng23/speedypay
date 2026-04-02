@@ -60,7 +60,7 @@ export default async function Dashboard() {
     <>
       <PageHeader
         title="Dashboard"
-        description="Here’s a snapshot of your marketplace performance."
+        description="An executive overview of your marketplace's performance."
       >
         <DemoPaymentSimulator />
       </PageHeader>
@@ -85,7 +85,7 @@ export default async function Dashboard() {
             description="Merchants with a completed onboarding."
           />
            <StatCard
-            title="Merchant Net Remittances"
+            title="Merchant Net Payouts"
             value={formatCurrency(stats.totalMerchantNetRemittances, 'PHP')}
             icon={<Banknote />}
             description="Total net amount successfully paid out."

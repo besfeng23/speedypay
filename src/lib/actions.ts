@@ -411,6 +411,7 @@ export async function runUATTestAction(testCaseId: string, payload?: any): Promi
     let result: ActionResult = { success: false, message: "Test case not found." };
     let entityId: string | null = null;
     let entityType: 'payment' | 'settlement' | 'merchant' | null = null;
+    const user = 'UAT Tester';
 
     try {
         switch (testCaseId) {
@@ -470,6 +471,14 @@ export async function runUATTestAction(testCaseId: string, payload?: any): Promi
             providerResponse: JSON.stringify(result.data, null, 2),
         });
 
+        await addAuditLog({
+            eventType: 'uat.test.passed',
+            user,
+            details: `UAT case ${testCaseId} passed.`,
+            entityId,
+            entityType,
+        });
+
         revalidatePath('/testing');
         return result;
 
@@ -482,6 +491,13 @@ export async function runUATTestAction(testCaseId: string, payload?: any): Promi
             entityId,
             entityType,
             providerResponse: JSON.stringify(e, null, 2),
+        });
+        await addAuditLog({
+            eventType: 'uat.test.failed',
+            user,
+            details: `UAT case ${testCaseId} failed: ${errorMessage}`,
+            entityId,
+            entityType,
         });
         revalidatePath('/testing');
         // Return a failed action result so the client knows it failed

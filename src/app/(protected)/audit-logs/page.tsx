@@ -13,12 +13,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import type { AuditLog } from "@/lib/types";
 import { EmptyState } from "@/components/empty-state";
-import { FileClock, CircleUser, Server, ArrowRightLeft, HandCoins, Building, Settings, CreditCard, Banknote } from "lucide-react";
+import { FileClock, CircleUser, Server, ArrowRightLeft, HandCoins, Building, Settings, CreditCard, Banknote, FlaskConical, AlertTriangle, ShieldCheck, FileQuestion } from "lucide-react";
 import Link from "next/link";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const eventTypeIcons: Record<string, React.ReactNode> = {
-    'default': <ArrowRightLeft />,
+    'default': <FileQuestion />,
     'user': <CircleUser />,
     'system': <Server />,
     'payout': <HandCoins />,
@@ -26,8 +26,10 @@ const eventTypeIcons: Record<string, React.ReactNode> = {
     'merchant': <Building />,
     'settlement': <Banknote />,
     'provider': <Settings />,
-    'simulation': <FileClock />,
+    'simulation': <FlaskConical />,
     'webhook': <ArrowRightLeft />,
+    'security': <ShieldCheck />,
+    'uat': <FlaskConical />,
 }
 
 const getIconForEventType = (eventType: string) => {
