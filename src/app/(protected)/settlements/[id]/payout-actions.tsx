@@ -1,7 +1,7 @@
 // This needs to be a client component for the actions
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { initiateRemittance, querySettlementStatus } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
@@ -9,15 +9,15 @@ import type { Settlement } from "@/lib/types";
 import { HandCoins, Loader2, RefreshCw } from "lucide-react";
 
 export function PayoutActions({ settlement }: { settlement: Settlement }) {
-    const [isInitiating, setIsInitiating] = useTransition();
-    const [isQuerying, setIsQuerying] = useTransition();
+    const [isInitiating, startInitiating] = useTransition();
+    const [isQuerying, startQuerying] = useTransition();
     const { toast } = useToast();
 
     const canInitiate = settlement.settlementStatus === 'pending' && !settlement.providerOrderSeq;
     const canQuery = !!settlement.providerOrderSeq;
 
     const handleInitiate = () => {
-        setIsInitiating(async () => {
+        startInitiating(async () => {
             const result = await initiateRemittance(settlement.id);
             if (result.success) {
                 toast({ title: "Payout Initiated", description: result.message });
@@ -28,7 +28,7 @@ export function PayoutActions({ settlement }: { settlement: Settlement }) {
     };
     
     const handleQuery = () => {
-        setIsQuerying(async () => {
+        startQuerying(async () => {
             const result = await querySettlementStatus(settlement.id);
             if (result.success) {
                 toast({ title: "Status Queried", description: result.message });
@@ -43,13 +43,13 @@ export function PayoutActions({ settlement }: { settlement: Settlement }) {
             {canQuery && (
                 <Button variant="outline" onClick={handleQuery} disabled={isQuerying}>
                     {isQuerying ? <Loader2 className="animate-spin"/> : <RefreshCw />}
-                    <span className="ml-2">Query Status</span>
+                    {isQuerying ? 'Querying...' : 'Query Status'}
                 </Button>
             )}
              {canInitiate && (
                 <Button onClick={handleInitiate} disabled={isInitiating}>
                     {isInitiating ? <Loader2 className="animate-spin"/> : <HandCoins />}
-                    <span className="ml-2">Initiate Payout</span>
+                    {isInitiating ? 'Initiating...' : 'Initiate Payout'}
                 </Button>
             )}
         </div>

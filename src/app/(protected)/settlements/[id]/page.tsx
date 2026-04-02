@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
@@ -110,7 +109,7 @@ export default async function SettlementDetailPage({
                         <DetailItem label="Provider Message" value={settlement.providerRespMessage} />
                         <DetailItem label="Payout Channel" value={settlement.payoutChannelDescription ? `${settlement.payoutChannelDescription} (${settlement.payoutChannelProcId})` : null} />
                         <DetailItem label="Last Provider Timestamp" value={settlement.providerTimestamp} isMono />
-                        <DetailItem label="Signature Verified" value={settlement.signatureVerified === null ? 'N/A' : (settlement.signatureVerified ? <CheckCircle className="h-4 w-4 text-green-500"/> : <XCircle className="h-4 w-4 text-red-500"/>)} />
+                        <DetailItem label="Signature Verified" value={settlement.signatureVerified === null ? <span className="text-muted-foreground/70">N/A</span> : (settlement.signatureVerified ? <CheckCircle className="h-5 w-5 text-green-500"/> : <XCircle className="h-5 w-5 text-red-500"/>)} />
                         <DetailItem label="Last Queried" value={settlement.lastQueryAt ? format(new Date(settlement.lastQueryAt), "PPP p") : 'Never'} />
                     </dl>
                 </CardContent>
@@ -125,7 +124,7 @@ export default async function SettlementDetailPage({
                     <dl className="divide-y">
                         <DetailItem label="Gross Amount" value={formatCurrency(settlement.grossAmount)} />
                         <DetailItem label="Platform Fee" value={formatCurrency(settlement.platformFeeAmount)} />
-                        <DetailItem label="Merchant Net Amount" value={<strong>{formatCurrency(settlement.merchantNetAmount, 'PHP')}</strong>} />
+                        <DetailItem label="Merchant Net Amount" value={<strong className="text-lg">{formatCurrency(settlement.merchantNetAmount, 'PHP')}</strong>} />
                     </dl>
                 </CardContent>
             </Card>

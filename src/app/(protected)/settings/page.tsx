@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { speedypayConfig, isSpeedyPayConfigured, getBaseUrl } from "@/lib/speedypay/config";
-import { CheckCircle, XCircle, AlertTriangle, Terminal, Banknote, Loader2 } from "lucide-react";
+import { CheckCircle, AlertTriangle, Terminal, Loader2 } from "lucide-react";
 import { SystemReadiness } from "@/components/system-readiness";
 import { useAuth } from "@/lib/firebase/hooks";
 import { payoutChannels } from "@/lib/speedypay/payout-channels";
@@ -179,9 +179,9 @@ function ProviderBalance() {
                 )}
             </CardContent>
             <CardFooter>
-                 <Button onClick={handleQueryBalance} disabled={isLoading}>
+                 <Button onClick={handleQueryBalance} disabled={isLoading || !isSpeedyPayConfigured()}>
                     {isLoading && <Loader2 className="animate-spin" />}
-                    <span className="ml-2">Query Balance</span>
+                    {isLoading ? 'Querying...' : 'Query Balance'}
                 </Button>
             </CardFooter>
         </Card>

@@ -12,8 +12,8 @@ export let merchants: Merchant[] = [
     contactName: 'Alice Johnson',
     email: 'alice@starlight.com',
     mobile: '555-0101',
-    settlementAccountName: 'Alice Johnson',
-    settlementAccountNumberOrWalletId: '**** **** **** 1234',
+    settlementAccountName: 'Alice B Johnson',
+    settlementAccountNumberOrWalletId: '123456789012',
     settlementChannel: 'Bank Account',
     defaultPayoutChannelProcId: 'BPI',
     status: 'Active',
@@ -88,6 +88,26 @@ export let payments: Payment[] = [
     createdAt: formatISO(subHours(now, 5)),
     updatedAt: formatISO(subHours(now, 4)),
   },
+  {
+    id: 'pay-3',
+    externalReference: 'ch_3Pq...Y89',
+    bookingReferenceOrInvoiceReference: 'inv-2024-07-003',
+    customerName: 'Sophia Lee',
+    customerEmail: 'sophia.lee@example.com',
+    merchantId: 'mer-1',
+    grossAmount: 500.00,
+    currency: 'USD',
+    feeType: 'percentage',
+    feeValue: 3.2,
+    platformFeeAmount: 16.00,
+    merchantNetAmount: 484.00,
+    paymentStatus: 'succeeded',
+    settlementStatus: 'completed', // It settled internally
+    remittanceStatus: 'failed', // But the final payout failed
+    sourceChannel: 'API',
+    createdAt: formatISO(subDays(now, 2)),
+    updatedAt: formatISO(subDays(now, 1)),
+  }
 ];
 
 export let settlements: Settlement[] = [
@@ -97,7 +117,7 @@ export let settlements: Settlement[] = [
     merchantId: 'mer-1',
     grossAmount: 1250.00,
     platformFeeAmount: 40.00,
-    merchantNetAmount: 1210.00,
+    merchantNetAmount: 68902.50, // Approx 1210 USD in PHP
     settlementStatus: 'completed',
     remittanceStatus: 'sent',
     payoutReference: `payout-${uuidv4().slice(0,8)}`,
@@ -126,7 +146,7 @@ export let settlements: Settlement[] = [
     merchantId: 'mer-2',
     grossAmount: 800.00,
     platformFeeAmount: 0.50,
-    merchantNetAmount: 799.50,
+    merchantNetAmount: 45251.72, // Approx 799.50 USD in PHP
     settlementStatus: 'pending',
     remittanceStatus: 'pending',
     payoutReference: `payout-${uuidv4().slice(0,8)}`,
@@ -149,6 +169,35 @@ export let settlements: Settlement[] = [
     rawProviderRequest: null,
     rawProviderResponse: null,
   },
+   {
+    id: 'set-c3d4e5f6',
+    paymentId: 'pay-3',
+    merchantId: 'mer-1',
+    grossAmount: 500.00,
+    platformFeeAmount: 16.00,
+    merchantNetAmount: 27405.00, // Approx 484 USD in PHP
+    settlementStatus: 'completed',
+    remittanceStatus: 'failed',
+    payoutReference: `payout-${uuidv4().slice(0,8)}`,
+    failureReason: 'Provider Error: Invalid recipient account details.',
+    createdAt: formatISO(subDays(now, 2)),
+    updatedAt: formatISO(subDays(now, 1)),
+    providerName: 'SpeedyPay',
+    providerEndpointType: 'cashOut.do',
+    providerOrderSeq: `ord_${Date.now() - 3000000}`,
+    providerTransSeq: `T${Date.now() - 3000000}`,
+    providerRespCode: '20000010',
+    providerRespMessage: 'Invalid recipient account details.',
+    providerTransState: '01',
+    providerTimestamp: format(subDays(now, 2), 'yyyyMMddHHmmss'),
+    payoutChannelProcId: 'BPI',
+    payoutChannelDescription: 'BPI (InstaPay)',
+    signatureVerified: true,
+    reconciliationStatus: 'reconciled',
+    lastQueryAt: null,
+    rawProviderRequest: '{"message": "This is a mock request for a failed transaction"}',
+    rawProviderResponse: '{"respCode": "20000010", "respMessage": "Invalid recipient account details.", "transState": "01"}',
+  }
 ];
 
 export let auditLogs: AuditLog[] = [
@@ -179,8 +228,8 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     totalGrossVolume: 352649.99,
     totalPlatformFees: 12317.85,
     totalMerchantNetRemittances: 340332.14,
-    pendingSettlements: settlements.filter(s => s.settlementStatus === 'processing' || s.settlementStatus === 'pending').length,
-    failedSettlements: settlements.filter(s => s.settlementStatus === 'failed').length,
+    pendingSettlements: settlements.filter(s => s.settlementStatus === 'pending').length,
+    failedSettlements: settlements.filter(s => s.remittanceStatus === 'failed').length,
     activeMerchants: merchants.filter(m => m.status === 'Active').length,
   }
 }
@@ -247,8 +296,20 @@ export const getAuditLogs = async (): Promise<AuditLog[]> => {
 
 export const getAuditLogsByEntity = async (entityId: string): Promise<AuditLog[]> => {
     const relatedSettlement = settlements.find(s => s.paymentId === entityId || s.id === entityId);
-    const entityLogs = auditLogs.filter(log => log.entityId === entityId || (relatedSettlement && log.entityId === relatedSettlement.id))
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+    const entityLogs = auditLogs.filter(log => {
+      if (log.entityId === entityId) return true;
+      if (relatedSettlement && log.entityId === relatedSettlement.id) return true;
+      // Also check if the entityId is a payment and the log is for the related settlement
+      const payment = payments.find(p => p.id === entityId);
+      if (payment) {
+          const settlementForPayment = settlements.find(s => s.paymentId === payment.id);
+          if (settlementForPayment && log.entityId === settlementForPayment.id) {
+              return true;
+          }
+      }
+      return false;
+    })
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     return new Promise(resolve => setTimeout(() => resolve(entityLogs), 200));
 }
 
@@ -272,6 +333,18 @@ export async function updateSettlement(id: string, updates: Partial<Settlement>)
         const original = settlements[settlementIndex];
         settlements[settlementIndex] = { ...original, ...updates, updatedAt: formatISO(new Date()) };
         console.log(`[Data Update] Settlement ${id} updated.`);
+        
+        // Also update the parent payment record for status consistency
+        const paymentIndex = payments.findIndex(p => p.id === original.paymentId);
+        if (paymentIndex > -1) {
+            if (updates.settlementStatus) {
+                payments[paymentIndex].settlementStatus = updates.settlementStatus as any;
+            }
+            if (updates.remittanceStatus) {
+                 payments[paymentIndex].remittanceStatus = updates.remittanceStatus as any;
+            }
+        }
+        
         return settlements[settlementIndex];
     }
     return null;
