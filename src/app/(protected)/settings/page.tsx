@@ -17,9 +17,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { speedypayConfig, isSpeedyPayConfigured } from "@/lib/speedypay/config";
-import { CheckCircle, AlertTriangle, Terminal, Copy, Wallet, Loader2, Server, Landmark, Building } from "lucide-react";
+import { speedypayConfig } from "@/lib/speedypay/config";
+import { CheckCircle, AlertTriangle, Copy, Wallet, Loader2, Server, Landmark, Building } from "lucide-react";
 import { SystemReadiness } from "@/components/system-readiness";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { payoutChannels } from "@/lib/speedypay/payout-channels";
@@ -28,37 +27,6 @@ import { useState } from "react";
 import { getProviderBalance, getCollectionProviderBalance } from "@/lib/actions";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
-
-function IntegrationStatus() {
-  const isConfigured = isSpeedyPayConfigured();
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Integration Status</CardTitle>
-        <CardDescription>Live status of the SpeedyPay API integration.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {isConfigured ? (
-          <Alert>
-            <CheckCircle className="h-4 w-4" />
-            <AlertTitle>Ready</AlertTitle>
-            <AlertDescription>
-              All required API credentials are configured in the environment.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Configuration Missing</AlertTitle>
-            <AlertDescription>
-              One or more SpeedyPay API credentials are missing from your environment variables. The integration is disabled.
-            </AlertDescription>
-          </Alert>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
 
 function WebhookInfo() {
   const { toast } = useToast();
@@ -81,7 +49,6 @@ function WebhookInfo() {
       </CardHeader>
       <CardContent className="space-y-2">
         <div className="flex items-center gap-4 p-2 rounded-md bg-muted">
-            <Terminal className="h-4 w-4" />
             <code className="text-sm font-mono flex-1 truncate">{webhookUrl}</code>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopy}>
                 <Copy className="h-4 w-4" />
@@ -95,13 +62,13 @@ function WebhookInfo() {
   )
 }
 
-function ProviderConfig() {
+function PayoutProviderConfig() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Provider Credentials</CardTitle>
+        <CardTitle>Payout API Config</CardTitle>
         <CardDescription>
-          These values are read from your environment variables for security.
+          Configuration for sending funds out.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -109,10 +76,40 @@ function ProviderConfig() {
           <Label htmlFor="payout-base-url">Payout API URL</Label>
           <Input id="payout-base-url" value={speedypayConfig.payoutBaseUrl} readOnly disabled />
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function CollectionProviderConfig() {
+   return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Collection API Config</CardTitle>
+        <CardDescription>
+          Configuration for receiving funds.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="cashier-base-url">Cashier API URL</Label>
+          <Label htmlFor="cashier-base-url">Collection API URL</Label>
           <Input id="cashier-base-url" value={speedypayConfig.cashierBaseUrl} readOnly disabled />
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function SharedProviderConfig() {
+    return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Shared Merchant Credentials</CardTitle>
+        <CardDescription>
+          Values read from server environment variables.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="merch-seq">Merchant Sequence (merchSeq)</Label>
           <Input id="merch-seq" value={speedypayConfig.merchSeq || 'Not Set'} readOnly disabled />
@@ -123,7 +120,7 @@ function ProviderConfig() {
         </div>
       </CardContent>
     </Card>
-  )
+    )
 }
 
 function PayoutChannels() {
@@ -246,14 +243,16 @@ export default function SettingsPage() {
           <TabsTrigger value="treasury">Treasury</TabsTrigger>
           <TabsTrigger value="fees">Fee Configs</TabsTrigger>
           <TabsTrigger value="system">System</TabsTrigger>
+          <TabsTrigger value="release">About</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="integration" className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-6">
-              <ProviderConfig />
+        <TabsContent value="integration" className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <CollectionProviderConfig />
+              <PayoutProviderConfig />
             </div>
             <div className="space-y-6">
-              <IntegrationStatus />
+              <SharedProviderConfig />
               <WebhookInfo />
             </div>
         </TabsContent>
@@ -286,6 +285,31 @@ export default function SettingsPage() {
         </TabsContent>
         <TabsContent value="system" className="space-y-4">
           <SystemReadiness />
+        </TabsContent>
+        <TabsContent value="release" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>About SpeedyPay Marketplace Console</CardTitle>
+              <CardDescription>
+                Version 1.0.0 - Production Ready
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <p className="text-sm text-muted-foreground">This console provides a comprehensive interface for managing a marketplace payments platform, including merchant onboarding, payment processing, settlement orchestration, and financial reconciliation.</p>
+                <h4 className="font-semibold mt-4 mb-2">Key Modules Implemented:</h4>
+                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                    <li>Executive Dashboard & Financial Overview</li>
+                    <li>Full Merchant CRUD and Management</li>
+                    <li>Payment Transaction Lifecycle Viewing</li>
+                    <li>Settlement & Remittance Orchestration</li>
+                    <li>Live Provider Balance & Status Querying</li>
+                    <li>End-to-End UAT & Operator Testing Suite</li>
+                    <li>Comprehensive Audit Logging</li>
+                    <li>AI-Powered Simulation & Insights Tools</li>
+                    <li>System Readiness & Deployment Checklist</li>
+                </ul>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </>

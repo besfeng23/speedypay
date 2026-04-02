@@ -6,8 +6,20 @@ import { Button } from "@/components/ui/button";
 import { initiateRemittance, querySettlementStatus } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 import type { Settlement } from "@/lib/types";
-import { HandCoins, Loader2, RefreshCw } from "lucide-react";
+import { HandCoins, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { speedypayConfig } from "@/lib/speedypay/config";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export function PayoutActions({ settlement }: { settlement: Settlement }) {
     const [isInitiating, startInitiating] = useTransition();
@@ -17,6 +29,7 @@ export function PayoutActions({ settlement }: { settlement: Settlement }) {
 
     const canInitiate = settlement.settlementStatus === 'completed' && settlement.remittanceStatus === 'pending';
     const canQuery = !!settlement.providerOrderSeq;
+    const isLiveEnv = speedypayConfig.env === 'production';
 
     const handleInitiate = () => {
         startInitiating(async () => {
@@ -42,6 +55,13 @@ export function PayoutActions({ settlement }: { settlement: Settlement }) {
         });
     };
 
+    const InitiateButton = (
+        <Button onClick={isLiveEnv ? undefined : handleInitiate} disabled={isInitiating}>
+            {isInitiating ? <Loader2 className="animate-spin"/> : <HandCoins />}
+            {isInitiating ? 'Initiating...' : 'Initiate Payout'}
+        </Button>
+    );
+
     return (
         <div className="flex items-center gap-2">
             {canQuery && (
@@ -51,10 +71,34 @@ export function PayoutActions({ settlement }: { settlement: Settlement }) {
                 </Button>
             )}
              {canInitiate && (
-                <Button onClick={handleInitiate} disabled={isInitiating}>
-                    {isInitiating ? <Loader2 className="animate-spin"/> : <HandCoins />}
-                    {isInitiating ? 'Initiating...' : 'Initiate Payout'}
-                </Button>
+                isLiveEnv ? (
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            {InitiateButton}
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle className="flex items-center gap-2">
+                                    <AlertTriangle className="text-red-500" />
+                                    Confirm Live Payout
+                                </AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    You are in a LIVE environment. This action will initiate a real money transfer of
+                                    <strong className="mx-1">{settlement.merchantNetAmount.toFixed(2)} PHP</strong>
+                                    to the merchant. This cannot be undone. Are you sure you want to proceed?
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleInitiate} className="bg-destructive hover:bg-destructive/90">
+                                    Yes, Initiate Payout
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                ) : (
+                    InitiateButton
+                )
             )}
         </div>
     );

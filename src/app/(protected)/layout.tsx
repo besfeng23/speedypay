@@ -18,11 +18,13 @@ import {
   Settings,
   AlertTriangle,
   Beaker,
+  Server,
 } from "lucide-react";
 import { Icons } from "@/components/icons";
 import Link from "next/link";
 import { useAuth } from "@/lib/firebase/hooks";
 import { Badge } from "@/components/ui/badge";
+import { speedypayConfig } from "@/lib/speedypay/config";
 
 export default function ProtectedLayout({
   children,
@@ -52,6 +54,7 @@ export default function ProtectedLayout({
   }
 
   const isDemoMode = user?.uid === 'mock-user-id';
+  const isLiveEnv = speedypayConfig.env === 'production';
 
   return (
     <div className="min-h-screen w-full">
@@ -170,15 +173,18 @@ export default function ProtectedLayout({
           </Sheet>
 
           <div className="flex w-full items-center gap-4 md:ml-auto md:gap-2 lg:gap-4">
-            <div className="ml-auto flex-1 sm:flex-initial">
-              {/* Future search bar */}
-            </div>
-             {isDemoMode && (
+            <div className="ml-auto flex items-center gap-2 sm:flex-initial">
+              {isDemoMode && (
                 <Badge variant="outline" className="hidden sm:flex items-center gap-2 border-orange-500/50 text-orange-600 bg-orange-500/10">
                     <AlertTriangle className="h-3 w-3" />
-                    Demo Mode
+                    Auth: Demo Mode
                 </Badge>
-             )}
+              )}
+               <Badge variant={isLiveEnv ? 'destructive' : 'secondary'} className="hidden sm:flex items-center gap-2">
+                {isLiveEnv ? <Server className="h-3 w-3" /> : <Beaker className="h-3 w-3" />}
+                Env: {isLiveEnv ? 'Live' : 'Test'}
+              </Badge>
+            </div>
             <UserNav />
           </div>
         </header>
