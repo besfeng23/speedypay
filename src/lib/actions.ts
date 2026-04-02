@@ -187,6 +187,9 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
     // Use unique internal settlement ID as the provider's orderSeq for idempotency
     const orderSeq = settlement.id;
     const channelInfo = payoutChannelMap.get(merchant.defaultPayoutChannel);
+    if (!channelInfo) {
+        return { success: false, message: `Invalid payout channel configured for merchant: ${merchant.defaultPayoutChannel}` };
+    }
 
     // Use contact name for first/last name as it's more reliable than account name
     const names = merchant.contactName.split(' ');
@@ -220,7 +223,7 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
             providerTransStateLabel: providerStateLabels[response.transState] || 'Unknown',
             signatureVerified: verifySignature(response, speedypayConfig.secretKey!),
             payoutChannelProcId: merchant.defaultPayoutChannel,
-            payoutChannelDescription: channelInfo?.description || 'Unknown Channel',
+            payoutChannelDescription: channelInfo.description,
             providerTimestamp: response.timestamp,
             failureReason: response.respCode !== '00000000' ? response.respMessage : null,
             updatedAt: formatISO(new Date()),

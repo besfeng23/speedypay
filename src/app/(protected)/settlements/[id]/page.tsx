@@ -6,7 +6,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription
+  CardDescription,
 } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { format } from "date-fns";
@@ -137,7 +137,7 @@ export default async function SettlementDetailPage({
                     {settlement.providerOrderSeq ? (
                          <dl className="divide-y">
                             <DetailItem label="Provider Name" value={settlement.providerName} />
-                            <DetailItem label="Payout Channel" value={settlement.payoutChannelDescription || settlement.payoutChannelProcId} />
+                            <DetailItem label="Payout Channel" value={<div className="flex flex-col"><span className="font-medium">{settlement.payoutChannelDescription || 'N/A'}</span><span className="text-xs text-muted-foreground font-mono">{settlement.payoutChannelProcId}</span></div>} />
                             <DetailItem label="Provider Order Seq" value={<span className="font-mono text-xs">{settlement.providerOrderSeq}</span>} />
                             <DetailItem label="Provider Trans Seq" value={<span className="font-mono text-xs">{settlement.providerTransSeq || 'N/A'}</span>} />
                              <Separator className="my-2"/>

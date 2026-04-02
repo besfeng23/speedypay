@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import type { Payment, Settlement } from "@/lib/types";
 import Link from "next/link";
 import { Pencil } from "lucide-react";
+import { payoutChannelMap } from "@/lib/speedypay/payout-channels";
 
 function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -29,7 +30,7 @@ function DetailItem({ label, value }: { label: string; value: React.ReactNode })
 const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: "PHP",
     }).format(amount);
 };
 
@@ -106,6 +107,7 @@ export default async function MerchantDetailPage({
 
   const recentTransactions = await getPaymentsByMerchantId(merchant.id, 5);
   const recentSettlements = await getSettlementsByMerchantId(merchant.id, 5);
+  const payoutChannel = payoutChannelMap.get(merchant.defaultPayoutChannel);
 
   return (
     <>
@@ -145,7 +147,7 @@ export default async function MerchantDetailPage({
             </CardHeader>
             <CardContent>
               <dl className="divide-y">
-                <DetailItem label="Default Payout Channel" value={<Badge variant="secondary">{merchant.defaultPayoutChannel}</Badge>} />
+                <DetailItem label="Default Payout Channel" value={<div className="flex flex-col"><Badge variant="secondary" className="w-fit">{payoutChannel?.description || merchant.defaultPayoutChannel}</Badge><span className="text-xs text-muted-foreground font-mono mt-1">{merchant.defaultPayoutChannel}</span></div>} />
                 <DetailItem label="Recipient Account Name" value={merchant.settlementAccountName} />
                 <DetailItem label="Recipient Account Number" value={merchant.settlementAccountNumberOrWalletId} />
                 <DetailItem label="Default Fee Type" value={<Badge variant="outline" className="capitalize">{merchant.defaultFeeType}</Badge>} />
