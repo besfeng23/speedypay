@@ -1,4 +1,4 @@
-# SpeedyPay Marketplace Console
+# Speedy-pay
 
 This is a Next.js application built to serve as an administrative console for a marketplace payments platform. It includes features for managing merchants, tracking payments, orchestrating settlements, and handling remittances.
 
