@@ -1,12 +1,12 @@
 import { createHash } from 'crypto';
 
 /**
- * Builds the canonical string for signing from a payload object.
+ * Builds the canonical string for signing from a payload object according to provider rules.
  * Rules:
  * 1. Exclude 'sign' field.
- * 2. Filter out null or undefined values.
- * 3. Sort keys alphabetically.
- * 4. Concatenate into a URL query string format (key=value&...).
+ * 2. Filter out fields with null, undefined, or empty string values.
+ * 3. Sort remaining fields alphabetically (ASCII order) by key.
+ * 4. Concatenate into a URL query string format (e.g., key1=value1&key2=value2).
  * @param payload The request or response payload object.
  * @returns The canonical string to be signed.
  */
@@ -14,26 +14,35 @@ function buildCanonicalString(payload: Record<string, any>): string {
     const sortedKeys = Object.keys(payload).sort();
     
     const parts = sortedKeys
+        // Rule 1 & 2: Exclude 'sign' and filter out null, undefined, or empty values.
         .filter(key => key !== 'sign' && payload[key] !== null && payload[key] !== undefined && payload[key] !== '')
+        // Rule 3 is handled by using the sortedKeys array.
+        // Rule 4: Concatenate into key=value pairs joined by '&'.
         .map(key => `${key}=${payload[key]}`);
         
     return parts.join('&');
 }
 
 /**
- * Generates a SHA256 signature for a given payload.
+ * Generates a SHA256 signature for a given payload, following documented provider rules.
  * @param payload The request payload object.
- * @param secret The secret key to use for signing.
+ * @param secret The merchant secret key to use for signing.
  * @returns The generated lowercase SHA256 signature.
  */
 export function generateSignature(payload: Record<string, any>, secret: string): string {
+  // Steps 1-3: Build the canonical string from the payload.
   const canonicalString = buildCanonicalString(payload);
+  
+  // Step 4: Append the merchant secret key.
   const stringToSign = `${canonicalString}&${secret}`;
   
   console.log(`[SpeedyPay Crypto] String to sign: ${stringToSign}`);
 
+  // Step 5: Apply SHA256 hashing.
   const hash = createHash('sha256');
   hash.update(stringToSign, 'utf8');
+  
+  // Step 6: Use the resulting lowercase hash as the signature.
   const signature = hash.digest('hex').toLowerCase();
   
   console.log(`[SpeedyPay Crypto] Generated signature: ${signature}`);
@@ -42,22 +51,24 @@ export function generateSignature(payload: Record<string, any>, secret: string):
 }
 
 /**
- * Verifies a signature against a payload.
- * @param payload The response payload object containing the 'sign' field.
- * @param secret The secret key.
+ * Verifies a signature against a payload using the provider's specified rules.
+ * @param payload The response payload object containing the 'sign' field to be verified.
+ * @param secret The merchant secret key.
  * @returns `true` if the signature is valid, `false` otherwise.
  */
 export function verifySignature(payload: Record<string, any>, secret: string): boolean {
+  // Step 7.1: Extract the signature from the payload.
   const receivedSignature = payload.sign;
   if (!receivedSignature) {
       console.error('[SpeedyPay Crypto] Verification failed: No signature found in payload.');
       return false;
   }
   
+  // Step 7.2 & 7.3: Recompute the signature based on the rest of the payload.
   const expectedSignature = generateSignature(payload, secret);
   
   console.log(`[SpeedyPay Crypto] Verifying. Received: ${receivedSignature}, Expected: ${expectedSignature}`);
 
-  // Use a constant-time comparison to prevent timing attacks, although for this case it's less critical.
+  // Step 7.4: Compare signatures.
   return receivedSignature.toLowerCase() === expectedSignature;
 }
