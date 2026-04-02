@@ -27,3 +27,4 @@ Open [http://localhost:9002](http://localhost:9002) with your browser to see the
 - **Remittance Handling:** Initiate and monitor payouts to merchants.
 - **Audit Logs:** A complete trail of all significant system events.
 - **AI-Powered Tools:** Includes a payment simulator and dashboard insights generator.
+# speedypay
