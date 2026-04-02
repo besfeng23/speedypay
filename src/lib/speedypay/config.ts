@@ -5,32 +5,39 @@
  * 
  * In a Next.js app, create a `.env.local` file in the root of your project
  * to store these values securely.
- * 
- * .env.local
- * SPEEDYPAY_API_BASE_URL="https://api.sandbox.speedypay.com/v1"
- * SPEEDYPAY_API_KEY="YOUR_API_KEY"
- * SPEEDYPAY_API_SECRET="YOUR_API_SECRET"
- * SPEEDYPAY_WEBHOOK_SECRET="YOUR_WEBHOOK_SECRET"
  */
 
 export const speedypayConfig = {
-  /** The base URL for the SpeedyPay API. Defaults to the sandbox environment. */
-  apiBaseUrl: process.env.SPEEDYPAY_API_BASE_URL || 'https://api.sandbox.speedypay.com/v1',
+  /** The environment to use: 'test' or 'production'. */
+  env: process.env.SPEEDYPAY_ENV || 'test',
+
+  /** The base URL for the SpeedyPay API in the test environment. */
+  baseUrlTest: process.env.SPEEDYPAY_BASE_URL_TEST || 'https://test-api.emangopay.com/api',
   
-  /** Your public API key for SpeedyPay. */
-  apiKey: process.env.SPEEDYPAY_API_KEY,
+  /** The base URL for the SpeedyPay API in the production environment. */
+  baseUrlProd: process.env.SPEEDYPAY_BASE_URL_PROD || 'https://api.emangopay.com/api',
+
+  /** Your unique merchant sequence ID provided by SpeedyPay. */
+  merchSeq: process.env.SPEEDYPAY_MERCH_SEQ,
   
-  /** Your secret API key for SpeedyPay. Should be kept private. */
-  apiSecret: process.env.SPEEDYPAY_API_SECRET,
+  /** Your secret key provided by SpeedyPay for signing requests. */
+  secretKey: process.env.SPEEDYPAY_SECRET_KEY,
   
-  /** The secret used to verify incoming webhooks from SpeedyPay. */
-  webhookSecret: process.env.SPEEDYPAY_WEBHOOK_SECRET,
+  /** The default callback URL for receiving webhook notifications. */
+  notifyUrl: process.env.SPEEDYPAY_NOTIFY_URL,
 };
+
+/**
+ * Returns the appropriate base URL based on the configured environment.
+ */
+export function getBaseUrl(): string {
+    return speedypayConfig.env === 'production' ? speedypayConfig.baseUrlProd : speedypayConfig.baseUrlTest;
+}
 
 /**
  * Checks if the essential SpeedyPay configuration values are present.
  * @returns `true` if the API keys and webhook secret are configured, `false` otherwise.
  */
 export function isSpeedyPayConfigured(): boolean {
-    return !!(speedypayConfig.apiKey && speedypayConfig.apiSecret && speedypayConfig.webhookSecret);
+    return !!(speedypayConfig.merchSeq && speedypayConfig.secretKey);
 }

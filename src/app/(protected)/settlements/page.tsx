@@ -22,10 +22,10 @@ export default async function SettlementsPage() {
   const merchants: Merchant[] = await getMerchants();
   const merchantMap = new Map(merchants.map(m => [m.id, m.displayName]));
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, currency = "USD") => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
+      currency,
     }).format(amount);
   };
 
@@ -66,7 +66,7 @@ export default async function SettlementsPage() {
                                     </div>
                                 </TableCell>
                                 <TableCell>{merchantMap.get(settlement.merchantId) || 'Unknown'}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(settlement.merchantNetAmount)}</TableCell>
+                                <TableCell className="text-right font-mono">{formatCurrency(settlement.merchantNetAmount, 'PHP')}</TableCell>
                                 <TableCell><StatusBadge status={settlement.settlementStatus} /></TableCell>
                                 <TableCell><StatusBadge status={settlement.remittanceStatus} /></TableCell>
                                 <TableCell>{format(new Date(settlement.createdAt), 'MMM d, yyyy')}</TableCell>

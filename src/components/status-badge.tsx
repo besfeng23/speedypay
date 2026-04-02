@@ -10,6 +10,7 @@ const statusBadgeVariants = cva("font-semibold capitalize", {
       completed: "bg-green-100 text-green-800 border-transparent hover:bg-green-100 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/40",
       Active: "bg-green-100 text-green-800 border-transparent hover:bg-green-100 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/40",
       sent: "bg-sky-100 text-sky-800 border-transparent hover:bg-sky-100 dark:bg-sky-900/40 dark:text-sky-300 dark:hover:bg-sky-900/40",
+      reconciled: "bg-green-100 text-green-800 border-transparent hover:bg-green-100 dark:bg-green-900/40 dark:text-green-300 dark:hover:bg-green-900/40",
       
       // Neutral/In-Progress Statuses
       pending: "bg-yellow-100 text-yellow-800 border-transparent hover:bg-yellow-100 dark:bg-yellow-900/40 dark:text-yellow-300 dark:hover:bg-yellow-900/40",
@@ -20,6 +21,7 @@ const statusBadgeVariants = cva("font-semibold capitalize", {
       failed: "bg-red-100 text-red-800 border-transparent hover:bg-red-100 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-900/40",
       Suspended: "bg-orange-100 text-orange-800 border-transparent hover:bg-orange-100 dark:bg-orange-900/40 dark:text-orange-300 dark:hover:bg-orange-900/40",
       Rejected: "bg-red-100 text-red-800 border-transparent hover:bg-red-100 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-900/40",
+      discrepancy: "bg-orange-100 text-orange-800 border-transparent hover:bg-orange-100 dark:bg-orange-900/40 dark:text-orange-300 dark:hover:bg-orange-900/40",
 
       // Other Statuses
       Inactive: "bg-slate-100 text-slate-700 border-transparent hover:bg-slate-100 dark:bg-slate-800/50 dark:text-slate-300 dark:hover:bg-slate-800/50",

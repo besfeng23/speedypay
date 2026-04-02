@@ -1,5 +1,5 @@
 import type { Merchant, Payment, Settlement, AuditLog, DashboardStats } from '@/lib/types';
-import { subDays, subHours, subMinutes, formatISO } from 'date-fns';
+import { subDays, subHours, subMinutes, formatISO, format } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
 const now = new Date();
@@ -12,9 +12,10 @@ export let merchants: Merchant[] = [
     contactName: 'Alice Johnson',
     email: 'alice@starlight.com',
     mobile: '555-0101',
-    settlementAccountName: 'Starlight Ops Checking',
+    settlementAccountName: 'Alice Johnson',
     settlementAccountNumberOrWalletId: '**** **** **** 1234',
     settlementChannel: 'Bank Account',
+    defaultPayoutChannelProcId: 'BPI',
     status: 'Active',
     onboardingStatus: 'Completed',
     propertyAssociations: ['P-001', 'P-002'],
@@ -31,9 +32,10 @@ export let merchants: Merchant[] = [
     contactName: 'Bob Williams',
     email: 'bob@oceanview.co',
     mobile: '555-0102',
-    settlementAccountName: 'Oceanview Payouts',
-    settlementAccountNumberOrWalletId: 'bob-wallet@walletprovider.com',
+    settlementAccountName: 'Bob Williams',
+    settlementAccountNumberOrWalletId: '09171234567',
     settlementChannel: 'Digital Wallet',
+    defaultPayoutChannelProcId: 'GCASH',
     status: 'Active',
     onboardingStatus: 'Completed',
     propertyAssociations: ['P-003'],
@@ -42,63 +44,6 @@ export let merchants: Merchant[] = [
     notes: 'Handles luxury rentals. Prefers wallet payouts.',
     createdAt: formatISO(subDays(now, 120)),
     updatedAt: formatISO(subDays(now, 15)),
-  },
-  {
-    id: 'mer-3',
-    businessName: 'City Center Lofts',
-    displayName: 'City Lofts',
-    contactName: 'Charlie Brown',
-    email: 'charlie@citylofts.com',
-    mobile: '555-0103',
-    settlementAccountName: 'City Center Ops',
-    settlementAccountNumberOrWalletId: '**** **** **** 5678',
-    settlementChannel: 'Bank Account',
-    status: 'Suspended',
-    onboardingStatus: 'Completed',
-    propertyAssociations: [],
-    defaultFeeType: 'percentage',
-    defaultFeeValue: 4.0,
-    notes: 'Account suspended due to chargeback ratio. Under review.',
-    createdAt: formatISO(subDays(now, 200)),
-    updatedAt: formatISO(subDays(now, 7)),
-  },
-  {
-    id: 'mer-4',
-    businessName: 'Innovate SaaS Inc.',
-    displayName: 'Innovate SaaS',
-    contactName: 'Dana Scully',
-    email: 'dana@innovatesaas.io',
-    mobile: '555-0104',
-    settlementAccountName: 'Innovate Operations',
-    settlementAccountNumberOrWalletId: '**** **** **** 9012',
-    settlementChannel: 'Bank Account',
-    status: 'Active',
-    onboardingStatus: 'Completed',
-    propertyAssociations: [],
-    defaultFeeType: 'percentage',
-    defaultFeeValue: 2.9,
-    notes: 'Software-as-a-Service, high transaction count, low average value.',
-    createdAt: formatISO(subDays(now, 90)),
-    updatedAt: formatISO(subDays(now, 10)),
-  },
-   {
-    id: 'mer-5',
-    businessName: 'Greenleaf Organics',
-    displayName: 'Greenleaf',
-    contactName: 'Eve Planter',
-    email: 'eve@greenleaforganics.com',
-    mobile: '555-0105',
-    settlementAccountName: 'Greenleaf Business',
-    settlementAccountNumberOrWalletId: '**** **** **** 3456',
-    settlementChannel: 'Bank Account',
-    status: 'Inactive',
-    onboardingStatus: 'Pending',
-    propertyAssociations: [],
-    defaultFeeType: 'percentage',
-    defaultFeeValue: 3.5,
-    notes: 'New merchant, onboarding in progress. KYC verification pending.',
-    createdAt: formatISO(subDays(now, 5)),
-    updatedAt: formatISO(subDays(now, 1)),
   },
 ];
 
@@ -137,71 +82,11 @@ export let payments: Payment[] = [
     platformFeeAmount: 0.50,
     merchantNetAmount: 799.50,
     paymentStatus: 'succeeded',
-    settlementStatus: 'processing',
+    settlementStatus: 'pending',
     remittanceStatus: 'pending',
     sourceChannel: 'Mobile',
     createdAt: formatISO(subHours(now, 5)),
     updatedAt: formatISO(subHours(now, 4)),
-  },
-  {
-    id: 'pay-3',
-    externalReference: 'ch_3Pq...Y89',
-    bookingReferenceOrInvoiceReference: 'inv-2024-07-003',
-    customerName: 'Frank Wright',
-    customerEmail: 'frank.wright@example.com',
-    merchantId: 'mer-1',
-    grossAmount: 200.00,
-    currency: 'USD',
-    feeType: 'percentage',
-    feeValue: 3.2,
-    platformFeeAmount: 6.40,
-    merchantNetAmount: 193.60,
-    paymentStatus: 'failed',
-    settlementStatus: 'N/A',
-    remittanceStatus: 'N/A',
-    sourceChannel: 'API',
-    createdAt: formatISO(subDays(now, 3)),
-    updatedAt: formatISO(subDays(now, 3)),
-  },
-  {
-    id: 'pay-4',
-    externalReference: 'ch_3Pq...Z12',
-    bookingReferenceOrInvoiceReference: 'inv-2024-06-112',
-    customerName: 'Grace Hall',
-    customerEmail: 'grace.hall@example.com',
-    merchantId: 'mer-4',
-    grossAmount: 49.99,
-    currency: 'USD',
-    feeType: 'percentage',
-    feeValue: 2.9,
-    platformFeeAmount: 1.45,
-    merchantNetAmount: 48.54,
-    paymentStatus: 'succeeded',
-    settlementStatus: 'completed',
-    remittanceStatus: 'sent',
-    sourceChannel: 'Web',
-    createdAt: formatISO(subDays(now, 10)),
-    updatedAt: formatISO(subDays(now, 9)),
-  },
-  {
-    id: 'pay-5',
-    externalReference: 'ch_3Pq...A34',
-    bookingReferenceOrInvoiceReference: 'inv-2024-07-005',
-    customerName: 'Heidi Turner',
-    customerEmail: 'heidi.turner@example.com',
-    merchantId: 'mer-3',
-    grossAmount: 1500.00,
-    currency: 'USD',
-    feeType: 'percentage',
-    feeValue: 4.0,
-    platformFeeAmount: 60.00,
-    merchantNetAmount: 1440.00,
-    paymentStatus: 'succeeded',
-    settlementStatus: 'failed',
-    remittanceStatus: 'N/A',
-    sourceChannel: 'Web',
-    createdAt: formatISO(subDays(now, 8)),
-    updatedAt: formatISO(subDays(now, 7)),
   },
 ];
 
@@ -215,10 +100,25 @@ export let settlements: Settlement[] = [
     merchantNetAmount: 1210.00,
     settlementStatus: 'completed',
     remittanceStatus: 'sent',
-    payoutReference: 'po_1Pq...sE1',
+    payoutReference: `payout-${uuidv4().slice(0,8)}`,
     failureReason: null,
     createdAt: formatISO(subHours(now, 23)),
     updatedAt: formatISO(subHours(now, 20)),
+    providerName: 'SpeedyPay',
+    providerEndpointType: 'cashOut.do',
+    providerOrderSeq: `ord_${Date.now() - 2000000}`,
+    providerTransSeq: `T${Date.now() - 2000000}`,
+    providerRespCode: '00000000',
+    providerRespMessage: 'Transaction is accepted',
+    providerTransState: '00',
+    providerTimestamp: format(subHours(now, 22), 'yyyyMMddHHmmss'),
+    payoutChannelProcId: 'BPI',
+    payoutChannelDescription: 'BPI (InstaPay)',
+    signatureVerified: true,
+    reconciliationStatus: 'reconciled',
+    lastQueryAt: null,
+    rawProviderRequest: '{"message": "This is a mock request"}',
+    rawProviderResponse: '{"message": "This is a mock response"}',
   },
   {
     id: 'set-b2c3d4e5',
@@ -227,40 +127,27 @@ export let settlements: Settlement[] = [
     grossAmount: 800.00,
     platformFeeAmount: 0.50,
     merchantNetAmount: 799.50,
-    settlementStatus: 'processing',
+    settlementStatus: 'pending',
     remittanceStatus: 'pending',
-    payoutReference: 'po_1Pq...tF2',
+    payoutReference: `payout-${uuidv4().slice(0,8)}`,
     failureReason: null,
     createdAt: formatISO(subHours(now, 5)),
     updatedAt: formatISO(subHours(now, 4)),
-  },
-  {
-    id: 'set-c3d4e5f6',
-    paymentId: 'pay-5',
-    merchantId: 'mer-3',
-    grossAmount: 1500.00,
-    platformFeeAmount: 60.00,
-    merchantNetAmount: 1440.00,
-    settlementStatus: 'failed',
-    remittanceStatus: 'N/A',
-    payoutReference: 'po_1Pq...uG3',
-    failureReason: "Merchant's account is suspended. Payouts are blocked.",
-    createdAt: formatISO(subDays(now, 8)),
-    updatedAt: formatISO(subDays(now, 7)),
-  },
-  {
-    id: 'set-d4e5f6g7',
-    paymentId: 'pay-4',
-    merchantId: 'mer-4',
-    grossAmount: 49.99,
-    platformFeeAmount: 1.45,
-    merchantNetAmount: 48.54,
-    settlementStatus: 'completed',
-    remittanceStatus: 'sent',
-    payoutReference: 'po_1Pq...vH4',
-    failureReason: null,
-    createdAt: formatISO(subDays(now, 10)),
-    updatedAt: formatISO(subDays(now, 9)),
+    providerName: null,
+    providerEndpointType: null,
+    providerOrderSeq: null,
+    providerTransSeq: null,
+    providerRespCode: null,
+    providerRespMessage: null,
+    providerTransState: null,
+    providerTimestamp: null,
+    payoutChannelProcId: null,
+    payoutChannelDescription: null,
+    signatureVerified: null,
+    reconciliationStatus: 'pending',
+    lastQueryAt: null,
+    rawProviderRequest: null,
+    rawProviderResponse: null,
   },
 ];
 
@@ -283,63 +170,9 @@ export let auditLogs: AuditLog[] = [
         entityId: 'pay-1',
         amount: 1250.00
     },
-    {
-        id: 'log-3',
-        timestamp: formatISO(subHours(now, 22)),
-        eventType: 'payment.status.succeeded',
-        user: 'System',
-        details: 'Payment status changed to succeeded.',
-        entityId: 'pay-1',
-        amount: null,
-    },
-    {
-        id: 'log-4',
-        timestamp: formatISO(subHours(now, 21)),
-        eventType: 'settlement.created',
-        user: 'System',
-        details: 'Settlement record created.',
-        entityId: 'pay-1',
-        amount: 1210.00,
-    },
-    {
-        id: 'log-5',
-        timestamp: formatISO(subHours(now, 20)),
-        eventType: 'settlement.status.completed',
-        user: 'System',
-        details: 'Settlement status changed to completed, remittance sent.',
-        entityId: settlements.find(s => s.paymentId === 'pay-1')?.id || '',
-        amount: null,
-    },
-    {
-        id: 'log-6',
-        timestamp: formatISO(subDays(now, 2)),
-        eventType: 'merchant.updated',
-        user: 'admin@speedypay.com',
-        details: 'Updated contact name for merchant Starlight Apts.',
-        entityId: 'mer-1',
-        amount: null,
-    },
-     {
-        id: 'log-7',
-        timestamp: formatISO(subDays(now, 7)),
-        eventType: 'merchant.status.suspended',
-        user: 'System (Automated Risk)',
-        details: 'Merchant suspended due to high chargeback rate.',
-        entityId: 'mer-3',
-        amount: null,
-    },
-     {
-        id: 'log-8',
-        timestamp: formatISO(subDays(now, 8)),
-        eventType: 'settlement.status.failed',
-        user: 'System',
-        details: 'Settlement failed. Reason: Merchant\'s account is suspended.',
-        entityId: 'pay-5',
-        amount: 1440.00,
-    }
 ];
 
-// --- Data Fetching Functions (Client-side) ---
+// --- Data Fetching Functions (Simulated) ---
 
 export const getDashboardStats = async (): Promise<DashboardStats> => {
   return {
@@ -413,7 +246,7 @@ export const getAuditLogs = async (): Promise<AuditLog[]> => {
 }
 
 export const getAuditLogsByEntity = async (entityId: string): Promise<AuditLog[]> => {
-    const relatedSettlement = settlements.find(s => s.paymentId === entityId);
+    const relatedSettlement = settlements.find(s => s.paymentId === entityId || s.id === entityId);
     const entityLogs = auditLogs.filter(log => log.entityId === entityId || (relatedSettlement && log.entityId === relatedSettlement.id))
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     return new Promise(resolve => setTimeout(() => resolve(entityLogs), 200));
@@ -421,8 +254,6 @@ export const getAuditLogsByEntity = async (entityId: string): Promise<AuditLog[]
 
 
 // --- Data Mutation Functions (Server-side) ---
-// These functions simulate interactions that would happen on the server,
-// typically triggered by API calls or webhooks.
 
 export async function addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>): Promise<AuditLog> {
     console.log('[Audit Log]', log.details);
@@ -435,48 +266,12 @@ export async function addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>): Prom
     return newLog;
 }
 
-export async function updatePaymentStatus(
-    paymentId: string,
-    status: Payment['paymentStatus'],
-    settlementStatus?: Payment['settlementStatus']
-): Promise<Payment | null> {
-    const paymentIndex = payments.findIndex(p => p.id === paymentId);
-    if (paymentIndex > -1) {
-        payments[paymentIndex].paymentStatus = status;
-        if (settlementStatus) {
-            payments[paymentIndex].settlementStatus = settlementStatus;
-        }
-        payments[paymentIndex].updatedAt = formatISO(new Date());
-        console.log(`[Data Update] Payment ${paymentId} status updated to ${status}`);
-        return payments[paymentIndex];
-    }
-    return null;
-}
-
-export async function updateSettlementAndRemittanceStatus(
-    settlementId: string,
-    settlementStatus: Settlement['settlementStatus'],
-    remittanceStatus: Settlement['remittanceStatus'],
-    failureReason?: string | null
-): Promise<Settlement | null> {
-    const settlementIndex = settlements.findIndex(s => s.id === settlementId);
+export async function updateSettlement(id: string, updates: Partial<Settlement>): Promise<Settlement | null> {
+    const settlementIndex = settlements.findIndex(s => s.id === id);
     if (settlementIndex > -1) {
-        settlements[settlementIndex].settlementStatus = settlementStatus;
-        settlements[settlementIndex].remittanceStatus = remittanceStatus;
-        if (failureReason !== undefined) {
-             settlements[settlementIndex].failureReason = failureReason;
-        }
-        settlements[settlementIndex].updatedAt = formatISO(new Date());
-
-        // Also update the parent payment record
-        const payment = payments.find(p => p.id === settlements[settlementIndex].paymentId);
-        if (payment) {
-            payment.settlementStatus = settlementStatus;
-            payment.remittanceStatus = remittanceStatus;
-            payment.updatedAt = formatISO(new Date());
-        }
-
-        console.log(`[Data Update] Settlement ${settlementId} status updated to ${settlementStatus}`);
+        const original = settlements[settlementIndex];
+        settlements[settlementIndex] = { ...original, ...updates, updatedAt: formatISO(new Date()) };
+        console.log(`[Data Update] Settlement ${id} updated.`);
         return settlements[settlementIndex];
     }
     return null;

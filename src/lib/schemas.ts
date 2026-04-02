@@ -15,6 +15,7 @@ export const MerchantSchema = z.object({
   settlementChannel: SettlementChannelSchema,
   settlementAccountName: z.string().min(2, "Account name is required"),
   settlementAccountNumberOrWalletId: z.string().min(5, "A valid account number or wallet ID is required"),
+  defaultPayoutChannelProcId: z.string().min(1, "A default payout channel is required."),
 
   onboardingStatus: OnboardingStatusSchema,
   
@@ -32,7 +33,7 @@ export type MerchantFormValues = z.infer<typeof MerchantSchema>;
 
 const PaymentStatusSchema = z.enum(['pending', 'succeeded', 'failed']);
 const SettlementStatusSchema = z.enum(['pending', 'processing', 'completed', 'failed', 'N/A']);
-const RemittanceStatusSchema = z.enum(['pending', 'sent', 'failed', 'N/A']);
+const RemittanceStatusSchema = z.enum(['pending', 'sent', 'failed', 'N/A', 'processing']);
 const SourceChannelSchema = z.enum(['Web', 'Mobile', 'API']);
 
 export const PaymentSchema = z.object({

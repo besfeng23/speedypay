@@ -1,135 +1,145 @@
-// TODO: Finalize these contracts based on the actual SpeedyPay API documentation.
+/**
+ * @fileoverview This file contains the TypeScript types for the SpeedyPay/eMango Pay Payout API.
+ * The contracts are based on the provided API documentation.
+ */
+
+// ==================================
+// Base & Common Types
+// ==================================
+
+/** A map for custom metadata. Not part of the core SpeedyPay spec but used internally. */
+type InternalMetadata = { [key: string]: string | number | null };
+
+export type SignType = 'SHA256';
+export type Currency = 'PHP'; // Default is PHP as per docs
 
 /**
- * Standardized error response from the SpeedyPay API.
+ * Defines the transaction states as per the SpeedyPay API documentation appendix.
  */
-export interface SpeedyPayErrorResponse {
-  error: {
-    type: 'invalid_request_error' | 'api_error' | 'authentication_error' | 'rate_limit_error';
-    code: string;
-    message: string;
-    doc_url?: string;
-  };
+export type SpeedyPayTransactionState = 
+  | '00' // transaction succeeded
+  | '01' // transaction failed
+  | '03' // partial refund
+  | '04' // full refund
+  | '05' // failed refund
+  | '06' // in process
+  | '07' // order to be paid
+  | '08' // cancelled order
+  | '09';// order expired
+
+export const transactionStateMap: Record<SpeedyPayTransactionState, string> = {
+    '00': 'Transaction Succeeded',
+    '01': 'Transaction Failed',
+    '03': 'Partial Refund',
+    '04': 'Full Refund',
+    '05': 'Failed Refund',
+    '06': 'In Process',
+    '07': 'Order to be Paid',
+    '08': 'Cancelled Order',
+    '09': 'Order Expired',
+};
+
+// ==================================
+// API Request Contracts
+// ==================================
+
+interface BaseRequest {
+  signType: SignType;
+  sign: string;
+  timestamp: string; // e.g., "20210325160000" (yyyyMMddHHmmss)
+  merchSeq: string;
+}
+
+export interface PayoutRequest extends BaseRequest {
+  orderSeq: string;
+  orderDate: string; // e.g., "20210325" (yyyyMMdd)
+  amount: string; // e.g., "100.00"
+  fee?: string; // Must be "0.00" per docs
+  currency: Currency;
+  procId: string;
+  procDetail: string; // Account/mobile number
+  email: string;
+  notifyUrl: string;
+  mobilePhone: string;
+  purposes: string;
+  remark?: string;
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  birthDate?: string; // (yyyy-MM-dd)
+  nationality?: string;
+  street1?: string;
+  street2?: string;
+  barangay?: string;
+  city?: string;
+  province?: string;
+  country?: string; // 2-letter country code
+}
+
+export interface QueryOrderRequest extends BaseRequest {
+  orderSeq: string;
+}
+
+export interface QueryBalanceRequest extends BaseRequest {
+  // No extra fields besides base
 }
 
 // ==================================
-// API Request/Response Contracts
+// API Response Contracts
 // ==================================
 
-/** A map for custom metadata. */
-type Metadata = { [key: string]: string | number | null };
-
-export interface CreatePaymentIntentRequest {
-  amount: number; // in cents
-  currency: string;
-  merchant_id: string;
-  metadata: Metadata & {
-    internal_payment_id: string;
-    internal_merchant_id: string;
-  };
+interface BaseResponse {
+  respCode: string; // "00000000" for success
+  respMessage: string;
+  signType: SignType;
+  sign: string;
+  timestamp: string;
+  merchSeq: string;
 }
 
-export interface CreatePaymentIntentResponse {
-  id: string; // The SpeedyPay payment intent ID (e.g., 'pi_...')
-  amount: number;
-  currency: string;
-  status: 'requires_payment_method' | 'requires_confirmation' | 'processing' | 'succeeded';
-  client_secret: string;
+export interface PayoutResponse extends BaseResponse {
+  orderSeq: string;
+  transSeq: string;
+  amount: string;
+  currency: Currency;
+  transState: SpeedyPayTransactionState;
 }
 
-export interface PaymentStatusResponse extends PaymentObject {}
-
-export interface CreateSettlementInstructionRequest {
-  payment_id: string;
-  net_amount: number;
-  currency: string;
-  idempotency_key: string;
-  metadata: Metadata & {
-      internal_settlement_id: string;
-      internal_merchant_id: string;
-  }
+export interface QueryOrderResponse extends BaseResponse {
+  orderSeq: string;
+  transSeq: string;
+  amount: string;
+  fee: string;
+  currency: Currency;
+  transState: SpeedyPayTransactionState;
+  busiType: string;
+  createTime: string; // yyyy-MM-dd HH:mm:ss
+  notifyTime: string; // yyyy-MM-dd HH:mm:ss
 }
 
-export interface CreateSettlementInstructionResponse {
-    id: string; // The SpeedyPay settlement ID (e.g., 'set_...')
-    payment_id: string;
-    status: 'processing' | 'completed' | 'failed';
-    net_amount: number;
-    currency: string;
-}
-
-export interface RemittanceRequest {
-    settlement_id: string;
-    amount: number;
-    currency: string;
-    destination_account_id: string;
-    idempotency_key: string;
-}
-
-export interface RemittanceResponse {
-    id: string; // The SpeedyPay remittance ID (e.g., 'remit_...')
-    settlement_id: string;
-    status: 'pending' | 'sent' | 'failed' | 'canceled';
-    amount: number;
-    destination: string;
+export interface QueryBalanceResponse extends BaseResponse {
+  amount: string; // e.g., "10000.00"
 }
 
 // ==================================
-// Webhook Event Contracts
+// Webhook Event Contracts (Assuming structure based on other APIs, as not detailed in Payout docs)
 // ==================================
 
-export type SpeedyPayWebhookEventType =
-  | 'payment.succeeded'
-  | 'payment.failed'
-  | 'settlement.created'
-  | 'settlement.completed'
-  | 'settlement.failed'
-  | 'remittance.sent'
-  | 'remittance.failed';
-
-export interface SpeedyPayWebhookEvent {
-  id: string; // The unique ID for the event (e.g., 'evt_...')
-  api_version: string;
-  type: SpeedyPayWebhookEventType;
-  created: string; // ISO 8601 timestamp
-  data: {
-    object: PaymentObject | SettlementObject | RemittanceObject;
-  };
-}
-
-// --- Webhook Data Objects ---
-
-export interface PaymentObject {
-  object: 'payment';
-  id: string; // The SpeedyPay payment ID
-  amount: number;
-  currency: string;
-  status: 'succeeded' | 'failed';
-  failure_reason?: string;
-  created: string;
-  metadata: Metadata & {
-    internal_payment_id: string; // Critical for linking back to our system
-  };
-}
-
-export interface SettlementObject {
-    object: 'settlement';
-    id: string; // The SpeedyPay settlement ID
-    payment_id: string;
-    status: 'processing' | 'completed' | 'failed';
-    net_amount: number;
-    failure_reason?: string;
-    metadata: Metadata & {
-        internal_settlement_id: string; // Critical for linking
-    };
-}
-
-export interface RemittanceObject {
-    object: 'remittance';
-    id: string; // The SpeedyPay remittance ID
-    settlement_id: string; // The parent settlement ID
-    status: 'sent' | 'failed';
-    amount: number;
-    failure_reason?: string;
-    destination: string;
+/**
+ * This is an assumed structure for webhooks. The provided docs do not detail the webhook payload.
+ * This structure should be verified and updated when real webhook documentation is available.
+ */
+export interface SpeedyPayWebhookPayload {
+  signType: SignType;
+  sign: string;
+  timestamp: string; // e.g., "20210325160000"
+  merchSeq: string;
+  orderSeq: string;
+  transSeq: string;
+  amount: string;
+  currency: Currency;
+  transState: SpeedyPayTransactionState;
+  respCode: string;
+  respMessage: string;
+  notifyTime: string; // yyyy-MM-dd HH:mm:ss
 }

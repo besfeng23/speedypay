@@ -15,12 +15,13 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Payment, Settlement } from "@/lib/types";
 import Link from "next/link";
+import { payoutChannelMap } from "@/lib/speedypay/payout-channels";
 
-function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
+function DetailItem({ label, value, isMono = false }: { label: string; value: React.ReactNode, isMono?: boolean }) {
   return (
     <div className="grid grid-cols-3 items-start gap-4 py-3">
       <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className="text-sm col-span-2 font-medium">{value}</dd>
+      <dd className={`text-sm col-span-2 font-medium ${isMono ? 'font-mono text-xs' : ''}`}>{value}</dd>
     </div>
   );
 }
@@ -105,6 +106,7 @@ export default async function MerchantDetailPage({
 
   const recentTransactions = await getPaymentsByMerchantId(merchant.id, 5);
   const recentSettlements = await getSettlementsByMerchantId(merchant.id, 5);
+  const payoutChannel = merchant.defaultPayoutChannelProcId ? payoutChannelMap.get(merchant.defaultPayoutChannelProcId) : null;
 
   return (
     <>
@@ -136,14 +138,14 @@ export default async function MerchantDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle>Settlement & Fees</CardTitle>
-              <CardDescription>Configuration for payouts and platform fee structure.</CardDescription>
+              <CardTitle>Payout & Fee Configuration</CardTitle>
+              <CardDescription>Configuration for merchant payouts and platform fee structure.</CardDescription>
             </CardHeader>
             <CardContent>
               <dl className="divide-y">
-                <DetailItem label="Settlement Channel" value={merchant.settlementChannel} />
-                <DetailItem label="Account Name" value={merchant.settlementAccountName} />
-                <DetailItem label="Account/Wallet ID" value={<span className="font-mono text-xs">{merchant.settlementAccountNumberOrWalletId}</span>} />
+                <DetailItem label="Default Payout Channel" value={payoutChannel ? `${payoutChannel.description} (${payoutChannel.procId})` : 'Not Set'} />
+                <DetailItem label="Recipient Full Name" value={merchant.settlementAccountName} />
+                <DetailItem label="Recipient Account/Wallet" value={merchant.settlementAccountNumberOrWalletId} isMono />
                 <DetailItem label="Default Fee Type" value={<Badge variant="outline" className="capitalize">{merchant.defaultFeeType}</Badge>} />
                 <DetailItem label="Default Fee Value" value={merchant.defaultFeeType === 'percentage' ? `${merchant.defaultFeeValue}%` : `$${merchant.defaultFeeValue.toFixed(2)}`} />
               </dl>

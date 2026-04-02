@@ -13,13 +13,16 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { transactionStateMap } from "@/lib/speedypay/types";
+import { PayoutActions } from "./payout-actions";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
-function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
+function DetailItem({ label, value, isMono = false }: { label: string; value: React.ReactNode; isMono?: boolean }) {
     return (
         <div className="grid grid-cols-3 items-start gap-4 py-3">
             <dt className="text-sm text-muted-foreground">{label}</dt>
-            <dd className="text-sm col-span-2 font-medium">{value}</dd>
+            <dd className={`text-sm col-span-2 font-medium ${isMono ? 'font-mono text-xs' : ''}`}>{value || <span className="text-muted-foreground/70">N/A</span>}</dd>
         </div>
     )
 }
@@ -63,24 +66,28 @@ export default async function SettlementDetailPage({
   const payment = await getPaymentById(settlement.paymentId);
   const events = await getAuditLogsByEntity(settlement.id);
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, currency = "USD") => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
+      currency,
     }).format(amount);
   };
+  
+  const providerStateLabel = settlement.providerTransState ? `${transactionStateMap[settlement.providerTransState]} (${settlement.providerTransState})` : null;
 
   return (
     <>
       <PageHeader
         title="Settlement Details"
         description={`Settlement ID: ${settlement.id}`}
-      />
+      >
+        <PayoutActions settlement={settlement} />
+      </PageHeader>
       
       {settlement.failureReason && (
           <Alert variant="destructive" className="mb-6">
               <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Settlement Failure</AlertTitle>
+              <AlertTitle>Settlement or Remittance Failure</AlertTitle>
               <AlertDescription>
                   {settlement.failureReason}
               </AlertDescription>
@@ -91,16 +98,20 @@ export default async function SettlementDetailPage({
         <div className="md:col-span-2 grid gap-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Core Information</CardTitle>
-                    <CardDescription>Key identifiers and associations for this settlement.</CardDescription>
+                    <CardTitle>Payout Provider Details</CardTitle>
+                    <CardDescription>Information from the payout provider (SpeedyPay).</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <dl className="divide-y">
-                        <DetailItem label="Payment ID" value={<Link href={`/transactions/${settlement.paymentId}`} className="text-primary hover:underline font-mono text-xs">{settlement.paymentId}</Link>} />
-                        <DetailItem label="Merchant" value={<Link href={`/merchants/${settlement.merchantId}`} className="text-primary hover:underline">{merchant?.displayName || 'Unknown'}</Link>} />
-                        <DetailItem label="Payout Reference" value={<Badge variant="secondary" className="font-mono text-xs">{settlement.payoutReference}</Badge>} />
-                        <DetailItem label="Created At" value={format(new Date(settlement.createdAt), "PPP p")} />
-                        <DetailItem label="Last Updated" value={format(new Date(settlement.updatedAt), "PPP p")} />
+                        <DetailItem label="Provider Name" value={settlement.providerName} />
+                        <DetailItem label="Provider Order ID" value={settlement.providerOrderSeq} isMono />
+                        <DetailItem label="Provider Transaction ID" value={settlement.providerTransSeq} isMono />
+                        <DetailItem label="Provider State" value={providerStateLabel} />
+                        <DetailItem label="Provider Message" value={settlement.providerRespMessage} />
+                        <DetailItem label="Payout Channel" value={settlement.payoutChannelDescription ? `${settlement.payoutChannelDescription} (${settlement.payoutChannelProcId})` : null} />
+                        <DetailItem label="Last Provider Timestamp" value={settlement.providerTimestamp} isMono />
+                        <DetailItem label="Signature Verified" value={settlement.signatureVerified === null ? 'N/A' : (settlement.signatureVerified ? <CheckCircle className="h-4 w-4 text-green-500"/> : <XCircle className="h-4 w-4 text-red-500"/>)} />
+                        <DetailItem label="Last Queried" value={settlement.lastQueryAt ? format(new Date(settlement.lastQueryAt), "PPP p") : 'Never'} />
                     </dl>
                 </CardContent>
             </Card>
@@ -114,7 +125,23 @@ export default async function SettlementDetailPage({
                     <dl className="divide-y">
                         <DetailItem label="Gross Amount" value={formatCurrency(settlement.grossAmount)} />
                         <DetailItem label="Platform Fee" value={formatCurrency(settlement.platformFeeAmount)} />
-                        <DetailItem label="Merchant Net Amount" value={formatCurrency(settlement.merchantNetAmount)} />
+                        <DetailItem label="Merchant Net Amount" value={<strong>{formatCurrency(settlement.merchantNetAmount, 'PHP')}</strong>} />
+                    </dl>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Core Information</CardTitle>
+                    <CardDescription>Key identifiers and associations for this settlement.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                     <dl className="divide-y">
+                        <DetailItem label="Source Payment ID" value={<Link href={`/transactions/${settlement.paymentId}`} className="text-primary hover:underline font-mono text-xs">{settlement.paymentId}</Link>} />
+                        <DetailItem label="Merchant" value={<Link href={`/merchants/${settlement.merchantId}`} className="text-primary hover:underline">{merchant?.displayName || 'Unknown'}</Link>} />
+                        <DetailItem label="Internal Payout Ref" value={settlement.payoutReference} isMono />
+                        <DetailItem label="Created At" value={format(new Date(settlement.createdAt), "PPP p")} />
+                        <DetailItem label="Last Updated" value={format(new Date(settlement.updatedAt), "PPP p")} />
                     </dl>
                 </CardContent>
             </Card>
@@ -135,9 +162,30 @@ export default async function SettlementDetailPage({
                     <CardTitle>Statuses</CardTitle>
                     <CardDescription>Current state of the settlement and remittance process.</CardDescription>
                 </CardHeader>
+                <CardContent className="grid gap-y-4">
+                    <DetailItem label="Internal Settlement" value={<StatusBadge status={settlement.settlementStatus} />} />
+                    <DetailItem label="Internal Remittance" value={<StatusBadge status={settlement.remittanceStatus} />} />
+                    <DetailItem label="Reconciliation" value={<StatusBadge status={settlement.reconciliationStatus} />} />
+                </CardContent>
+            </Card>
+            <Card>
+                 <CardHeader>
+                    <CardTitle>Raw Provider Data</CardTitle>
+                    <CardDescription>The raw JSON request and response for debugging.</CardDescription>
+                </CardHeader>
                 <CardContent className="space-y-4">
-                    <DetailItem label="Settlement Status" value={<StatusBadge status={settlement.settlementStatus} />} />
-                    <DetailItem label="Remittance Status" value={<StatusBadge status={settlement.remittanceStatus} />} />
+                    <div>
+                        <h4 className="text-xs font-semibold mb-1">Request</h4>
+                        <ScrollArea className="h-48 bg-muted/50 rounded p-2 border">
+                            <pre className="text-xs font-mono">{settlement.rawProviderRequest ? JSON.stringify(JSON.parse(settlement.rawProviderRequest), null, 2) : 'N/A'}</pre>
+                        </ScrollArea>
+                    </div>
+                     <div>
+                        <h4 className="text-xs font-semibold mb-1">Response</h4>
+                        <ScrollArea className="h-48 bg-muted/50 rounded p-2 border">
+                            <pre className="text-xs font-mono">{settlement.rawProviderResponse ? JSON.stringify(JSON.parse(settlement.rawProviderResponse), null, 2) : 'N/A'}</pre>
+                        </ScrollArea>
+                    </div>
                 </CardContent>
             </Card>
         </div>

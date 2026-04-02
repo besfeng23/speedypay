@@ -30,6 +30,7 @@ import { Bot, Loader2, Sparkles } from "lucide-react";
 import { useState, useTransition } from "react";
 import { MerchantSchema, type MerchantFormValues } from "@/lib/schemas";
 import { createMerchant } from "@/lib/actions";
+import { payoutChannels } from "@/lib/speedypay/payout-channels";
 
 
 export default function NewMerchantPage() {
@@ -49,6 +50,7 @@ export default function NewMerchantPage() {
       settlementAccountName: "",
       settlementAccountNumberOrWalletId: "",
       settlementChannel: "Bank Account",
+      defaultPayoutChannelProcId: "BPI",
       onboardingStatus: "Pending",
       defaultFeeType: "percentage",
       defaultFeeValue: 2.9,
@@ -117,7 +119,7 @@ export default function NewMerchantPage() {
                     <FormField control={form.control} name="displayName" render={({ field }) => ( <FormItem> <FormLabel>Display Name</FormLabel> <FormControl> <Input placeholder="e.g., Starlight Apts" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                     <FormField control={form.control} name="contactName" render={({ field }) => ( <FormItem> <FormLabel>Contact Name</FormLabel> <FormControl> <Input placeholder="e.g., Alice Johnson" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                     <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Contact Email</FormLabel> <FormControl> <Input type="email" placeholder="e.g., alice@starlight.com" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-                    <FormField control={form.control} name="mobile" render={({ field }) => ( <FormItem> <FormLabel>Mobile Number</FormLabel> <FormControl> <Input placeholder="e.g., 555-0101" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="mobile" render={({ field }) => ( <FormItem> <FormLabel>Mobile Number</FormLabel> <FormControl> <Input placeholder="e.g., 09171234567" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                 </CardContent>
               </Card>
 
@@ -127,10 +129,10 @@ export default function NewMerchantPage() {
                   <CardDescription>Configure where and how to send money to this merchant.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField control={form.control} name="settlementChannel" render={({ field }) => ( <FormItem> <FormLabel>Settlement Channel</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a channel"/> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="Bank Account">Bank Account</SelectItem> <SelectItem value="Digital Wallet">Digital Wallet</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )}/>
-                    <FormField control={form.control} name="settlementAccountName" render={({ field }) => ( <FormItem> <FormLabel>Account Name</FormLabel> <FormControl> <Input placeholder="e.g., Starlight Ops" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-                    <FormField control={form.control} name="settlementAccountNumberOrWalletId" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>Account Number / Wallet ID</FormLabel> <FormControl> <Input placeholder="Enter account details" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-
+                    <FormField control={form.control} name="settlementChannel" render={({ field }) => ( <FormItem> <FormLabel>Internal Channel Type</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a channel"/> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="Bank Account">Bank Account</SelectItem> <SelectItem value="Digital Wallet">Digital Wallet</SelectItem> </SelectContent> </Select> <FormDescription>Used for internal classification.</FormDescription><FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="settlementAccountName" render={({ field }) => ( <FormItem> <FormLabel>Recipient Full Name</FormLabel> <FormControl> <Input placeholder="e.g., Alice B. Johnson" {...field} /> </FormControl><FormDescription>Full legal name of the account holder.</FormDescription> <FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="settlementAccountNumberOrWalletId" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>Recipient Account / Wallet ID</FormLabel> <FormControl> <Input placeholder="Enter account details (e.g., bank account # or mobile #)" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+                     <FormField control={form.control} name="defaultPayoutChannelProcId" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>Default Payout Channel</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a provider payout channel"/> </SelectTrigger> </FormControl> <SelectContent> {payoutChannels.map(channel => <SelectItem key={channel.procId} value={channel.procId}>{channel.description}</SelectItem>)} </SelectContent> </Select> <FormDescription>The specific provider channel to use for payouts.</FormDescription><FormMessage /> </FormItem> )}/>
                     <FormField control={form.control} name="defaultFeeType" render={({ field }) => ( <FormItem> <FormLabel>Default Fee Type</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a fee type"/> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="percentage">Percentage</SelectItem> <SelectItem value="fixed">Fixed</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )}/>
                     <FormField control={form.control} name="defaultFeeValue" render={({ field }) => ( <FormItem> <FormLabel>Default Fee Value</FormLabel> <FormControl> <Input type="number" step="0.01" placeholder="e.g., 2.9" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                 </CardContent>

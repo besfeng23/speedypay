@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter
 } from "@/components/ui/card";
 import {
   Tabs,
@@ -18,10 +19,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { speedypayConfig, isSpeedyPayConfigured } from "@/lib/speedypay/config";
-import { CheckCircle, XCircle, AlertTriangle, Terminal } from "lucide-react";
+import { speedypayConfig, isSpeedyPayConfigured, getBaseUrl } from "@/lib/speedypay/config";
+import { CheckCircle, XCircle, AlertTriangle, Terminal, Banknote, Loader2 } from "lucide-react";
 import { SystemReadiness } from "@/components/system-readiness";
 import { useAuth } from "@/lib/firebase/hooks";
+import { payoutChannels } from "@/lib/speedypay/payout-channels";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useState } from "react";
+import { getProviderBalance } from "@/lib/actions";
+import { useToast } from "@/hooks/use-toast";
 
 function IntegrationStatus() {
   const isConfigured = isSpeedyPayConfigured();
@@ -46,7 +53,7 @@ function IntegrationStatus() {
             <AlertTitle>Configuration Missing</AlertTitle>
             <AlertDescription>
               One or more SpeedyPay API credentials are missing from your environment variables. The integration is disabled.
-              <p className="mt-2 text-xs">Please check your <code>.env.local</code> file for `SPEEDYPAY_API_KEY`, `SPEEDYPAY_API_SECRET`, and `SPEEDYPAY_WEBHOOK_SECRET`.</p>
+              <p className="mt-2 text-xs">Please check your environment file for `SPEEDYPAY_MERCH_SEQ` and `SPEEDYPAY_SECRET_KEY`.</p>
             </AlertDescription>
           </Alert>
         )}
@@ -56,16 +63,15 @@ function IntegrationStatus() {
 }
 
 function WebhookInfo() {
-  const isConfigured = !!speedypayConfig.webhookSecret;
-  const webhookUrl = typeof window !== 'undefined'
+  const webhookUrl = speedypayConfig.notifyUrl || (typeof window !== 'undefined'
     ? `${window.location.origin}/api/webhooks/speedypay`
-    : '/api/webhooks/speedypay';
+    : '/api/webhooks/speedypay');
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Webhook Endpoint</CardTitle>
-        <CardDescription>Configure this endpoint in your SpeedyPay developer dashboard.</CardDescription>
+        <CardDescription>Configure this `notifyUrl` in your SpeedyPay merchant dashboard.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4 p-2 rounded-md bg-muted">
@@ -73,12 +79,8 @@ function WebhookInfo() {
             <code className="text-sm font-mono flex-1">{webhookUrl}</code>
             <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(webhookUrl)}>Copy</Button>
         </div>
-        <div className="flex items-center gap-2 text-sm">
-            {isConfigured ? <CheckCircle className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
-            <span>Webhook secret is {isConfigured ? 'configured' : 'missing'}.</span>
-        </div>
         <p className="text-xs text-muted-foreground">
-          This endpoint listens for real-time events from SpeedyPay to update payment, settlement, and remittance statuses automatically.
+          This endpoint listens for real-time events from SpeedyPay to update payout statuses automatically.
         </p>
       </CardContent>
     </Card>
@@ -96,24 +98,93 @@ function ProviderConfig() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="api-base-url">API Base URL</Label>
-          <Input id="api-base-url" value={speedypayConfig.apiBaseUrl} readOnly disabled />
+          <Label htmlFor="api-base-url">API Base URL ({speedypayConfig.env})</Label>
+          <Input id="api-base-url" value={getBaseUrl()} readOnly disabled />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="api-key">API Key</Label>
-          <Input id="api-key" value={speedypayConfig.apiKey ? `spk_...${speedypayConfig.apiKey.slice(-4)}` : 'Not Set'} readOnly disabled />
+          <Label htmlFor="merch-seq">Merchant Sequence (merchSeq)</Label>
+          <Input id="merch-seq" value={speedypayConfig.merchSeq || 'Not Set'} readOnly disabled />
         </div>
          <div className="space-y-2">
-          <Label htmlFor="api-secret">API Secret</Label>
-          <Input id="api-secret" type="password" value={speedypayConfig.apiSecret ? '••••••••••••••••' : ''} readOnly disabled />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="webhook-secret">Webhook Secret</Label>
-          <Input id="webhook-secret" type="password" value={speedypayConfig.webhookSecret ? '••••••••••••••••' : ''} readOnly disabled />
+          <Label htmlFor="api-secret">Secret Key</Label>
+          <Input id="api-secret" type="password" value={speedypayConfig.secretKey ? '••••••••••••••••' : ''} readOnly disabled />
         </div>
       </CardContent>
     </Card>
   )
+}
+
+function PayoutChannels() {
+    return (
+        <Card>
+             <CardHeader>
+                <CardTitle>Supported Payout Channels</CardTitle>
+                <CardDescription>List of currently supported channels for SpeedyPay payouts.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ScrollArea className="h-96">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>procId</TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Type</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {payoutChannels.map(channel => (
+                            <TableRow key={channel.procId}>
+                                <TableCell className="font-mono text-xs">{channel.procId}</TableCell>
+                                <TableCell>{channel.description}</TableCell>
+                                <TableCell><Badge variant="outline">{channel.type}</Badge></TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+                </ScrollArea>
+            </CardContent>
+        </Card>
+    )
+}
+
+function ProviderBalance() {
+    const [isLoading, setIsLoading] = useState(false);
+    const [balance, setBalance] = useState<string | null>(null);
+    const { toast } = useToast();
+
+    const handleQueryBalance = async () => {
+        setIsLoading(true);
+        setBalance(null);
+        const result = await getProviderBalance();
+        if(result.success) {
+            setBalance(result.data.balance);
+        } else {
+            toast({ variant: "destructive", title: "Failed to Query Balance", description: result.message });
+        }
+        setIsLoading(false);
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Provider Balance</CardTitle>
+                <CardDescription>Query your current merchant balance with SpeedyPay.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                {balance ? (
+                    <p className="text-2xl font-bold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(Number(balance))}</p>
+                ) : (
+                    <p className="text-sm text-muted-foreground">Click the button to query your live balance.</p>
+                )}
+            </CardContent>
+            <CardFooter>
+                 <Button onClick={handleQueryBalance} disabled={isLoading}>
+                    {isLoading && <Loader2 className="animate-spin" />}
+                    <span className="ml-2">Query Balance</span>
+                </Button>
+            </CardFooter>
+        </Card>
+    )
 }
 
 export default function SettingsPage() {
@@ -127,13 +198,11 @@ export default function SettingsPage() {
         description="Manage your account and application settings."
       />
 
-      <Tabs defaultValue="profile" className="space-y-4">
+      <Tabs defaultValue="integration" className="space-y-4">
         <TabsList>
           <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="integration">Integration</TabsTrigger>
+          <TabsTrigger value="integration">Payout Integration</TabsTrigger>
           <TabsTrigger value="fees">Fee Configs</TabsTrigger>
-          <TabsTrigger value="api">Platform API</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
           {isAdmin && <TabsTrigger value="system">System</TabsTrigger>}
         </TabsList>
 
@@ -156,13 +225,17 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="integration" className="grid md:grid-cols-2 gap-6">
+        <TabsContent value="integration" className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="space-y-6">
               <ProviderConfig />
+              <ProviderBalance />
             </div>
             <div className="space-y-6">
               <IntegrationStatus />
               <WebhookInfo />
+            </div>
+             <div className="lg:col-span-1">
+                <PayoutChannels />
             </div>
         </TabsContent>
         <TabsContent value="fees" className="space-y-4">
@@ -175,32 +248,6 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">Fee configuration management will be implemented here.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="api" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Platform API & Webhooks</CardTitle>
-              <CardDescription>
-                Manage your API keys and webhook endpoints for platform integration.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Platform API and webhook settings will be available here.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-         <TabsContent value="notifications" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notifications</CardTitle>
-              <CardDescription>
-                Manage how you receive notifications from the system.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Notification preferences will be configured here.</p>
             </CardContent>
           </Card>
         </TabsContent>

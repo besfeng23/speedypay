@@ -1,141 +1,217 @@
 import 'server-only';
-import { speedypayConfig } from './config';
+import { speedypayConfig, getBaseUrl } from './config';
 import type {
-  CreatePaymentIntentRequest,
-  CreatePaymentIntentResponse,
-  PaymentStatusResponse,
-  CreateSettlementInstructionRequest,
-  CreateSettlementInstructionResponse,
-  RemittanceRequest,
-  RemittanceResponse,
-  SpeedyPayErrorResponse,
+  PayoutRequest,
+  PayoutResponse,
+  QueryOrderRequest,
+  QueryOrderResponse,
+  QueryBalanceRequest,
+  QueryBalanceResponse,
+  SpeedyPayWebhookPayload,
 } from './types';
-import crypto from 'crypto';
+import { generateSignature, verifySignature } from './crypto';
+import { format } from 'date-fns';
 
 /**
- * A service adapter for interacting with the SpeedyPay API.
- * Contains placeholder methods for key operations.
- * TODO: Implement actual API calls using fetch() and handle responses/errors.
+ * A service adapter for interacting with the SpeedyPay Payout API.
+ * This implementation is based on the provided eMango Pay documentation.
  */
 
 const getHeaders = () => ({
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${speedypayConfig.apiSecret}`,
-  'X-Api-Key': speedypayConfig.apiKey || '',
+  'Accept': 'application/json',
 });
 
 /**
- * Creates a payment intent with SpeedyPay.
- * @param request - The payment intent creation request payload.
+ * A generic fetch wrapper to handle API requests to SpeedyPay.
+ * In a real app, this would use `fetch` and handle errors, retries, etc.
+ * Here, it simulates the API call and returns a mock response.
+ */
+async function postToSpeedyPay<TRequest, TResponse>(endpoint: string, request: TRequest): Promise<TResponse | { respCode: string; respMessage: string; }> {
+    const url = `${getBaseUrl()}/${endpoint}`;
+    console.log(`[SpeedyPay API] Simulating POST to ${url}`);
+    console.log(`[SpeedyPay API] Request Body:`, JSON.stringify(request, null, 2));
+
+    // In a real application, you would use fetch:
+    /*
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: getHeaders(),
+            body: JSON.stringify(request),
+        });
+
+        if (!response.ok) {
+            // Handle HTTP errors
+            const errorBody = await response.text();
+            console.error(`[SpeedyPay API] HTTP Error ${response.status}:`, errorBody);
+            return {
+                respCode: String(response.status),
+                respMessage: `HTTP Error: ${response.statusText}`,
+            };
+        }
+
+        return await response.json() as TResponse;
+
+    } catch (error) {
+        console.error('[SpeedyPay API] Network or fetch error:', error);
+        return {
+            respCode: 'NET_ERROR',
+            respMessage: error instanceof Error ? error.message : 'A network error occurred',
+        };
+    }
+    */
+
+    // For now, return a successful-looking mock response for demonstration.
+    // The specific mock logic will be in each function.
+    // This is a generic fallback.
+    return {
+        respCode: 'MOCK_ERROR',
+        respMessage: 'This is a mock response. API method not fully mocked.',
+    } as any;
+}
+
+
+/**
+ * Submits a payout (cash out) request.
+ * @param params - The payout request parameters.
  * @returns The response from SpeedyPay.
  */
-export async function createPaymentIntent(request: CreatePaymentIntentRequest): Promise<CreatePaymentIntentResponse> {
-  console.log('[SpeedyPay API] Initiating createPaymentIntent:', request);
-  // TODO: Implement fetch() call to POST /payment_intents
-  // const response = await fetch(`${speedypayConfig.apiBaseUrl}/payment_intents`, {
-  //   method: 'POST',
-  //   headers: getHeaders(),
-  //   body: JSON.stringify(request),
-  // });
-  // if (!response.ok) { ... handle error ... }
-  // return await response.json();
+export async function createPayout(params: Omit<PayoutRequest, 'signType' | 'sign' | 'timestamp' | 'merchSeq'>): Promise<PayoutResponse> {
+  const request: Omit<PayoutRequest, 'sign'> = {
+    ...params,
+    merchSeq: speedypayConfig.merchSeq!,
+    timestamp: format(new Date(), 'yyyyMMddHHmmss'),
+    signType: 'SHA256',
+  };
+  const signature = generateSignature(request);
+  const signedRequest: PayoutRequest = { ...request, sign: signature };
+
+  // This is where you would make the actual API call.
+  // For now, we simulate a successful response.
+  console.log(`[SpeedyPay API] Calling cashOut.do with orderSeq: ${params.orderSeq}`);
   
-  // Placeholder response
-  return {
-    id: `pi_${crypto.randomBytes(12).toString('hex')}`,
-    amount: request.amount,
-    currency: request.currency,
-    status: 'requires_payment_method',
-    client_secret: `pi_${crypto.randomBytes(12).toString('hex')}_secret_${crypto.randomBytes(24).toString('hex')}`,
+  // MOCK RESPONSE
+  const mockResponsePayload: Omit<PayoutResponse, 'sign' | 'signType'> = {
+      respCode: '00000000',
+      respMessage: 'Transaction is accepted',
+      timestamp: format(new Date(), 'yyyyMMddHHmmss'),
+      merchSeq: speedypayConfig.merchSeq!,
+      orderSeq: params.orderSeq,
+      transSeq: `T${Date.now()}`,
+      amount: params.amount,
+      currency: 'PHP',
+      transState: '06', // In Process
   };
-}
-
-/**
- * Retrieves the status of a payment from SpeedyPay.
- * @param paymentId - The ID of the payment to look up.
- * @returns The current status information for the payment.
- */
-export async function getPaymentStatus(paymentId: string): Promise<PaymentStatusResponse> {
-  console.log(`[SpeedyPay API] Getting status for payment: ${paymentId}`);
-  // TODO: Implement fetch() call to GET /payments/{paymentId}
   
-  // Placeholder response
-  return {
-    id: paymentId,
-    amount: 10000,
-    currency: 'usd',
-    status: 'succeeded',
-    created: new Date().toISOString(),
-    metadata: {},
+  const responseSignature = generateSignature(mockResponsePayload);
+  const mockResponse: PayoutResponse = {
+      ...mockResponsePayload,
+      signType: 'SHA256',
+      sign: responseSignature,
   };
+
+  // Simulate network delay
+  await new Promise(res => setTimeout(res, 500));
+
+  return mockResponse;
 }
 
 /**
- * Creates a settlement instruction with SpeedyPay.
- * @param request - The settlement instruction creation request.
- * @returns The response from SpeedyPay.
+ * Queries the status of a specific order/transaction.
+ * @param orderSeq - The unique order sequence ID to query.
+ * @returns The transaction details from SpeedyPay.
  */
-export async function createSettlementInstruction(request: CreateSettlementInstructionRequest): Promise<CreateSettlementInstructionResponse> {
-  console.log('[SpeedyPay API] Creating settlement instruction:', request);
-  // TODO: Implement fetch() call to POST /settlements
-  // This is an idempotent operation, use the idempotency_key.
+export async function queryOrder(orderSeq: string): Promise<QueryOrderResponse> {
+    const request: Omit<QueryOrderRequest, 'sign'> = {
+        merchSeq: speedypayConfig.merchSeq!,
+        timestamp: format(new Date(), 'yyyyMMddHHmmss'),
+        signType: 'SHA256',
+        orderSeq: orderSeq,
+    };
+    const signature = generateSignature(request);
+    const signedRequest: QueryOrderRequest = { ...request, sign: signature };
 
-  // Placeholder response
-  return {
-    id: `set_${crypto.randomBytes(12).toString('hex')}`,
-    payment_id: request.payment_id,
-    status: 'processing',
-    net_amount: request.net_amount,
-    currency: request.currency,
-  };
+    console.log(`[SpeedyPay API] Calling qryOrder.do for orderSeq: ${orderSeq}`);
+
+    // MOCK RESPONSE - in a real scenario, this would come from the API
+    const mockResponsePayload: Omit<QueryOrderResponse, 'sign' | 'signType'> = {
+        respCode: '00000000',
+        respMessage: 'Query Success',
+        timestamp: format(new Date(), 'yyyyMMddHHmmss'),
+        merchSeq: speedypayConfig.merchSeq!,
+        orderSeq: orderSeq,
+        transSeq: `T${Date.now()}`,
+        amount: "100.00", // Example
+        fee: "0.00",
+        currency: 'PHP',
+        transState: '00', // Assume it succeeded for the query
+        busiType: 'CashOut',
+        createTime: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
+        notifyTime: format(new Date(), 'yyyy-MM-dd HH:mm:ss'),
+    };
+    const responseSignature = generateSignature(mockResponsePayload);
+    const mockResponse: QueryOrderResponse = {
+        ...mockResponsePayload,
+        signType: 'SHA256',
+        sign: responseSignature,
+    };
+    
+    await new Promise(res => setTimeout(res, 300));
+    return mockResponse;
 }
 
 /**
- * Initiates a remittance (payout) to a merchant.
- * @param request - The remittance request details.
- * @returns The response from SpeedyPay.
+ * Queries the merchant's current balance with SpeedyPay.
+ * @returns The balance information.
  */
-export async function remitToMerchant(request: RemittanceRequest): Promise<RemittanceResponse> {
-  console.log('[SpeedyPay API] Initiating remittance:', request);
-  // TODO: Implement fetch() call to POST /remittances
-  // This is an idempotent operation, use the idempotency_key.
+export async function queryBalance(): Promise<QueryBalanceResponse> {
+    const request: Omit<QueryBalanceRequest, 'sign'> = {
+        merchSeq: speedypayConfig.merchSeq!,
+        timestamp: format(new Date(), 'yyyyMMddHHmmss'),
+        signType: 'SHA256',
+    };
+    const signature = generateSignature(request);
+    const signedRequest: QueryBalanceRequest = { ...request, sign: signature };
 
-  // Placeholder response
-  return {
-    id: `remit_${crypto.randomBytes(12).toString('hex')}`,
-    settlement_id: request.settlement_id,
-    status: 'sent',
-    amount: request.amount,
-    destination: request.destination_account_id,
-  };
+    console.log(`[SpeedyPay API] Calling qryBalance.do`);
+
+    // MOCK RESPONSE
+    const mockResponsePayload: Omit<QueryBalanceResponse, 'sign' | 'signType'> = {
+        respCode: '00000000',
+        respMessage: 'Query Success',
+        timestamp: format(new Date(), 'yyyyMMddHHmmss'),
+        merchSeq: speedypayConfig.merchSeq!,
+        amount: (Math.random() * 100000).toFixed(2), // Random balance for demo
+    };
+    const responseSignature = generateSignature(mockResponsePayload);
+    const mockResponse: QueryBalanceResponse = {
+        ...mockResponsePayload,
+        signType: 'SHA256',
+        sign: responseSignature,
+    };
+
+    await new Promise(res => setTimeout(res, 300));
+    return mockResponse;
 }
+
 
 /**
  * Verifies the signature of an incoming webhook payload.
- * @param payload - The raw string body of the webhook request.
- * @param signature - The value of the 'speedypay-signature' header.
+ * The payload is assumed to be the parsed JSON body of the request.
+ * @param payload - The webhook payload object.
  * @returns True if the signature is valid, false otherwise.
  */
-export function verifyWebhookSignature(payload: string, signature: string): boolean {
+export function verifyWebhookSignature(payload: SpeedyPayWebhookPayload): boolean {
   console.log('[SpeedyPay Webhook] Verifying webhook signature.');
-  if (!speedypayConfig.webhookSecret) {
-    console.error('[SpeedyPay Webhook] Webhook secret is not configured. Cannot verify signature.');
+  if (!speedypayConfig.secretKey) {
+    console.error('[SpeedyPay Webhook] Webhook secret key is not configured. Cannot verify signature.');
     return false;
   }
+  if (!payload.sign) {
+      console.error('[SpeedyPay Webhook] Payload has no signature.');
+      return false;
+  }
   
-  // TODO: Implement the actual signature verification logic based on SpeedyPay docs.
-  // This typically involves creating an HMAC SHA256 hash of the payload with the secret.
-  const expectedSignature = crypto
-    .createHmac('sha256', speedypayConfig.webhookSecret)
-    .update(payload)
-    .digest('hex');
-
-  // Placeholder logic: for demo purposes, we'll just check for a simple match.
-  // In a real scenario, you must perform a constant-time comparison to prevent timing attacks.
-  // return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
-
-  console.log(`[SpeedyPay Webhook] Received signature: ${signature.substring(0,10)}...`);
-  // For this placeholder, we'll just return true if a secret is present.
-  // In a real app, this MUST be a real verification.
-  return true;
+  return verifySignature(payload, payload.sign);
 }
