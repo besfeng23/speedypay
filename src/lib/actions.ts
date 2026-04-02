@@ -7,9 +7,9 @@ import { formatISO } from 'date-fns';
 import { MerchantSchema, CreatePaymentSchema, type MerchantFormValues, type CreatePaymentFormValues } from './schemas';
 import { merchants, addAuditLog, payments, settlements, updatePayment } from './data';
 import type { Merchant, Settlement, Payment } from './types';
-import { updateSettlement as dbUpdateSettlement, getSettlementById, getMerchantById } from './data';
-import { cashOut, qryOrder, qryBalance, createQrPhDirectPayment } from './speedypay/api';
-import { mapProviderStateToInternal, providerStateLabels } from './speedypay/mappers';
+import { updateSettlement as dbUpdateSettlement, getSettlementById, getMerchantById, getPaymentById } from './data';
+import { cashOut, qryOrder, qryBalance, createQrPhDirectPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
+import { mapProviderStateToInternal, providerStateLabels, mapCollectionStateToPaymentStatus } from './speedypay/mappers';
 import { payoutChannelMap } from './speedypay/payout-channels';
 import { speedypayConfig } from './speedypay/config';
 import { verifySignature } from './speedypay/crypto';
@@ -86,7 +86,7 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
         customerEmail: 'N/A',
         merchantId: merchantId,
         grossAmount: amount,
-        currency: 'USD', // The app's internal currency
+        currency: 'PHP', // Provider uses PHP, so internal currency should match
         feeType: merchant.defaultFeeType,
         feeValue: merchant.defaultFeeValue,
         platformFeeAmount: merchant.defaultFeeType === 'percentage' ? amount * (merchant.defaultFeeValue / 100) : merchant.defaultFeeValue,
@@ -133,6 +133,7 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
 
     revalidatePath('/transactions');
     revalidatePath(`/transactions/${orderSeq}`);
+    revalidatePath('/dashboard');
 
     return { success: true, data: { paymentUrl: response.url } };
 
@@ -231,6 +232,7 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
         });
 
         revalidatePath(`/settlements/${settlement.id}`);
+        revalidatePath('/dashboard');
         return { success: true, message: 'Payout initiated successfully.' };
 
     } catch (error) {
@@ -283,6 +285,7 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
         });
 
         revalidatePath(`/settlements/${settlement.id}`);
+        revalidatePath('/dashboard');
         return { success: true, message: 'Status updated from provider.' };
 
     } catch (error) {
@@ -298,6 +301,54 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
     }
 }
 
+export async function queryCollectionStatus(paymentId: string): Promise<ActionResult> {
+     const payment = await getPaymentById(paymentId);
+    if (!payment) {
+        return { success: false, message: "Payment not found." };
+    }
+
+    try {
+        const response = await qryCollectionOrder({ orderSeq: payment.id });
+
+        const internalPaymentStatus = mapCollectionStateToPaymentStatus(response.transState);
+        
+        const updatedPayment: Partial<Payment> = {
+            paymentStatus: internalPaymentStatus,
+            providerTransState: response.transState,
+            providerStateLabel: providerStateLabels[response.transState] || 'Unknown',
+            providerCollectionRespCode: response.respCode,
+            providerCollectionRespMessage: response.respMessage,
+            providerCollectionSignatureVerified: verifySignature(response, speedypayConfig.secretKey!),
+            lastQueryAt: formatISO(new Date()),
+        }
+
+        await updatePayment(payment.id, updatedPayment);
+
+         await addAuditLog({
+            eventType: 'collection.status.queried',
+            user: 'admin@speedypay.com',
+            details: `Queried collection status. New provider state: ${response.transState} (${response.respMessage})`,
+            entityId: payment.id,
+            entityType: 'payment'
+        });
+
+        revalidatePath(`/transactions/${payment.id}`);
+        revalidatePath('/dashboard');
+        return { success: true, message: 'Status updated from provider.' };
+
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "An unknown error occurred during status query.";
+         await addAuditLog({
+            eventType: 'collection.query.failed',
+            user: 'System',
+            details: `Collection query failed. Error: ${message}`,
+            entityId: payment.id,
+            entityType: 'payment'
+        });
+        return { success: false, message };
+    }
+}
+
 export async function getProviderBalance(): Promise<ActionResult> {
     try {
         const response = await qryBalance();
@@ -307,11 +358,31 @@ export async function getProviderBalance(): Promise<ActionResult> {
         await addAuditLog({
             eventType: 'provider.balance.queried',
             user: 'admin@speedypay.com',
-            details: `Successfully queried provider balance: PHP ${response.amount}`,
+            details: `Successfully queried provider payout balance: PHP ${response.amount}`,
             entityId: null,
             entityType: null,
         });
         return { success: true, data: { amount: response.amount } };
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "An unknown error occurred.";
+        return { success: false, message };
+    }
+}
+
+export async function getCollectionProviderBalance(): Promise<ActionResult> {
+    try {
+        const response = await qryCollectionBalance();
+        if (response.respCode !== '00000000') {
+            throw new Error(response.respMessage || 'Failed to query collection balance.');
+        }
+        await addAuditLog({
+            eventType: 'provider.collection_balance.queried',
+            user: 'admin@speedypay.com',
+            details: `Successfully queried provider collection balance: PHP ${response.balance}`,
+            entityId: null,
+            entityType: null,
+        });
+        return { success: true, data: { balance: response.balance } };
     } catch (error) {
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
         return { success: false, message };

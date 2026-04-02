@@ -70,8 +70,8 @@ export interface QryOrderRequest extends Omit<BaseRequest, 'sign'> {
     orderSeq: string;
 }
 
-export interface QryOrderResponse extends SpeedyPayResponse {
-    busiType: string;
+export interface QryCollectionOrderResponse extends SpeedyPayResponse {
+    busiType: '1';
     createTime: string; // YYYY-MM-DD HH:mm:ss
     notifyTime: string; // YYYY-MM-DD HH:mm:ss
 }
@@ -79,8 +79,23 @@ export interface QryOrderResponse extends SpeedyPayResponse {
 // --- Merchant Balance Query API ---
 
 export interface QryBalanceRequest extends Omit<BaseRequest, 'sign'> {
-    // No extra params needed
+    // No extra params needed for payout balance query
 }
+
+export interface QryCollectionBalanceRequest extends Omit<BaseRequest, 'sign'> {
+    // No extra params needed for collection balance query
+}
+
+export interface QryCollectionBalanceResponse {
+    respCode: string;
+    respMessage: string;
+    merchSeq: string;
+    balance: number;
+    signType: 'SHA256';
+    sign: string;
+    timestamp: string;
+}
+
 
 // --- Collection (Cashier) API ---
 

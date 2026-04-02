@@ -31,7 +31,7 @@ export type Payment = {
   feeValue: number;
   platformFeeAmount: number;
   merchantNetAmount: number;
-  paymentStatus: 'pending' | 'succeeded' | 'failed' | 'expired';
+  paymentStatus: 'pending' | 'succeeded' | 'failed' | 'expired' | 'processing';
   settlementStatus: 'pending' | 'completed' | 'N/A';
   remittanceStatus: 'pending' | 'processing' | 'sent' | 'failed' | 'N/A';
   sourceChannel: 'Web' | 'Mobile' | 'API' | 'Manual';
@@ -43,7 +43,11 @@ export type Payment = {
   providerQrCodePayload?: string;
   providerCollectionRespCode?: string;
   providerCollectionRespMessage?: string;
+al
   providerCollectionSignatureVerified?: boolean;
+  providerTransState?: string;
+  providerStateLabel?: string;
+  lastQueryAt?: string;
 };
 
 export type Settlement = {
@@ -110,4 +114,6 @@ export type DashboardStats = {
   activeMerchants: number;
   pendingSettlements: number;
   failedSettlements: number;
+  processingPayments: number;
+  failedPayments: number;
 }

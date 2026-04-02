@@ -1,6 +1,15 @@
 import 'server-only';
 import { speedypayConfig } from './config';
-import type { CashOutRequest, QryOrderRequest, QryBalanceRequest, QrPayRequest, SpeedyPayResponse, QryBalanceResponse, QrPayResponse } from './types';
+import type { 
+    CashOutRequest, 
+    QryOrderRequest, 
+    QrPayRequest, 
+    SpeedyPayResponse, 
+    QryBalanceResponse, 
+    QrPayResponse,
+    QryCollectionOrderResponse,
+    QryCollectionBalanceResponse
+} from './types';
 import { generateSignature, verifySignature } from './crypto';
 import { format } from 'date-fns';
 
@@ -78,17 +87,16 @@ export async function cashOut(params: Omit<CashOutRequest, 'merchSeq' | 'timesta
 }
 
 /**
- * Queries the status of a specific payout or collection order.
- * Corresponds to the `qryOrder.do` endpoint.
+ * Queries the status of a specific payout order.
+ * Corresponds to the `qryOrder.do` endpoint ON THE PAYOUT HOST.
  */
 export async function qryOrder(params: Omit<QryOrderRequest, 'merchSeq' | 'timestamp' | 'sign' | 'signType'>) {
-    // Note: qryOrder is on the payout API host, even for collection orders.
     return postToSpeedyPay<QryOrderRequest, SpeedyPayResponse>(speedypayConfig.payoutBaseUrl, '/emg/qryOrder.do', params);
 }
 
 /**
  * Queries the merchant's balance for payouts.
- * Corresponds to the `qryBalance.do` endpoint.
+ * Corresponds to the `qryBalance.do` endpoint ON THE PAYOUT HOST.
  */
 export async function qryBalance() {
     return postToSpeedyPay<{}, QryBalanceResponse>(speedypayConfig.payoutBaseUrl, '/emg/qryBalance.do', {});
@@ -96,6 +104,23 @@ export async function qryBalance() {
 
 
 // --- Collection API Methods ---
+
+/**
+ * Queries the status of a specific collection order.
+ * Corresponds to the `/cashier/qryOrder.do` endpoint.
+ */
+export async function qryCollectionOrder(params: Omit<QryOrderRequest, 'merchSeq' | 'timestamp' | 'sign' | 'signType'>) {
+    return postToSpeedyPay<QryOrderRequest, QryCollectionOrderResponse>(speedypayConfig.cashierBaseUrl, '/cashier/qryOrder.do', params);
+}
+
+/**
+ * Queries the merchant's balance for collections.
+ * Corresponds to the `qryBalance.do` endpoint ON THE CASHIER HOST.
+ */
+export async function qryCollectionBalance() {
+    return postToSpeedyPay<{}, QryCollectionBalanceResponse>(speedypayConfig.cashierBaseUrl, '/cashier/qryBalance.do', {});
+}
+
 
 /**
  * Creates a QRPh Direct Payment request.

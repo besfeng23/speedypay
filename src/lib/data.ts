@@ -104,12 +104,18 @@ export let payments: Payment[] = [
     feeValue: 0.50,
     platformFeeAmount: 0.50,
     merchantNetAmount: 799.50,
-    paymentStatus: 'succeeded',
-    settlementStatus: 'completed',
+    paymentStatus: 'pending',
+    settlementStatus: 'pending',
     remittanceStatus: 'pending',
-    sourceChannel: 'Mobile',
+    sourceChannel: 'Manual',
     createdAt: formatISO(subHours(now, 5)),
     updatedAt: formatISO(subHours(now, 4)),
+    providerPaymentUrl: 'https://test.e-mango.ph/cashier/pay?id=anotherid',
+    providerCollectionRespCode: '00000000',
+    providerCollectionRespMessage: 'Success',
+    providerCollectionSignatureVerified: true,
+    providerTransState: '07',
+    providerStateLabel: 'To Be Paid',
   },
    {
     id: 'pay-3',
@@ -150,6 +156,26 @@ export let payments: Payment[] = [
     sourceChannel: 'API',
     createdAt: formatISO(subDays(now, 5)),
     updatedAt: formatISO(subDays(now, 4)),
+  },
+  {
+    id: 'pay-5',
+    externalReference: 'N/A',
+    bookingReferenceOrInvoiceReference: 'inv-2024-07-005',
+    customerName: 'Demo Customer',
+    customerEmail: 'demo@example.com',
+    merchantId: 'mer-2',
+    grossAmount: 150.00,
+    currency: 'USD',
+    feeType: 'fixed',
+    feeValue: 0.50,
+    platformFeeAmount: 0.50,
+    merchantNetAmount: 149.50,
+    paymentStatus: 'succeeded',
+    settlementStatus: 'completed',
+    remittanceStatus: 'failed',
+    sourceChannel: 'API',
+    createdAt: formatISO(subDays(now, 2)),
+    updatedAt: formatISO(subDays(now, 2)),
   }
 ];
 
@@ -219,6 +245,20 @@ export let settlements: Settlement[] = [
     updatedAt: formatISO(subDays(now, 4)),
     lastQueryAt: formatISO(subDays(now, 4)),
      providerTimestamp: formatISO(subDays(now, 4)),
+  },
+  {
+    id: 'set-d4e5f6g7',
+    paymentId: 'pay-5',
+    merchantId: 'mer-2',
+    grossAmount: 150.00,
+    platformFeeAmount: 0.50,
+    merchantNetAmount: 149.50,
+    settlementStatus: 'completed',
+    remittanceStatus: 'failed',
+    payoutReference: null,
+    failureReason: 'Could not connect to provider.',
+    createdAt: formatISO(subDays(now, 2)),
+    updatedAt: formatISO(subDays(now, 2)),
   }
 ];
 
@@ -253,6 +293,8 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     activeMerchants: merchants.filter(m => m.status === 'Active').length,
     pendingSettlements: settlements.filter(s => s.remittanceStatus === 'pending').length,
     failedSettlements: settlements.filter(s => s.remittanceStatus === 'failed').length,
+    processingPayments: payments.filter(p => p.paymentStatus === 'processing').length,
+    failedPayments: payments.filter(p => p.paymentStatus === 'failed').length,
   }
 }
 
@@ -316,7 +358,19 @@ export const getAuditLogs = async (): Promise<AuditLog[]> => {
 }
 
 export const getAuditLogsByEntity = async (entityType: string, entityId: string): Promise<AuditLog[]> => {
-    const entityLogs = auditLogs.filter(log => log.entityType === entityType && log.entityId === entityId)
+    // This is a simple implementation. In a real app, you'd query a database.
+    // We are combining logs where the entity is the direct subject, or is related (e.g. payment logs on a settlement page)
+    let relatedIds: string[] = [entityId];
+    if (entityType === 'settlement') {
+        const settlement = await getSettlementById(entityId);
+        if (settlement) relatedIds.push(settlement.paymentId);
+    }
+     if (entityType === 'payment') {
+        const settlement = await getSettlementByPaymentId(entityId);
+        if (settlement) relatedIds.push(settlement.id);
+    }
+
+    const entityLogs = auditLogs.filter(log => log.entityId && relatedIds.includes(log.entityId))
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     return new Promise(resolve => setTimeout(() => resolve(entityLogs), 200));
 }

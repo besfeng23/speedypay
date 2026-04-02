@@ -1,4 +1,4 @@
-import { DollarSign, Users, Activity, Banknote } from "lucide-react";
+import { DollarSign, Users, Activity, Banknote, RefreshCw, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
@@ -53,7 +53,7 @@ export default async function Dashboard() {
       activeMerchants: stats.activeMerchants,
       recentTransactionsCount: recentPayments.length,
       recentSettlementEventsCount: recentSettlements.length,
-      currency: 'USD',
+      currency: 'PHP',
   };
 
   return (
@@ -68,28 +68,55 @@ export default async function Dashboard() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Total Gross Volume"
-            value={formatCurrency(stats.totalGrossVolume)}
+            value={formatCurrency(stats.totalGrossVolume, 'PHP')}
             icon={<DollarSign />}
-            description="Total value of all payments processed."
+            description="Total value of all successful payments."
           />
           <StatCard
             title="Platform Fees Earned"
-            value={formatCurrency(stats.totalPlatformFees)}
+            value={formatCurrency(stats.totalPlatformFees, 'PHP')}
             icon={<Activity />}
             description="Your total revenue from transaction fees."
           />
           <StatCard
             title="Merchant Net Remittances"
-            value={formatCurrency(stats.totalMerchantNetRemittances)}
+            value={formatCurrency(stats.totalMerchantNetRemittances, 'PHP')}
             icon={<Banknote />}
-            description="Total net amount paid out to merchants."
+            description="Total net amount successfully paid out."
           />
           <StatCard
             title="Active Merchants"
             value={`${stats.activeMerchants}`}
             icon={<Users />}
-            description="Merchants actively transacting on the platform."
+            description="Merchants actively transacting."
           />
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+                title="Processing Payments"
+                value={`${stats.processingPayments}`}
+                icon={<RefreshCw />}
+                description="Collections currently in-process with the provider."
+            />
+             <StatCard
+                title="Failed Payments"
+                value={`${stats.failedPayments}`}
+                icon={<AlertCircle />}
+                description="Collections that have failed or were cancelled."
+            />
+            <StatCard
+                title="Pending Settlements"
+                value={`${stats.pendingSettlements}`}
+                icon={<RefreshCw />}
+                description="Internal settlements awaiting payout initiation."
+            />
+             <StatCard
+                title="Failed Payouts"
+                value={`${stats.failedSettlements}`}
+                icon={<AlertCircle />}
+                description="Payouts that failed at the provider."
+            />
         </div>
 
         <div className="grid gap-6 lg:grid-cols-5">

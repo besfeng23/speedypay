@@ -1,7 +1,7 @@
-import type { RemittanceStatus } from '../types';
+import type { RemittanceStatus, Payment } from '../types';
 
 /**
- * Maps the provider's `transState` to our internal `remittanceStatus`.
+ * Maps the provider's `transState` for a payout to our internal `remittanceStatus`.
  * This is crucial for decoupling our internal state from the provider's.
  * @param providerState The `transState` from the SpeedyPay API response.
  * @returns The corresponding internal `RemittanceStatus`.
@@ -20,6 +20,30 @@ export function mapProviderStateToInternal(providerState: string): RemittanceSta
       return 'failed';
     default:
       return 'pending'; // Default to pending if unknown
+  }
+}
+
+/**
+ * Maps the provider's `transState` for a collection to our internal `paymentStatus`.
+ * @param providerState The `transState` from the SpeedyPay API response.
+ * @returns The corresponding internal `Payment['paymentStatus']`.
+ */
+export function mapCollectionStateToPaymentStatus(providerState: string): Payment['paymentStatus'] {
+  switch (providerState) {
+    case '00': // transaction succeeded
+      return 'succeeded';
+    case '01': // transaction failed
+      return 'failed';
+    case '06': // in process
+      return 'processing';
+    case '07': // order to be paid
+      return 'pending';
+    case '08': // cancelled order
+      return 'failed'; // Treat cancelled as failed
+    case '09': // order expired
+      return 'expired';
+    default:
+      return 'pending';
   }
 }
 

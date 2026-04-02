@@ -19,13 +19,13 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { speedypayConfig, isSpeedyPayConfigured } from "@/lib/speedypay/config";
-import { CheckCircle, AlertTriangle, Terminal, Copy, Wallet, Loader2, Server } from "lucide-react";
+import { CheckCircle, AlertTriangle, Terminal, Copy, Wallet, Loader2, Server, Landmark, Building } from "lucide-react";
 import { SystemReadiness } from "@/components/system-readiness";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { payoutChannels } from "@/lib/speedypay/payout-channels";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { getProviderBalance } from "@/lib/actions";
+import { getProviderBalance, getCollectionProviderBalance } from "@/lib/actions";
 import { Badge } from "@/components/ui/badge";
 
 function IntegrationStatus() {
@@ -156,7 +156,7 @@ function PayoutChannels() {
     )
 }
 
-function BalanceQuery() {
+function PayoutBalanceQuery() {
     const { toast } = useToast();
     const [isLoading, setIsLoading] = useState(false);
     const [balance, setBalance] = useState<number | null>(null);
@@ -168,7 +168,7 @@ function BalanceQuery() {
         setIsLoading(false);
         if (result.success && result.data?.amount) {
             setBalance(result.data.amount);
-            toast({ title: "Balance Updated", description: "Successfully queried provider balance."});
+            toast({ title: "Balance Updated", description: "Successfully queried provider payout balance."});
         } else {
             toast({ variant: "destructive", title: "Query Failed", description: result.message || "Could not retrieve balance."});
         }
@@ -177,8 +177,8 @@ function BalanceQuery() {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Provider Payout Balance</CardTitle>
-                <CardDescription>Query your live balance with SpeedyPay.</CardDescription>
+                <CardTitle className="flex items-center gap-2"><Landmark/> Payout Balance</CardTitle>
+                <CardDescription>Query your live balance with SpeedyPay for making payouts.</CardDescription>
             </CardHeader>
             <CardContent className="flex items-center justify-between">
                 <div className="text-2xl font-bold">
@@ -186,7 +186,44 @@ function BalanceQuery() {
                 </div>
                 <Button onClick={handleQuery} disabled={isLoading}>
                     {isLoading ? <Loader2 className="animate-spin" /> : <Wallet />}
-                    <span className="ml-2">{isLoading ? 'Querying...' : 'Query Balance'}</span>
+                    <span className="ml-2">{isLoading ? 'Querying...' : 'Query Payout Balance'}</span>
+                </Button>
+            </CardContent>
+        </Card>
+    )
+}
+
+function CollectionBalanceQuery() {
+    const { toast } = useToast();
+    const [isLoading, setIsLoading] = useState(false);
+    const [balance, setBalance] = useState<number | null>(null);
+
+    const handleQuery = async () => {
+        setIsLoading(true);
+        setBalance(null);
+        const result = await getCollectionProviderBalance();
+        setIsLoading(false);
+        if (result.success && result.data?.balance) {
+            setBalance(result.data.balance);
+            toast({ title: "Balance Updated", description: "Successfully queried provider collection balance."});
+        } else {
+            toast({ variant: "destructive", title: "Query Failed", description: result.message || "Could not retrieve balance."});
+        }
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                 <CardTitle className="flex items-center gap-2"><Building/> Collection Balance</CardTitle>
+                <CardDescription>Query your live balance with SpeedyPay from received collections.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center justify-between">
+                <div className="text-2xl font-bold">
+                    {balance !== null ? `PHP ${balance.toFixed(2)}` : <span className="text-muted-foreground">N/A</span>}
+                </div>
+                <Button onClick={handleQuery} disabled={isLoading}>
+                    {isLoading ? <Loader2 className="animate-spin" /> : <Wallet />}
+                    <span className="ml-2">{isLoading ? 'Querying...' : 'Query Collection Balance'}</span>
                 </Button>
             </CardContent>
         </Card>
@@ -205,7 +242,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="integration" className="space-y-4">
         <TabsList>
           <TabsTrigger value="integration">Integration</TabsTrigger>
-          <TabsTrigger value="payouts">Payouts</TabsTrigger>
+          <TabsTrigger value="treasury">Treasury</TabsTrigger>
           <TabsTrigger value="fees">Fee Configs</TabsTrigger>
           <TabsTrigger value="system">System</TabsTrigger>
         </TabsList>
@@ -219,9 +256,10 @@ export default function SettingsPage() {
               <WebhookInfo />
             </div>
         </TabsContent>
-        <TabsContent value="payouts" className="grid md:grid-cols-2 gap-6">
+        <TabsContent value="treasury" className="grid md:grid-cols-2 gap-6">
             <div className="space-y-6">
-                <BalanceQuery />
+                <CollectionBalanceQuery />
+                <PayoutBalanceQuery />
             </div>
             <div className="space-y-6">
                 <PayoutChannels />

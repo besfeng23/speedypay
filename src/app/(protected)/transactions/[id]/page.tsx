@@ -15,6 +15,7 @@ import { ArrowRight, Wallet, Landmark, HandCoins, Minus, Equals, Link as LinkIco
 import Link from "next/link";
 import { StatCard } from "@/components/stat-card";
 import { Separator } from "@/components/ui/separator";
+import { CollectionActions } from "./collection-actions";
 
 function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
     return (
@@ -64,7 +65,7 @@ export default async function TransactionDetailPage({
   const settlement = await getSettlementByPaymentId(payment.id);
   const events = await getAuditLogsByEntity('payment', payment.id);
 
-  const formatCurrency = (amount: number, currency: string = "USD") => {
+  const formatCurrency = (amount: number, currency: string = "PHP") => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: currency,
@@ -78,6 +79,7 @@ export default async function TransactionDetailPage({
         description="A complete record of the payment from collection to internal settlement."
       >
         <div className="font-mono text-sm text-muted-foreground bg-muted px-3 py-1.5 rounded-md">{payment.id}</div>
+        <CollectionActions payment={payment} />
       </PageHeader>
       
       <div className="grid md:grid-cols-3 gap-6">
@@ -124,9 +126,13 @@ export default async function TransactionDetailPage({
                     {payment.providerPaymentUrl || payment.providerCollectionRespCode ? (
                          <dl className="divide-y">
                             {payment.providerPaymentUrl && <DetailItem label="Payment URL" value={<a href={payment.providerPaymentUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-2"><LinkIcon className="h-4 w-4" /> Link</a>} />}
+                            <Separator className="my-2" />
                             <DetailItem label="Provider Resp Code" value={<Badge variant="secondary">{payment.providerCollectionRespCode}</Badge>} />
                             <DetailItem label="Provider Resp Message" value={payment.providerCollectionRespMessage} />
                             <DetailItem label="Signature Verified" value={payment.providerCollectionSignatureVerified ? <CheckCircle className="text-green-500"/> : <AlertCircle className="text-red-500" />} />
+                             <Separator className="my-2"/>
+                            <DetailItem label="Provider State" value={<StatusBadge status={payment.providerStateLabel || payment.providerTransState} />} />
+                             <DetailItem label="Last Queried" value={payment.lastQueryAt ? format(new Date(payment.lastQueryAt), "PPpp") : 'Never'} />
                          </dl>
                     ) : (
                          <div className="text-center py-8 text-muted-foreground">

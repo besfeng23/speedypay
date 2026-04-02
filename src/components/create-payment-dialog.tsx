@@ -67,7 +67,11 @@ export function CreatePaymentDialog({ merchants }: { merchants: Merchant[] }) {
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
         // Reset state when closing
-        form.reset();
+        form.reset({
+          merchantId: merchants[0]?.id || "",
+          amount: 100.00,
+          description: "Manual payment request",
+        });
         setPaymentUrl(null);
         setIsLoading(false);
     }
@@ -155,7 +159,7 @@ export function CreatePaymentDialog({ merchants }: { merchants: Merchant[] }) {
               />
               <DialogFooter>
                 <Button type="submit" disabled={isLoading} className="w-full">
-                  {isLoading ? <Loader2 className="animate-spin" /> : <PlusCircle />}
+                  {isLoading && <Loader2 className="animate-spin" />}
                   {isLoading ? "Generating Link..." : "Generate Payment Link"}
                 </Button>
               </DialogFooter>
