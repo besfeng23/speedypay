@@ -34,38 +34,35 @@ export default async function MerchantsPage() {
         </Link>
       </PageHeader>
       <Card>
-        <CardHeader>
-            <CardTitle>Merchant Directory</CardTitle>
-            <CardDescription>A list of all merchants in the system.</CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
             {merchants.length > 0 ? (
                 <Table>
                     <TableHeader>
                         <TableRow>
                             <TableHead>Business Name</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Onboarding</TableHead>
-                            <TableHead>Contact</TableHead>
-                            <TableHead>Created At</TableHead>
+                            <TableHead className="hidden sm:table-cell">Status</TableHead>
+                            <TableHead className="hidden md:table-cell">Onboarding</TableHead>
+                            <TableHead className="hidden lg:table-cell">Contact</TableHead>
+                            <TableHead className="hidden sm:table-cell">Created At</TableHead>
                             <TableHead><span className="sr-only">Actions</span></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {merchants.map((merchant) => (
-                            <TableRow key={merchant.id} className="even:bg-muted/30">
+                            <TableRow key={merchant.id}>
                                 <TableCell className="font-medium">
                                     <Link href={`/merchants/${merchant.id}`} className="hover:underline">
                                         {merchant.displayName}
                                     </Link>
+                                    <div className="text-sm text-muted-foreground md:hidden">{merchant.email}</div>
                                 </TableCell>
-                                <TableCell><StatusBadge status={merchant.status} /></TableCell>
-                                <TableCell><StatusBadge status={merchant.onboardingStatus} /></TableCell>
-                                <TableCell>
+                                <TableCell className="hidden sm:table-cell"><StatusBadge status={merchant.status} /></TableCell>
+                                <TableCell className="hidden md:table-cell"><StatusBadge status={merchant.onboardingStatus} /></TableCell>
+                                <TableCell className="hidden lg:table-cell">
                                     <div className="font-medium">{merchant.contactName}</div>
                                     <div className="text-sm text-muted-foreground">{merchant.email}</div>
                                 </TableCell>
-                                <TableCell>{format(new Date(merchant.createdAt), 'MMM d, yyyy')}</TableCell>
+                                <TableCell className="hidden sm:table-cell">{format(new Date(merchant.createdAt), 'MMM d, yyyy')}</TableCell>
                                 <TableCell className="text-right">
                                     <Link href={`/merchants/${merchant.id}`}>
                                         <Button variant="outline" size="sm">View</Button>

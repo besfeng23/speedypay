@@ -60,13 +60,13 @@ export function SystemReadiness() {
                     isReady={isProviderConfigured}
                     title="SpeedyPay Provider"
                     description={isProviderConfigured ? "API credentials for SpeedyPay are configured." : "SpeedyPay API credentials are missing."}
-                    fixSuggestion="Add `SPEEDYPAY_API_KEY`, `SPEEDYPAY_API_SECRET`, and `SPEEDYPAY_WEBHOOK_SECRET` to your environment variables."
+                    fixSuggestion="Add `SPEEDYPAY_MERCH_SEQ` and `SPEEDYPAY_SECRET_KEY` to your environment variables."
                 />
                  <CheckItem 
                     isReady={true}
                     title="Webhook Handler"
                     description="The webhook endpoint at `/api/webhooks/speedypay` is available to receive events."
-                    fixSuggestion=""
+                    fixSuggestion="Ensure this URL is publicly accessible and configured in your SpeedyPay dashboard."
                 />
                  <CheckItem 
                     isReady={true}

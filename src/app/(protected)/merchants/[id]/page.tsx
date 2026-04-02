@@ -15,13 +15,13 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Payment, Settlement } from "@/lib/types";
 import Link from "next/link";
-import { payoutChannelMap } from "@/lib/speedypay/payout-channels";
+import { Pencil } from "lucide-react";
 
-function DetailItem({ label, value, isMono = false }: { label: string; value: React.ReactNode, isMono?: boolean }) {
+function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-3 items-start gap-4 py-3">
       <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className={`text-sm col-span-2 font-medium ${isMono ? 'font-mono text-xs' : ''}`}>{value}</dd>
+      <dd className="text-sm col-span-2 font-medium">{value}</dd>
     </div>
   );
 }
@@ -106,7 +106,6 @@ export default async function MerchantDetailPage({
 
   const recentTransactions = await getPaymentsByMerchantId(merchant.id, 5);
   const recentSettlements = await getSettlementsByMerchantId(merchant.id, 5);
-  const payoutChannel = merchant.defaultPayoutChannelProcId ? payoutChannelMap.get(merchant.defaultPayoutChannelProcId) : null;
 
   return (
     <>
@@ -114,7 +113,10 @@ export default async function MerchantDetailPage({
         title={merchant.displayName}
         description={`Details for merchant ID: ${merchant.id}`}
       >
-        <Button variant="outline">Edit Merchant</Button>
+        <Button variant="outline">
+            <Pencil />
+            Edit Merchant
+        </Button>
       </PageHeader>
 
       <div className="grid md:grid-cols-3 gap-6">
@@ -122,7 +124,7 @@ export default async function MerchantDetailPage({
           <Card>
             <CardHeader>
               <CardTitle>Business Information</CardTitle>
-              <CardDescription>Primary contact and legal entity details.</CardDescription>
+              <CardDescription>Core legal and contact details for this merchant.</CardDescription>
             </CardHeader>
             <CardContent>
               <dl className="divide-y">
@@ -139,23 +141,23 @@ export default async function MerchantDetailPage({
           <Card>
             <CardHeader>
               <CardTitle>Payout & Fee Configuration</CardTitle>
-              <CardDescription>Configuration for merchant payouts and platform fee structure.</CardDescription>
+              <CardDescription>Settings for how this merchant receives funds and how fees are applied.</CardDescription>
             </CardHeader>
             <CardContent>
               <dl className="divide-y">
-                <DetailItem label="Default Payout Channel" value={payoutChannel ? `${payoutChannel.description} (${payoutChannel.procId})` : 'Not Set'} />
-                <DetailItem label="Recipient Full Name" value={merchant.settlementAccountName} />
-                <DetailItem label="Recipient Account/Wallet" value={merchant.settlementAccountNumberOrWalletId} isMono />
+                <DetailItem label="Default Payout Channel" value={<Badge variant="secondary">{merchant.defaultPayoutChannel}</Badge>} />
+                <DetailItem label="Recipient Account Name" value={merchant.settlementAccountName} />
+                <DetailItem label="Recipient Account Number" value={merchant.settlementAccountNumberOrWalletId} />
                 <DetailItem label="Default Fee Type" value={<Badge variant="outline" className="capitalize">{merchant.defaultFeeType}</Badge>} />
                 <DetailItem label="Default Fee Value" value={merchant.defaultFeeType === 'percentage' ? `${merchant.defaultFeeValue}%` : `$${merchant.defaultFeeValue.toFixed(2)}`} />
               </dl>
             </CardContent>
           </Card>
-          
+
           <Card>
               <CardHeader>
                   <CardTitle>Recent Transactions</CardTitle>
-                  <CardDescription>The last 5 payments received for this merchant.</CardDescription>
+                   <CardDescription>The last 5 transactions processed for this merchant.</CardDescription>
               </CardHeader>
               <CardContent>
                   <RecentTransactions transactions={recentTransactions} />
@@ -164,7 +166,7 @@ export default async function MerchantDetailPage({
            <Card>
               <CardHeader>
                   <CardTitle>Recent Settlements</CardTitle>
-                  <CardDescription>The last 5 settlements processed for this merchant.</CardDescription>
+                   <CardDescription>The last 5 internal settlements for this merchant.</CardDescription>
               </CardHeader>
               <CardContent>
                   <RecentSettlements settlements={recentSettlements} />
@@ -176,6 +178,7 @@ export default async function MerchantDetailPage({
           <Card>
             <CardHeader>
               <CardTitle>Status</CardTitle>
+              <CardDescription>Current operational status of the merchant.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <DetailItem label="Overall Status" value={<StatusBadge status={merchant.status} />} />
@@ -185,6 +188,7 @@ export default async function MerchantDetailPage({
           <Card>
             <CardHeader>
               <CardTitle>Associated Properties</CardTitle>
+              <CardDescription>Linked properties or business units.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
@@ -199,6 +203,7 @@ export default async function MerchantDetailPage({
           <Card>
             <CardHeader>
               <CardTitle>Notes</CardTitle>
+              <CardDescription>Internal notes and context.</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">{merchant.notes || "No notes for this merchant."}</p>

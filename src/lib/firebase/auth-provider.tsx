@@ -22,9 +22,6 @@ interface AuthContextType {
  * In a production environment, you would replace this with a real Firebase
  * Auth implementation using `onAuthStateChanged` to listen for user state
  * and fetch their ID token for custom claims/roles.
- *
- * The mock user includes a `claims: { role: 'admin' }` property to simulate
- * role-based access control for demonstration.
  */
 
 // A mock user for when authentication is disabled.
@@ -32,7 +29,7 @@ const mockUser: User & { claims?: IdTokenResult['claims'] } = {
   uid: 'mock-user-id',
   email: 'admin@speedypay.com',
   displayName: 'Admin User',
-  photoURL: 'https://picsum.photos/seed/user1/100/100',
+  photoURL: `https://avatar.vercel.sh/admin@speedypay.com.png`,
   emailVerified: true,
   isAnonymous: false,
   metadata: {},

@@ -1,8 +1,10 @@
 import type { Merchant, Payment, Settlement, AuditLog, DashboardStats } from '@/lib/types';
-import { subDays, subHours, subMinutes, formatISO, format } from 'date-fns';
+import { subDays, subHours, subMinutes, formatISO } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
 const now = new Date();
+
+// --- In-Memory Mock Database ---
 
 export let merchants: Merchant[] = [
   {
@@ -13,9 +15,8 @@ export let merchants: Merchant[] = [
     email: 'alice@starlight.com',
     mobile: '555-0101',
     settlementAccountName: 'Alice B Johnson',
-    settlementAccountNumberOrWalletId: '123456789012',
-    settlementChannel: 'Bank Account',
-    defaultPayoutChannelProcId: 'BPI',
+    settlementAccountNumberOrWalletId: '1234567890',
+    defaultPayoutChannel: 'BPI',
     status: 'Active',
     onboardingStatus: 'Completed',
     propertyAssociations: ['P-001', 'P-002'],
@@ -34,8 +35,7 @@ export let merchants: Merchant[] = [
     mobile: '555-0102',
     settlementAccountName: 'Bob Williams',
     settlementAccountNumberOrWalletId: '09171234567',
-    settlementChannel: 'Digital Wallet',
-    defaultPayoutChannelProcId: 'GCASH',
+    defaultPayoutChannel: 'GCASH',
     status: 'Active',
     onboardingStatus: 'Completed',
     propertyAssociations: ['P-003'],
@@ -44,6 +44,25 @@ export let merchants: Merchant[] = [
     notes: 'Handles luxury rentals. Prefers wallet payouts.',
     createdAt: formatISO(subDays(now, 120)),
     updatedAt: formatISO(subDays(now, 15)),
+  },
+   {
+    id: 'mer-3',
+    businessName: 'Greenwood Heights HOA',
+    displayName: 'Greenwood HOA',
+    contactName: 'Carol White',
+    email: 'carol@greenwood.org',
+    mobile: '555-0103',
+    settlementAccountName: 'Carol White',
+    settlementAccountNumberOrWalletId: '9876543210',
+    defaultPayoutChannel: 'BDO',
+    status: 'Suspended',
+    onboardingStatus: 'Completed',
+    propertyAssociations: ['P-004'],
+    defaultFeeType: 'percentage',
+    defaultFeeValue: 2.5,
+    notes: 'Temporarily suspended due to compliance review.',
+    createdAt: formatISO(subDays(now, 200)),
+    updatedAt: formatISO(subDays(now, 1)),
   },
 ];
 
@@ -67,6 +86,10 @@ export let payments: Payment[] = [
     sourceChannel: 'Web',
     createdAt: formatISO(subDays(now, 1)),
     updatedAt: formatISO(subHours(now, 20)),
+    providerPaymentUrl: 'https://test.e-mango.ph/cashier/pay?id=someid',
+    providerCollectionRespCode: '00000000',
+    providerCollectionRespMessage: 'Success',
+    providerCollectionSignatureVerified: true,
   },
   {
     id: 'pay-2',
@@ -82,31 +105,51 @@ export let payments: Payment[] = [
     platformFeeAmount: 0.50,
     merchantNetAmount: 799.50,
     paymentStatus: 'succeeded',
-    settlementStatus: 'pending',
+    settlementStatus: 'completed',
     remittanceStatus: 'pending',
     sourceChannel: 'Mobile',
     createdAt: formatISO(subHours(now, 5)),
     updatedAt: formatISO(subHours(now, 4)),
   },
-  {
+   {
     id: 'pay-3',
     externalReference: 'ch_3Pq...Y89',
     bookingReferenceOrInvoiceReference: 'inv-2024-07-003',
-    customerName: 'Sophia Lee',
-    customerEmail: 'sophia.lee@example.com',
+    customerName: 'Frank Harris',
+    customerEmail: 'frank.harris@example.com',
     merchantId: 'mer-1',
-    grossAmount: 500.00,
+    grossAmount: 350.00,
     currency: 'USD',
     feeType: 'percentage',
     feeValue: 3.2,
-    platformFeeAmount: 16.00,
-    merchantNetAmount: 484.00,
+    platformFeeAmount: 11.20,
+    merchantNetAmount: 338.80,
+    paymentStatus: 'failed',
+    settlementStatus: 'N/A',
+    remittanceStatus: 'N/A',
+    sourceChannel: 'Web',
+    createdAt: formatISO(subHours(now, 2)),
+    updatedAt: formatISO(subHours(now, 1)),
+  },
+   {
+    id: 'pay-4',
+    externalReference: 'ch_3Pq...Z12',
+    bookingReferenceOrInvoiceReference: 'inv-2024-06-105',
+    customerName: 'Grace Lee',
+    customerEmail: 'grace.lee@example.com',
+    merchantId: 'mer-3',
+    grossAmount: 2000.00,
+    currency: 'USD',
+    feeType: 'percentage',
+    feeValue: 2.5,
+    platformFeeAmount: 50.00,
+    merchantNetAmount: 1950.00,
     paymentStatus: 'succeeded',
-    settlementStatus: 'completed', // It settled internally
-    remittanceStatus: 'failed', // But the final payout failed
+    settlementStatus: 'completed',
+    remittanceStatus: 'failed',
     sourceChannel: 'API',
-    createdAt: formatISO(subDays(now, 2)),
-    updatedAt: formatISO(subDays(now, 1)),
+    createdAt: formatISO(subDays(now, 5)),
+    updatedAt: formatISO(subDays(now, 4)),
   }
 ];
 
@@ -117,28 +160,25 @@ export let settlements: Settlement[] = [
     merchantId: 'mer-1',
     grossAmount: 1250.00,
     platformFeeAmount: 40.00,
-    merchantNetAmount: 68902.50, // Approx 1210 USD in PHP
+    merchantNetAmount: 1210.00,
     settlementStatus: 'completed',
     remittanceStatus: 'sent',
-    payoutReference: `payout-${uuidv4().slice(0,8)}`,
+    payoutReference: `payout-set-a1b2c3d4`,
     failureReason: null,
-    createdAt: formatISO(subHours(now, 23)),
-    updatedAt: formatISO(subHours(now, 20)),
     providerName: 'SpeedyPay',
-    providerEndpointType: 'cashOut.do',
-    providerOrderSeq: `ord_${Date.now() - 2000000}`,
-    providerTransSeq: `T${Date.now() - 2000000}`,
+    providerOrderSeq: 'set-a1b2c3d4',
+    providerTransSeq: 'T12345678',
     providerRespCode: '00000000',
-    providerRespMessage: 'Transaction is accepted',
+    providerRespMessage: 'Transaction Success',
     providerTransState: '00',
-    providerTimestamp: format(subHours(now, 22), 'yyyyMMddHHmmss'),
+    providerTransStateLabel: 'Succeeded',
+    signatureVerified: true,
     payoutChannelProcId: 'BPI',
     payoutChannelDescription: 'BPI (InstaPay)',
-    signatureVerified: true,
-    reconciliationStatus: 'reconciled',
-    lastQueryAt: null,
-    rawProviderRequest: '{"message": "This is a mock request"}',
-    rawProviderResponse: '{"message": "This is a mock response"}',
+    createdAt: formatISO(subHours(now, 23)),
+    updatedAt: formatISO(subHours(now, 20)),
+    lastQueryAt: formatISO(subHours(now, 20)),
+    providerTimestamp: formatISO(subHours(now, 20)),
   },
   {
     id: 'set-b2c3d4e5',
@@ -146,57 +186,39 @@ export let settlements: Settlement[] = [
     merchantId: 'mer-2',
     grossAmount: 800.00,
     platformFeeAmount: 0.50,
-    merchantNetAmount: 45251.72, // Approx 799.50 USD in PHP
-    settlementStatus: 'pending',
+    merchantNetAmount: 799.50,
+    settlementStatus: 'completed',
     remittanceStatus: 'pending',
-    payoutReference: `payout-${uuidv4().slice(0,8)}`,
+    payoutReference: null,
     failureReason: null,
     createdAt: formatISO(subHours(now, 5)),
     updatedAt: formatISO(subHours(now, 4)),
-    providerName: null,
-    providerEndpointType: null,
-    providerOrderSeq: null,
-    providerTransSeq: null,
-    providerRespCode: null,
-    providerRespMessage: null,
-    providerTransState: null,
-    providerTimestamp: null,
-    payoutChannelProcId: null,
-    payoutChannelDescription: null,
-    signatureVerified: null,
-    reconciliationStatus: 'pending',
-    lastQueryAt: null,
-    rawProviderRequest: null,
-    rawProviderResponse: null,
   },
    {
     id: 'set-c3d4e5f6',
-    paymentId: 'pay-3',
-    merchantId: 'mer-1',
-    grossAmount: 500.00,
-    platformFeeAmount: 16.00,
-    merchantNetAmount: 27405.00, // Approx 484 USD in PHP
+    paymentId: 'pay-4',
+    merchantId: 'mer-3',
+    grossAmount: 2000.00,
+    platformFeeAmount: 50.00,
+    merchantNetAmount: 1950.00,
     settlementStatus: 'completed',
     remittanceStatus: 'failed',
-    payoutReference: `payout-${uuidv4().slice(0,8)}`,
-    failureReason: 'Provider Error: Invalid recipient account details.',
-    createdAt: formatISO(subDays(now, 2)),
-    updatedAt: formatISO(subDays(now, 1)),
+    payoutReference: `payout-set-c3d4e5f6`,
+    failureReason: "Invalid recipient account number.",
     providerName: 'SpeedyPay',
-    providerEndpointType: 'cashOut.do',
-    providerOrderSeq: `ord_${Date.now() - 3000000}`,
-    providerTransSeq: `T${Date.now() - 3000000}`,
-    providerRespCode: '20000010',
-    providerRespMessage: 'Invalid recipient account details.',
+    providerOrderSeq: 'set-c3d4e5f6',
+    providerTransSeq: 'T87654321',
+    providerRespCode: 'ER100100',
+    providerRespMessage: 'Transaction Failed: Invalid Account',
     providerTransState: '01',
-    providerTimestamp: format(subDays(now, 2), 'yyyyMMddHHmmss'),
-    payoutChannelProcId: 'BPI',
-    payoutChannelDescription: 'BPI (InstaPay)',
+    providerTransStateLabel: 'Failed',
     signatureVerified: true,
-    reconciliationStatus: 'reconciled',
-    lastQueryAt: null,
-    rawProviderRequest: '{"message": "This is a mock request for a failed transaction"}',
-    rawProviderResponse: '{"respCode": "20000010", "respMessage": "Invalid recipient account details.", "transState": "01"}',
+    payoutChannelProcId: 'BDO',
+    payoutChannelDescription: 'BDO (InstaPay)',
+    createdAt: formatISO(subDays(now, 5)),
+    updatedAt: formatISO(subDays(now, 4)),
+    lastQueryAt: formatISO(subDays(now, 4)),
+     providerTimestamp: formatISO(subDays(now, 4)),
   }
 ];
 
@@ -208,7 +230,7 @@ export let auditLogs: AuditLog[] = [
         user: 'admin@speedypay.com',
         details: 'User logged in successfully from IP 192.168.1.1',
         entityId: 'usr_admin',
-        amount: null,
+        entityType: 'user',
     },
     {
         id: 'log-2',
@@ -217,7 +239,7 @@ export let auditLogs: AuditLog[] = [
         user: 'System',
         details: 'Payment created via Web channel.',
         entityId: 'pay-1',
-        amount: 1250.00
+        entityType: 'payment',
     },
 ];
 
@@ -225,18 +247,17 @@ export let auditLogs: AuditLog[] = [
 
 export const getDashboardStats = async (): Promise<DashboardStats> => {
   return {
-    totalGrossVolume: 352649.99,
-    totalPlatformFees: 12317.85,
-    totalMerchantNetRemittances: 340332.14,
-    pendingSettlements: settlements.filter(s => s.settlementStatus === 'pending').length,
-    failedSettlements: settlements.filter(s => s.remittanceStatus === 'failed').length,
+    totalGrossVolume: payments.filter(p => p.paymentStatus === 'succeeded').reduce((sum, p) => sum + p.grossAmount, 0),
+    totalPlatformFees: payments.filter(p => p.paymentStatus === 'succeeded').reduce((sum, p) => sum + p.platformFeeAmount, 0),
+    totalMerchantNetRemittances: settlements.filter(s => s.remittanceStatus === 'sent').reduce((sum, s) => sum + s.merchantNetAmount, 0),
     activeMerchants: merchants.filter(m => m.status === 'Active').length,
+    pendingSettlements: settlements.filter(s => s.remittanceStatus === 'pending').length,
+    failedSettlements: settlements.filter(s => s.remittanceStatus === 'failed').length,
   }
 }
 
 export const getMerchants = async (): Promise<Merchant[]> => {
-  const sorted = [...merchants].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  return new Promise(resolve => setTimeout(() => resolve(sorted), 300));
+  return new Promise(resolve => setTimeout(() => resolve(merchants), 300));
 }
 
 export const getMerchantById = async (id: string): Promise<Merchant | undefined> => {
@@ -294,22 +315,9 @@ export const getAuditLogs = async (): Promise<AuditLog[]> => {
   return new Promise(resolve => setTimeout(() => resolve(sorted), 300));
 }
 
-export const getAuditLogsByEntity = async (entityId: string): Promise<AuditLog[]> => {
-    const relatedSettlement = settlements.find(s => s.paymentId === entityId || s.id === entityId);
-    const entityLogs = auditLogs.filter(log => {
-      if (log.entityId === entityId) return true;
-      if (relatedSettlement && log.entityId === relatedSettlement.id) return true;
-      // Also check if the entityId is a payment and the log is for the related settlement
-      const payment = payments.find(p => p.id === entityId);
-      if (payment) {
-          const settlementForPayment = settlements.find(s => s.paymentId === payment.id);
-          if (settlementForPayment && log.entityId === settlementForPayment.id) {
-              return true;
-          }
-      }
-      return false;
-    })
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+export const getAuditLogsByEntity = async (entityType: string, entityId: string): Promise<AuditLog[]> => {
+    const entityLogs = auditLogs.filter(log => log.entityType === entityType && log.entityId === entityId)
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     return new Promise(resolve => setTimeout(() => resolve(entityLogs), 200));
 }
 
@@ -327,25 +335,20 @@ export async function addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>): Prom
     return newLog;
 }
 
-export async function updateSettlement(id: string, updates: Partial<Settlement>): Promise<Settlement | null> {
-    const settlementIndex = settlements.findIndex(s => s.id === id);
-    if (settlementIndex > -1) {
-        const original = settlements[settlementIndex];
-        settlements[settlementIndex] = { ...original, ...updates, updatedAt: formatISO(new Date()) };
-        console.log(`[Data Update] Settlement ${id} updated.`);
-        
-        // Also update the parent payment record for status consistency
-        const paymentIndex = payments.findIndex(p => p.id === original.paymentId);
-        if (paymentIndex > -1) {
-            if (updates.settlementStatus) {
-                payments[paymentIndex].settlementStatus = updates.settlementStatus as any;
-            }
-            if (updates.remittanceStatus) {
-                 payments[paymentIndex].remittanceStatus = updates.remittanceStatus as any;
-            }
-        }
-        
-        return settlements[settlementIndex];
+export async function updateSettlement(id: string, updatedData: Partial<Settlement>): Promise<Settlement | undefined> {
+    const index = settlements.findIndex(s => s.id === id);
+    if (index > -1) {
+        settlements[index] = { ...settlements[index], ...updatedData, updatedAt: formatISO(new Date()) };
+        return settlements[index];
     }
-    return null;
+    return undefined;
+}
+
+export async function updatePayment(id: string, updatedData: Partial<Payment>): Promise<Payment | undefined> {
+    const index = payments.findIndex(p => p.id === id);
+    if (index > -1) {
+        payments[index] = { ...payments[index], ...updatedData, updatedAt: formatISO(new Date()) };
+        return payments[index];
+    }
+    return undefined;
 }

@@ -34,6 +34,8 @@ import { simulatePayment, type SimulatePaymentOutput } from "@/ai/flows/simulate
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "./ui/scroll-area";
 import { merchants } from "@/lib/data";
+import { useRouter } from "next/navigation";
+import { addSimulatedData } from "@/lib/actions";
 
 const formSchema = z.object({
   scenarioType: z.enum([
@@ -53,6 +55,7 @@ export function DemoPaymentSimulator() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationResult, setSimulationResult] = useState<SimulatePaymentOutput | null>(null);
   const { toast } = useToast();
+  const router = useRouter();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -84,11 +87,18 @@ export function DemoPaymentSimulator() {
         customerName: "Demo Customer",
         description: "Simulated via SpeedyPay Console",
       });
+      
+      const addResult = await addSimulatedData(result);
+      if (!addResult.success) throw new Error(addResult.message);
+      
       setSimulationResult(result);
       toast({ title: 'Simulation Complete', description: `Successfully simulated a ${values.scenarioType} scenario.` });
+      router.refresh();
+      
     } catch (error) {
       console.error("Simulation failed:", error);
-      toast({ variant: 'destructive', title: 'Simulation Failed', description: 'An error occurred during simulation.' });
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred during simulation.';
+      toast({ variant: 'destructive', title: 'Simulation Failed', description: errorMessage });
     } finally {
       setIsSimulating(false);
     }

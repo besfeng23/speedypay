@@ -1,145 +1,122 @@
 /**
- * @fileoverview This file contains the TypeScript types for the SpeedyPay/eMango Pay Payout API.
- * The contracts are based on the provided API documentation.
+ * This file contains the TypeScript types for the SpeedyPay/eMangoPay API.
+ * These are based on the provided API documentation.
  */
 
-// ==================================
-// Base & Common Types
-// ==================================
+// --- Base API Contracts ---
 
-/** A map for custom metadata. Not part of the core SpeedyPay spec but used internally. */
-type InternalMetadata = { [key: string]: string | number | null };
+export interface BaseRequest {
+    merchSeq: string;
+    signType: 'SHA256';
+    timestamp: string;
+    sign: string;
+}
 
-export type SignType = 'SHA256';
-export type Currency = 'PHP'; // Default is PHP as per docs
+export interface SpeedyPayResponse {
+    respCode: string; // e.g., "00000000" for success
+    respMessage: string;
+    merchSeq: string;
+    orderSeq: string;
+    transSeq: string;
+    amount: number;
+    currency: string;
+    transState: '00' | '01' | '03' | '04' | '05' | '06' | '07' | '08' | '09'; // From appendix
+    signType: 'SHA256';
+    sign: string;
+    timestamp: string;
+}
+
+export interface QryBalanceResponse {
+    respCode: string;
+    respMessage: string;
+    merchSeq: string;
+    amount: number;
+    signType: 'SHA256';
+    sign: string;
+    timestamp: string;
+}
+
+// --- Payout (Cash Out) API ---
+
+export interface CashOutRequest extends BaseRequest {
+    orderSeq: string;
+    orderDate: string; // YYYY-MM-DD
+    amount: number;
+    fee: string; // Reserved, use "0.00"
+    currency: 'PHP';
+    procId: string; // From payout channel list
+    procDetail: string; // Account number or mobile number
+    email: string;
+    notifyUrl: string;
+    mobilePhone: string;
+    purposes?: string;
+    remark?: string;
+    firstName: string;
+    middleName?: string;
+    lastName: string;
+    birthDate?: string; // YYYY-MM-DD
+    nationality?: string; // ISO 3166-1 alpha-2
+    street1?: string;
+    street2?: string;
+    barangay?: string;
+    city?: string;
+    province?: string;
+    country?: string; // ISO 3166-1 alpha-2
+}
+
+// --- Transaction Query API ---
+
+export interface QryOrderRequest extends Omit<BaseRequest, 'sign'> {
+    orderSeq: string;
+}
+
+export interface QryOrderResponse extends SpeedyPayResponse {
+    busiType: string;
+    createTime: string; // YYYY-MM-DD HH:mm:ss
+    notifyTime: string; // YYYY-MM-DD HH:mm:ss
+}
+
+// --- Merchant Balance Query API ---
+
+export interface QryBalanceRequest extends Omit<BaseRequest, 'sign'> {
+    // No extra params needed
+}
+
+// --- Collection (Cashier) API ---
+
+export interface QrPayRequest extends Omit<BaseRequest, 'sign'> {
+    orderSeq: string;
+    orderDate: string; // YYYY-MM-DD
+    amount: number;
+    fee: '0.00';
+    currency: 'PHP';
+    busiName: string;
+    dueTime: number; // Expiration time in minutes
+    busiType: '1';
+    notifyUrl: string;
+    isRedirect?: 'true' | 'false';
+    redirectUrl?: string;
+    additionInfo?: string;
+    remark?: string;
+}
+
+export interface QrPayResponse {
+    respCode: string;
+    respMessage: string;
+    merchSeq: string;
+    signType: 'SHA256';
+    timestamp: string;
+    sign: string;
+    url?: string;
+    qrCode?: string;
+}
+
+
+// --- Webhook ---
 
 /**
- * Defines the transaction states as per the SpeedyPay API documentation appendix.
+ * This represents the payload received from SpeedyPay's webhook.
+ * Based on the documentation, it seems the webhook sends a form-urlencoded
+ * payload that mirrors the `qryOrder` response shape.
  */
-export type SpeedyPayTransactionState = 
-  | '00' // transaction succeeded
-  | '01' // transaction failed
-  | '03' // partial refund
-  | '04' // full refund
-  | '05' // failed refund
-  | '06' // in process
-  | '07' // order to be paid
-  | '08' // cancelled order
-  | '09';// order expired
-
-export const transactionStateMap: Record<SpeedyPayTransactionState, string> = {
-    '00': 'Transaction Succeeded',
-    '01': 'Transaction Failed',
-    '03': 'Partial Refund',
-    '04': 'Full Refund',
-    '05': 'Failed Refund',
-    '06': 'In Process',
-    '07': 'Order to be Paid',
-    '08': 'Cancelled Order',
-    '09': 'Order Expired',
-};
-
-// ==================================
-// API Request Contracts
-// ==================================
-
-interface BaseRequest {
-  signType: SignType;
-  sign: string;
-  timestamp: string; // e.g., "20210325160000" (yyyyMMddHHmmss)
-  merchSeq: string;
-}
-
-export interface PayoutRequest extends BaseRequest {
-  orderSeq: string;
-  orderDate: string; // e.g., "20210325" (yyyyMMdd)
-  amount: string; // e.g., "100.00"
-  fee?: string; // Must be "0.00" per docs
-  currency: Currency;
-  procId: string;
-  procDetail: string; // Account/mobile number
-  email: string;
-  notifyUrl: string;
-  mobilePhone: string;
-  purposes: string;
-  remark?: string;
-  firstName: string;
-  middleName?: string;
-  lastName: string;
-  birthDate?: string; // (yyyy-MM-dd)
-  nationality?: string;
-  street1?: string;
-  street2?: string;
-  barangay?: string;
-  city?: string;
-  province?: string;
-  country?: string; // 2-letter country code
-}
-
-export interface QueryOrderRequest extends BaseRequest {
-  orderSeq: string;
-}
-
-export interface QueryBalanceRequest extends BaseRequest {
-  // No extra fields besides base
-}
-
-// ==================================
-// API Response Contracts
-// ==================================
-
-interface BaseResponse {
-  respCode: string; // "00000000" for success
-  respMessage: string;
-  signType: SignType;
-  sign: string;
-  timestamp: string;
-  merchSeq: string;
-}
-
-export interface PayoutResponse extends BaseResponse {
-  orderSeq: string;
-  transSeq: string;
-  amount: string;
-  currency: Currency;
-  transState: SpeedyPayTransactionState;
-}
-
-export interface QueryOrderResponse extends BaseResponse {
-  orderSeq: string;
-  transSeq: string;
-  amount: string;
-  fee: string;
-  currency: Currency;
-  transState: SpeedyPayTransactionState;
-  busiType: string;
-  createTime: string; // yyyy-MM-dd HH:mm:ss
-  notifyTime: string; // yyyy-MM-dd HH:mm:ss
-}
-
-export interface QueryBalanceResponse extends BaseResponse {
-  amount: string; // e.g., "10000.00"
-}
-
-// ==================================
-// Webhook Event Contracts (Assuming structure based on other APIs, as not detailed in Payout docs)
-// ==================================
-
-/**
- * This is an assumed structure for webhooks. The provided docs do not detail the webhook payload.
- * This structure should be verified and updated when real webhook documentation is available.
- */
-export interface SpeedyPayWebhookPayload {
-  signType: SignType;
-  sign: string;
-  timestamp: string; // e.g., "20210325160000"
-  merchSeq: string;
-  orderSeq: string;
-  transSeq: string;
-  amount: string;
-  currency: Currency;
-  transState: SpeedyPayTransactionState;
-  respCode: string;
-  respMessage: string;
-  notifyTime: string; // yyyy-MM-dd HH:mm:ss
-}
+export type SpeedyPayWebhookPayload = SpeedyPayResponse;

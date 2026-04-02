@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { format } from "date-fns";
-import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { getPayments, getMerchants } from "@/lib/data";
 import {
@@ -16,16 +15,18 @@ import { StatusBadge } from "@/components/status-badge";
 import type { Payment, Merchant } from "@/lib/types";
 import { EmptyState } from "@/components/empty-state";
 import { ArrowRightLeft } from "lucide-react";
+import { CreatePaymentDialog } from "@/components/create-payment-dialog";
+import { Button } from "@/components/ui/button";
 
 export default async function TransactionsPage() {
   const payments: Payment[] = await getPayments();
   const merchants: Merchant[] = await getMerchants();
   const merchantMap = new Map(merchants.map(m => [m.id, m.displayName]));
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, currency: string = "USD") => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: currency,
     }).format(amount);
   };
 
@@ -34,40 +35,42 @@ export default async function TransactionsPage() {
       <PageHeader
         title="Transactions"
         description="View and manage all payment transactions."
-      />
+      >
+        <CreatePaymentDialog merchants={merchants} />
+      </PageHeader>
       <Card>
         <CardHeader>
-            <CardTitle>Transaction History</CardTitle>
-            <CardDescription>A complete log of all payments processed through the system.</CardDescription>
+            <CardTitle>All Payments</CardTitle>
+            <CardDescription>A complete log of all payments received by the platform.</CardDescription>
         </CardHeader>
         <CardContent>
             {payments.length > 0 ? (
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Customer</TableHead>
-                            <TableHead>Merchant</TableHead>
+                            <TableHead>Customer / Desc</TableHead>
+                            <TableHead className="hidden md:table-cell">Merchant</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
-                            <TableHead>Payment Status</TableHead>
-                            <TableHead>Settlement Status</TableHead>
-                            <TableHead>Date</TableHead>
+                            <TableHead className="hidden sm:table-cell">Payment Status</TableHead>
+                            <TableHead className="hidden md:table-cell">Settlement Status</TableHead>
+                            <TableHead className="hidden sm:table-cell">Date</TableHead>
                             <TableHead><span className="sr-only">Actions</span></TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {payments.map((payment) => (
-                            <TableRow key={payment.id} className="even:bg-muted/30">
+                            <TableRow key={payment.id}>
                                 <TableCell className="font-medium">
                                     <Link href={`/transactions/${payment.id}`} className="hover:underline">
-                                        {payment.customerName}
+                                        {payment.customerName !== 'N/A (Generated Link)' ? payment.customerName : payment.id}
                                     </Link>
                                     <div className="text-sm text-muted-foreground">{payment.bookingReferenceOrInvoiceReference}</div>
                                 </TableCell>
-                                <TableCell>{merchantMap.get(payment.merchantId) || 'Unknown'}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(payment.grossAmount)}</TableCell>
-                                <TableCell><StatusBadge status={payment.paymentStatus} /></TableCell>
-                                <TableCell><StatusBadge status={payment.settlementStatus} /></TableCell>
-                                <TableCell>{format(new Date(payment.createdAt), 'MMM d, yyyy')}</TableCell>
+                                <TableCell className="hidden md:table-cell">{merchantMap.get(payment.merchantId) || 'Unknown'}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">{formatCurrency(payment.grossAmount)}</TableCell>
+                                <TableCell className="hidden sm:table-cell"><StatusBadge status={payment.paymentStatus} /></TableCell>
+                                <TableCell className="hidden md:table-cell"><StatusBadge status={payment.settlementStatus} /></TableCell>
+                                <TableCell className="hidden sm:table-cell">{format(new Date(payment.createdAt), 'MMM d, yyyy')}</TableCell>
                                 <TableCell className="text-right">
                                     <Link href={`/transactions/${payment.id}`}>
                                         <Button variant="outline" size="sm">Details</Button>

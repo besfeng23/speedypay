@@ -16,12 +16,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/firebase/hooks";
-import { CreditCard, User as UserIcon } from "lucide-react";
-import { PlaceHolderImages } from "@/lib/placeholder-images";
+import { CreditCard, LogOut, User as UserIcon } from "lucide-react";
 
 export function UserNav() {
-  const { user } = useAuth();
-  const userAvatar = PlaceHolderImages.find(p => p.id === 'user-avatar-1');
+  const { user, logout } = useAuth();
 
   if (!user) {
     return null;
@@ -41,9 +39,8 @@ export function UserNav() {
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
             <AvatarImage
-              src={user.photoURL || userAvatar?.imageUrl}
+              src={user.photoURL || `https://avatar.vercel.sh/${user.email}.png`}
               alt={user.displayName || "User"}
-              data-ai-hint={userAvatar?.imageHint}
             />
             <AvatarFallback>
               {getInitials(user.displayName || user.email || "U")}
@@ -73,6 +70,11 @@ export function UserNav() {
             <span>Billing</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={logout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          <span>Log out</span>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

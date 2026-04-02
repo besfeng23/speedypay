@@ -7,20 +7,23 @@ import { initiateRemittance, querySettlementStatus } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 import type { Settlement } from "@/lib/types";
 import { HandCoins, Loader2, RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export function PayoutActions({ settlement }: { settlement: Settlement }) {
     const [isInitiating, startInitiating] = useTransition();
     const [isQuerying, startQuerying] = useTransition();
     const { toast } = useToast();
+    const router = useRouter();
 
-    const canInitiate = settlement.settlementStatus === 'pending' && !settlement.providerOrderSeq;
+    const canInitiate = settlement.settlementStatus === 'completed' && settlement.remittanceStatus === 'pending';
     const canQuery = !!settlement.providerOrderSeq;
 
     const handleInitiate = () => {
         startInitiating(async () => {
             const result = await initiateRemittance(settlement.id);
             if (result.success) {
-                toast({ title: "Payout Initiated", description: result.message });
+                toast({ title: "Payout Initiated", description: "Payout request has been sent to the provider." });
+                router.refresh();
             } else {
                 toast({ variant: "destructive", title: "Initiation Failed", description: result.message });
             }
@@ -31,7 +34,8 @@ export function PayoutActions({ settlement }: { settlement: Settlement }) {
         startQuerying(async () => {
             const result = await querySettlementStatus(settlement.id);
             if (result.success) {
-                toast({ title: "Status Queried", description: result.message });
+                toast({ title: "Status Queried", description: "Latest status has been pulled from the provider." });
+                router.refresh();
             } else {
                 toast({ variant: "destructive", title: "Query Failed", description: result.message });
             }

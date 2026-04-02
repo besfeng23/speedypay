@@ -1,4 +1,4 @@
-"use client";
+"use client"
 
 import { PageHeader } from "@/components/page-header";
 import {
@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
-  CardFooter
 } from "@/components/ui/card";
 import {
   Tabs,
@@ -19,16 +18,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { speedypayConfig, isSpeedyPayConfigured, getBaseUrl } from "@/lib/speedypay/config";
-import { CheckCircle, AlertTriangle, Terminal, Loader2 } from "lucide-react";
+import { speedypayConfig, isSpeedyPayConfigured } from "@/lib/speedypay/config";
+import { CheckCircle, AlertTriangle, Terminal, Copy, Wallet, Loader2, Server } from "lucide-react";
 import { SystemReadiness } from "@/components/system-readiness";
-import { useAuth } from "@/lib/firebase/hooks";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { payoutChannels } from "@/lib/speedypay/payout-channels";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { getProviderBalance } from "@/lib/actions";
-import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
 function IntegrationStatus() {
@@ -37,7 +34,7 @@ function IntegrationStatus() {
     <Card>
       <CardHeader>
         <CardTitle>Integration Status</CardTitle>
-        <CardDescription>Readiness check for SpeedyPay integration.</CardDescription>
+        <CardDescription>Live status of the SpeedyPay API integration.</CardDescription>
       </CardHeader>
       <CardContent>
         {isConfigured ? (
@@ -45,7 +42,7 @@ function IntegrationStatus() {
             <CheckCircle className="h-4 w-4" />
             <AlertTitle>Ready</AlertTitle>
             <AlertDescription>
-              All required API credentials are configured in the environment. The application is ready to communicate with SpeedyPay.
+              All required API credentials are configured in the environment.
             </AlertDescription>
           </Alert>
         ) : (
@@ -54,7 +51,6 @@ function IntegrationStatus() {
             <AlertTitle>Configuration Missing</AlertTitle>
             <AlertDescription>
               One or more SpeedyPay API credentials are missing from your environment variables. The integration is disabled.
-              <p className="mt-2 text-xs">Please check your environment file for `SPEEDYPAY_MERCH_SEQ` and `SPEEDYPAY_SECRET_KEY`.</p>
             </AlertDescription>
           </Alert>
         )}
@@ -64,24 +60,34 @@ function IntegrationStatus() {
 }
 
 function WebhookInfo() {
-  const webhookUrl = speedypayConfig.notifyUrl || (typeof window !== 'undefined'
-    ? `${window.location.origin}/api/webhooks/speedypay`
-    : '/api/webhooks/speedypay');
+  const { toast } = useToast();
+  const webhookUrl = speedypayConfig.notifyUrl || 'Not configured in environment';
+
+  const handleCopy = () => {
+    if (speedypayConfig.notifyUrl) {
+        navigator.clipboard.writeText(speedypayConfig.notifyUrl);
+        toast({ title: "Copied!", description: "Webhook URL copied to clipboard." });
+    } else {
+        toast({ variant: "destructive", title: "Cannot Copy", description: "Webhook URL is not configured." });
+    }
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Webhook Endpoint</CardTitle>
-        <CardDescription>Configure this `notifyUrl` in your SpeedyPay merchant dashboard.</CardDescription>
+        <CardDescription>The URL to receive real-time events from SpeedyPay.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-2">
         <div className="flex items-center gap-4 p-2 rounded-md bg-muted">
-            <Terminal className="h-4 w-4 text-muted-foreground" />
-            <code className="text-sm font-mono flex-1">{webhookUrl}</code>
-            <Button variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(webhookUrl)}>Copy</Button>
+            <Terminal className="h-4 w-4" />
+            <code className="text-sm font-mono flex-1 truncate">{webhookUrl}</code>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopy}>
+                <Copy className="h-4 w-4" />
+            </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          This endpoint listens for real-time events from SpeedyPay to update payout statuses automatically.
+          This value is read from the `SPEEDYPAY_NOTIFY_URL` environment variable.
         </p>
       </CardContent>
     </Card>
@@ -94,13 +100,17 @@ function ProviderConfig() {
       <CardHeader>
         <CardTitle>Provider Credentials</CardTitle>
         <CardDescription>
-          These values are placeholders read from your environment variables.
+          These values are read from your environment variables for security.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="api-base-url">API Base URL ({speedypayConfig.env})</Label>
-          <Input id="api-base-url" value={getBaseUrl()} readOnly disabled />
+          <Label htmlFor="payout-base-url">Payout API URL</Label>
+          <Input id="payout-base-url" value={speedypayConfig.payoutBaseUrl} readOnly disabled />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="cashier-base-url">Cashier API URL</Label>
+          <Input id="cashier-base-url" value={speedypayConfig.cashierBaseUrl} readOnly disabled />
         </div>
         <div className="space-y-2">
           <Label htmlFor="merch-seq">Merchant Sequence (merchSeq)</Label>
@@ -118,13 +128,12 @@ function ProviderConfig() {
 function PayoutChannels() {
     return (
         <Card>
-             <CardHeader>
-                <CardTitle>Supported Payout Channels</CardTitle>
-                <CardDescription>List of currently supported channels for SpeedyPay payouts.</CardDescription>
+            <CardHeader>
+                <CardTitle>Payout Channels</CardTitle>
+                <CardDescription>Supported remittance channels from the provider.</CardDescription>
             </CardHeader>
             <CardContent>
-                <ScrollArea className="h-96">
-                <Table>
+                 <Table>
                     <TableHeader>
                         <TableRow>
                             <TableHead>procId</TableHead>
@@ -133,7 +142,7 @@ function PayoutChannels() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {payoutChannels.map(channel => (
+                        {payoutChannels.map((channel) => (
                             <TableRow key={channel.procId}>
                                 <TableCell className="font-mono text-xs">{channel.procId}</TableCell>
                                 <TableCell>{channel.description}</TableCell>
@@ -142,100 +151,79 @@ function PayoutChannels() {
                         ))}
                     </TableBody>
                 </Table>
-                </ScrollArea>
             </CardContent>
         </Card>
     )
 }
 
-function ProviderBalance() {
-    const [isLoading, setIsLoading] = useState(false);
-    const [balance, setBalance] = useState<string | null>(null);
+function BalanceQuery() {
     const { toast } = useToast();
+    const [isLoading, setIsLoading] = useState(false);
+    const [balance, setBalance] = useState<number | null>(null);
 
-    const handleQueryBalance = async () => {
+    const handleQuery = async () => {
         setIsLoading(true);
         setBalance(null);
         const result = await getProviderBalance();
-        if(result.success) {
-            setBalance(result.data.balance);
-        } else {
-            toast({ variant: "destructive", title: "Failed to Query Balance", description: result.message });
-        }
         setIsLoading(false);
+        if (result.success && result.data?.amount) {
+            setBalance(result.data.amount);
+            toast({ title: "Balance Updated", description: "Successfully queried provider balance."});
+        } else {
+            toast({ variant: "destructive", title: "Query Failed", description: result.message || "Could not retrieve balance."});
+        }
     }
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Provider Balance</CardTitle>
-                <CardDescription>Query your current merchant balance with SpeedyPay.</CardDescription>
+                <CardTitle>Provider Payout Balance</CardTitle>
+                <CardDescription>Query your live balance with SpeedyPay.</CardDescription>
             </CardHeader>
-            <CardContent>
-                {balance ? (
-                    <p className="text-2xl font-bold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'PHP' }).format(Number(balance))}</p>
-                ) : (
-                    <p className="text-sm text-muted-foreground">Click the button to query your live balance.</p>
-                )}
-            </CardContent>
-            <CardFooter>
-                 <Button onClick={handleQueryBalance} disabled={isLoading || !isSpeedyPayConfigured()}>
-                    {isLoading && <Loader2 className="animate-spin" />}
-                    {isLoading ? 'Querying...' : 'Query Balance'}
+            <CardContent className="flex items-center justify-between">
+                <div className="text-2xl font-bold">
+                    {balance !== null ? `PHP ${balance.toFixed(2)}` : <span className="text-muted-foreground">N/A</span>}
+                </div>
+                <Button onClick={handleQuery} disabled={isLoading}>
+                    {isLoading ? <Loader2 className="animate-spin" /> : <Wallet />}
+                    <span className="ml-2">{isLoading ? 'Querying...' : 'Query Balance'}</span>
                 </Button>
-            </CardFooter>
+            </CardContent>
         </Card>
     )
 }
 
-export default function SettingsPage() {
-  const { user } = useAuth();
-  const isAdmin = user?.claims?.role === 'admin';
 
+export default function SettingsPage() {
   return (
     <>
       <PageHeader
         title="Settings"
-        description="Manage your account and application settings."
+        description="Manage your integration, fee structures, and system configurations."
       />
 
       <Tabs defaultValue="integration" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="integration">Payout Integration</TabsTrigger>
+          <TabsTrigger value="integration">Integration</TabsTrigger>
+          <TabsTrigger value="payouts">Payouts</TabsTrigger>
           <TabsTrigger value="fees">Fee Configs</TabsTrigger>
-          {isAdmin && <TabsTrigger value="system">System</TabsTrigger>}
+          <TabsTrigger value="system">System</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="profile" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>My Profile</CardTitle>
-              <CardDescription>Update your personal information.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
-                    <Input id="name" defaultValue="Admin User" />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" defaultValue="admin@speedypay.com" disabled/>
-                </div>
-                 <Button>Save Changes</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="integration" className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <TabsContent value="integration" className="grid md:grid-cols-2 gap-6">
             <div className="space-y-6">
               <ProviderConfig />
-              <ProviderBalance />
             </div>
             <div className="space-y-6">
               <IntegrationStatus />
               <WebhookInfo />
             </div>
-             <div className="lg:col-span-1">
+        </TabsContent>
+        <TabsContent value="payouts" className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-6">
+                <BalanceQuery />
+            </div>
+            <div className="space-y-6">
                 <PayoutChannels />
             </div>
         </TabsContent>
@@ -248,15 +236,18 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Fee configuration management will be implemented here.</p>
+                 <EmptyState
+                    icon={<Server />}
+                    title="Feature Not Implemented"
+                    description="Global and merchant-level fee configuration management will be available in a future update."
+                    className="py-8"
+                />
             </CardContent>
           </Card>
         </TabsContent>
-        {isAdmin && (
-            <TabsContent value="system" className="space-y-4">
-                <SystemReadiness />
-            </TabsContent>
-        )}
+        <TabsContent value="system" className="space-y-4">
+          <SystemReadiness />
+        </TabsContent>
       </Tabs>
     </>
   );

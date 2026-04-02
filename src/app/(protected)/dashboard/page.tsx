@@ -5,8 +5,10 @@ import { StatCard } from "@/components/stat-card";
 import { getDashboardStats } from "@/lib/data";
 import type { ChartConfig } from "@/components/ui/chart";
 import { DashboardChart } from "@/components/dashboard-chart";
-import { DashboardInsights } from "@/components/dashboard-insights";
 import { RecentActivity } from "@/components/recent-activity";
+import { DemoPaymentSimulator } from "@/components/demo-payment-simulator";
+import { DashboardInsights } from "@/components/dashboard-insights";
+import { getRecentPayments, getRecentSettlements } from "@/lib/data";
 
 const chartData = [
   { month: "January", volume: 18600, fees: 800 },
@@ -30,25 +32,28 @@ const chartConfig = {
 
 export default async function Dashboard() {
   const stats = await getDashboardStats();
+  const recentPayments = await getRecentPayments();
+  const recentSettlements = await getRecentSettlements();
 
-  const formatCurrency = (amount: number) => {
+
+  const formatCurrency = (amount: number, currency: string = "USD") => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: currency,
       minimumFractionDigits: 2,
     }).format(amount);
   };
-
-  const kpiData = {
-    totalGrossVolume: stats.totalGrossVolume,
-    totalPlatformFees: stats.totalPlatformFees,
-    totalMerchantNetRemittances: stats.totalMerchantNetRemittances,
-    pendingSettlements: stats.pendingSettlements,
-    failedSettlements: stats.failedSettlements,
-    activeMerchants: stats.activeMerchants,
-    recentTransactionsCount: 243, // Example data
-    recentSettlementEventsCount: 89, // Example data
-    currency: "USD",
+  
+  const kpiDataForAI = {
+      totalGrossVolume: stats.totalGrossVolume,
+      totalPlatformFees: stats.totalPlatformFees,
+      totalMerchantNetRemittances: stats.totalMerchantNetRemittances,
+      pendingSettlements: stats.pendingSettlements,
+      failedSettlements: stats.failedSettlements,
+      activeMerchants: stats.activeMerchants,
+      recentTransactionsCount: recentPayments.length,
+      recentSettlementEventsCount: recentSettlements.length,
+      currency: 'USD',
   };
 
   return (
@@ -56,7 +61,9 @@ export default async function Dashboard() {
       <PageHeader
         title="Dashboard"
         description="Here’s a snapshot of your marketplace performance."
-      />
+      >
+        <DemoPaymentSimulator />
+      </PageHeader>
       <div className="grid gap-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
@@ -86,21 +93,22 @@ export default async function Dashboard() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-5">
-          <div className="lg:col-span-3 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Financial Overview</CardTitle>
-                <CardDescription>Monthly gross volume and platform fees.</CardDescription>
-              </CardHeader>
-              <CardContent className="pl-2">
-                <DashboardChart data={chartData} config={chartConfig} />
-              </CardContent>
-            </Card>
-            <DashboardInsights kpiData={kpiData} />
-          </div>
+          <Card className="lg:col-span-3">
+            <CardHeader>
+              <CardTitle>Financial Overview</CardTitle>
+              <CardDescription>A summary of gross volume vs. platform fees over time.</CardDescription>
+            </CardHeader>
+            <CardContent className="pl-2">
+              <DashboardChart data={chartData} config={chartConfig} />
+            </CardContent>
+          </Card>
           <div className="lg:col-span-2">
             <RecentActivity />
           </div>
+        </div>
+        
+        <div>
+            <DashboardInsights kpiData={kpiDataForAI} />
         </div>
       </div>
     </>

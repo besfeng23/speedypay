@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { PageHeader } from "@/components/page-header";
 import { getAuditLogs } from "@/lib/data";
 import {
@@ -13,7 +13,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import type { AuditLog } from "@/lib/types";
 import { EmptyState } from "@/components/empty-state";
-import { FileClock } from "lucide-react";
+import { FileClock, CircleUser, Server, ArrowRightLeft, HandCoins } from "lucide-react";
+import Link from "next/link";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+const eventTypeIcons: Record<string, React.ReactNode> = {
+    'default': <ArrowRightLeft />,
+    'user': <CircleUser />,
+    'system': <Server />,
+    'payout': <HandCoins />,
+}
+
+const getIconForEventType = (eventType: string) => {
+    const category = eventType.split('.')[0];
+    return eventTypeIcons[category] || eventTypeIcons['default'];
+}
+
 
 export default async function AuditLogsPage() {
   const logs: AuditLog[] = await getAuditLogs();
@@ -27,36 +42,62 @@ export default async function AuditLogsPage() {
       <Card>
         <CardHeader>
             <CardTitle>Event History</CardTitle>
-            <CardDescription>All system and user actions are recorded for traceability.</CardDescription>
+            <CardDescription>All system and user actions are recorded for traceability and compliance.</CardDescription>
         </CardHeader>
         <CardContent>
             {logs.length > 0 ? (
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Timestamp</TableHead>
-                            <TableHead>Event Type</TableHead>
-                            <TableHead>User/Actor</TableHead>
-                            <TableHead>Details</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {logs.map((log) => (
-                            <TableRow key={log.id} className="even:bg-muted/30">
-                                <TableCell className="whitespace-nowrap">
-                                    <div className="font-medium">{format(new Date(log.timestamp), 'MMM d, yyyy, h:mm:ss a')}</div>
-                                </TableCell>
-                                <TableCell>
-                                    <Badge variant="outline">{log.eventType}</Badge>
-                                </TableCell>
-                                <TableCell>
-                                    {log.user}
-                                </TableCell>
-                                <TableCell className="max-w-md truncate">{log.details}</TableCell>
+                <TooltipProvider>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-[180px]">Timestamp</TableHead>
+                                <TableHead className="w-[40px] hidden md:table-cell"></TableHead>
+                                <TableHead>Event</TableHead>
+                                <TableHead>Actor</TableHead>
+                                <TableHead className="hidden md:table-cell">Entity</TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                            {logs.map((log) => (
+                                <TableRow key={log.id} className="align-top">
+                                    <TableCell className="whitespace-nowrap">
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <div className="font-medium cursor-default">{formatDistanceToNow(new Date(log.timestamp), { addSuffix: true })}</div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                {format(new Date(log.timestamp), 'MMM d, yyyy, h:mm:ss a')}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                        <div className="text-xs text-muted-foreground">{log.id}</div>
+                                    </TableCell>
+                                    <TableCell className="hidden md:table-cell">
+                                        <div className="p-2 bg-muted rounded-full w-fit">
+                                            {getIconForEventType(log.eventType)}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline">{log.eventType}</Badge>
+                                        <p className="text-sm text-foreground mt-1 max-w-sm">{log.details}</p>
+                                    </TableCell>
+                                    <TableCell>
+                                        {log.user}
+                                    </TableCell>
+                                     <TableCell className="hidden md:table-cell">
+                                        {log.entityType && log.entityId ? (
+                                            <div>
+                                                <div className="text-xs uppercase text-muted-foreground">{log.entityType}</div>
+                                                <Link href={`/${log.entityType.toLowerCase()}s/${log.entityId}`} className="font-mono text-xs text-primary hover:underline">
+                                                    {log.entityId}
+                                                </Link>
+                                            </div>
+                                        ) : <span className="text-muted-foreground">-</span>}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </TooltipProvider>
             ) : (
                 <EmptyState
                     icon={<FileClock />}

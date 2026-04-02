@@ -1,67 +1,63 @@
-import 'server-only';
 import { createHash } from 'crypto';
-import { speedypayConfig } from './config';
 
 /**
- * Builds the canonical string for signature generation from a payload object.
- * @param payload - The request or response payload.
- * @returns A URL-encoded string of key-value pairs, sorted alphabetically by key.
+ * Builds the canonical string for signing from a payload object.
+ * Rules:
+ * 1. Exclude 'sign' field.
+ * 2. Filter out null or undefined values.
+ * 3. Sort keys alphabetically.
+ * 4. Concatenate into a URL query string format (key=value&...).
+ * @param payload The request or response payload object.
+ * @returns The canonical string to be signed.
  */
 function buildCanonicalString(payload: Record<string, any>): string {
-  const sortedKeys = Object.keys(payload).sort((a, b) => a.localeCompare(b));
-
-  const parts = sortedKeys
-    .filter(key => {
-      // Per docs: exclude sign field, file streams, byte streams, and null values
-      const value = payload[key];
-      return key !== 'sign' && value !== null && value !== undefined;
-    })
-    .map(key => {
-      const value = payload[key];
-      // Ensure value is a string. Objects/arrays are not part of the documented request payloads.
-      return `${key}=${String(value)}`;
-    });
-
-  return parts.join('&');
+    const sortedKeys = Object.keys(payload).sort();
+    
+    const parts = sortedKeys
+        .filter(key => key !== 'sign' && payload[key] !== null && payload[key] !== undefined && payload[key] !== '')
+        .map(key => `${key}=${payload[key]}`);
+        
+    return parts.join('&');
 }
 
 /**
- * Generates the SHA256 signature for a SpeedyPay API request.
- * @param payload - The request payload.
- * @returns The lowercase hex-encoded SHA256 signature.
+ * Generates a SHA256 signature for a given payload.
+ * @param payload The request payload object.
+ * @param secret The secret key to use for signing.
+ * @returns The generated lowercase SHA256 signature.
  */
-export function generateSignature(payload: Record<string, any>): string {
+export function generateSignature(payload: Record<string, any>, secret: string): string {
   const canonicalString = buildCanonicalString(payload);
-  const stringToSign = `${canonicalString}&${speedypayConfig.secretKey}`;
+  const stringToSign = `${canonicalString}&${secret}`;
+  
+  console.log(`[SpeedyPay Crypto] String to sign: ${stringToSign}`);
 
-  console.log('[SpeedyPay Crypto] String to Sign:', canonicalString + '&<SECRET_KEY>');
-
-  const hash = createHash('sha256')
-    .update(stringToSign)
-    .digest('hex');
-
-  return hash.toLowerCase();
+  const hash = createHash('sha256');
+  hash.update(stringToSign, 'utf8');
+  const signature = hash.digest('hex').toLowerCase();
+  
+  console.log(`[SpeedyPay Crypto] Generated signature: ${signature}`);
+  
+  return signature;
 }
 
 /**
- * Verifies the signature of an incoming response or webhook from SpeedyPay.
- * @param payload - The response or webhook payload.
- * @param receivedSignature - The signature received from SpeedyPay.
+ * Verifies a signature against a payload.
+ * @param payload The response payload object containing the 'sign' field.
+ * @param secret The secret key.
  * @returns `true` if the signature is valid, `false` otherwise.
  */
-export function verifySignature(payload: Record<string, any>, receivedSignature: string): boolean {
+export function verifySignature(payload: Record<string, any>, secret: string): boolean {
+  const receivedSignature = payload.sign;
   if (!receivedSignature) {
-    console.warn('[SpeedyPay Crypto] No signature received for verification.');
-    return false;
+      console.error('[SpeedyPay Crypto] Verification failed: No signature found in payload.');
+      return false;
   }
   
-  const expectedSignature = generateSignature(payload);
+  const expectedSignature = generateSignature(payload, secret);
+  
+  console.log(`[SpeedyPay Crypto] Verifying. Received: ${receivedSignature}, Expected: ${expectedSignature}`);
 
-  console.log(`[SpeedyPay Crypto] Verifying Signature. Expected: ${expectedSignature}, Received: ${receivedSignature}`);
-
-  // IMPORTANT: Use a constant-time comparison in a real production environment
-  // to mitigate timing attacks, though it's less critical for response verification
-  // than for webhooks. For Node.js `crypto.timingSafeEqual` is suitable.
-  // For this demo, a direct comparison is acceptable.
-  return expectedSignature === receivedSignature.toLowerCase();
+  // Use a constant-time comparison to prevent timing attacks, although for this case it's less critical.
+  return receivedSignature.toLowerCase() === expectedSignature;
 }

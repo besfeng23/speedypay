@@ -1,5 +1,3 @@
-import type { SpeedyPayTransactionState } from "./speedypay/types";
-
 export type Merchant = {
   id: string;
   businessName: string;
@@ -7,10 +5,9 @@ export type Merchant = {
   contactName: string;
   email: string;
   mobile: string;
-  settlementAccountName: string; // Maps to payout recipient name
-  settlementAccountNumberOrWalletId: string; // Maps to procDetail
-  settlementChannel: 'Bank Account' | 'Digital Wallet'; // Determines which procId to suggest
-  defaultPayoutChannelProcId: string | null; // The specific procId from the channel list
+  settlementAccountName: string;
+  settlementAccountNumberOrWalletId: string;
+  defaultPayoutChannel: string; // procId from payout channels
   status: 'Active' | 'Inactive' | 'Suspended';
   onboardingStatus: 'Completed' | 'Pending' | 'In Review' | 'Rejected';
   propertyAssociations: string[];
@@ -22,7 +19,7 @@ export type Merchant = {
 };
 
 export type Payment = {
-  id: string;
+  id: string; // Our internal ID, used as provider's orderSeq
   externalReference: string;
   bookingReferenceOrInvoiceReference: string;
   customerName: string;
@@ -34,12 +31,19 @@ export type Payment = {
   feeValue: number;
   platformFeeAmount: number;
   merchantNetAmount: number;
-  paymentStatus: 'pending' | 'succeeded' | 'failed';
-  settlementStatus: 'pending' | 'processing' | 'completed' | 'failed' | 'N/A';
-  remittanceStatus: 'pending' | 'sent' | 'failed' | 'N/A' | 'processing';
-  sourceChannel: 'Web' | 'Mobile' | 'API';
+  paymentStatus: 'pending' | 'succeeded' | 'failed' | 'expired';
+  settlementStatus: 'pending' | 'completed' | 'N/A';
+  remittanceStatus: 'pending' | 'processing' | 'sent' | 'failed' | 'N/A';
+  sourceChannel: 'Web' | 'Mobile' | 'API' | 'Manual';
   createdAt: string;
   updatedAt: string;
+  
+  // Provider-specific fields for collection
+  providerPaymentUrl?: string;
+  providerQrCodePayload?: string;
+  providerCollectionRespCode?: string;
+  providerCollectionRespMessage?: string;
+  providerCollectionSignatureVerified?: boolean;
 };
 
 export type Settlement = {
@@ -48,31 +52,31 @@ export type Settlement = {
   merchantId: string;
   grossAmount: number;
   platformFeeAmount: number;
-  merchantNetAmount: number; // This is the amount for the payout
-  settlementStatus: 'pending' | 'processing' | 'completed' | 'failed';
-  remittanceStatus: 'pending' | 'sent' | 'failed' | 'N/A' | 'processing';
-  payoutReference: string; // Internal payout ref, maps to orderSeq
+  merchantNetAmount: number; // This is the payoutAmount for remittance
+  settlementStatus: 'pending' | 'completed';
+  remittanceStatus: RemittanceStatus;
+  
+  // Provider-specific fields for remittance
+  providerName?: 'SpeedyPay' | string;
+  payoutReference: string | null;
   failureReason: string | null;
+  providerOrderSeq?: string;
+  providerTransSeq?: string;
+  providerRespCode?: string;
+  providerRespMessage?: string;
+  providerTransState?: string;
+  providerTransStateLabel?: string;
+  signatureVerified?: boolean;
+  payoutChannelProcId?: string;
+  payoutChannelDescription?: string;
+  lastQueryAt?: string;
+  providerTimestamp?: string;
+  
   createdAt: string;
   updatedAt: string;
-
-  // Provider-specific fields for payout/remittance
-  providerName: 'SpeedyPay' | null;
-  providerEndpointType: 'cashOut.do' | 'qryOrder.do' | null;
-  providerOrderSeq: string | null;
-  providerTransSeq: string | null;
-  providerRespCode: string | null;
-  providerRespMessage: string | null;
-  providerTransState: SpeedyPayTransactionState | null;
-  providerTimestamp: string | null;
-  payoutChannelProcId: string | null;
-  payoutChannelDescription: string | null;
-  signatureVerified: boolean | null;
-  reconciliationStatus: 'pending' | 'reconciled' | 'discrepancy';
-  lastQueryAt: string | null;
-  rawProviderRequest: string | null; // Store the JSON sent to the provider
-  rawProviderResponse: string | null; // Store the JSON received from the provider
 };
+
+export type RemittanceStatus = 'pending' | 'processing' | 'sent' | 'failed' | 'N/A';
 
 export type AuditLog = {
   id: string;
@@ -80,8 +84,8 @@ export type AuditLog = {
   eventType: string;
   user: string;
   details: string;
+  entityType: 'merchant' | 'payment' | 'settlement' | 'user' | null;
   entityId: string | null;
-  amount?: number | null;
 };
 
 export type FeeConfig = {
@@ -103,7 +107,7 @@ export type DashboardStats = {
   totalGrossVolume: number;
   totalPlatformFees: number;
   totalMerchantNetRemittances: number;
+  activeMerchants: number;
   pendingSettlements: number;
   failedSettlements: number;
-  activeMerchants: number;
 }

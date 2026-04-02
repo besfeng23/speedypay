@@ -131,7 +131,7 @@ Follow these rules for generating the output:
 
 
 const simulatePaymentFlow = ai.defineFlow(
-  { 
+  {
     name: 'simulatePaymentFlow',
     inputSchema: SimulatePaymentInputSchema,
     outputSchema: SimulatePaymentOutputSchema,
@@ -144,7 +144,7 @@ const simulatePaymentFlow = ai.defineFlow(
     const { output } = await simulatePaymentPrompt({
       ...input,
     });
-    
+
     if (!output) {
       throw new Error('Failed to generate simulation output.');
     }
@@ -155,7 +155,7 @@ const simulatePaymentFlow = ai.defineFlow(
         output.settlementRecord.settlementId = settlementId;
         output.settlementRecord.paymentId = paymentId;
     }
-    
+
     return output;
   }
 );

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { UserNav } from "@/components/user-nav";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import {
   ChevronLeft,
@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { Icons } from "@/components/icons";
 import Link from "next/link";
-import { DemoPaymentSimulator } from "@/components/demo-payment-simulator";
 import { useAuth } from "@/lib/firebase/hooks";
 import { Badge } from "@/components/ui/badge";
 
@@ -103,14 +102,12 @@ export default function ProtectedLayout({
                 <span className="sr-only">Toggle navigation menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="flex flex-col">
-              <SheetHeader className="sr-only">
-                <SheetTitle>Navigation Menu</SheetTitle>
-                <SheetDescription>
-                  Main navigation links for the application.
-                </SheetDescription>
-              </SheetHeader>
-              <nav className="grid gap-2 text-lg font-medium">
+            <SheetContent side="left" className="flex flex-col p-0">
+               <div className="p-4">
+                    <SheetTitle className="sr-only">Menu</SheetTitle>
+                    <SheetDescription className="sr-only">Main navigation menu</SheetDescription>
+                </div>
+              <nav className="grid gap-2 text-lg font-medium p-4">
                 <Link
                   href="#"
                   className="flex items-center gap-2 text-lg font-semibold mb-4"
@@ -174,11 +171,10 @@ export default function ProtectedLayout({
                     Demo Mode
                 </Badge>
              )}
-            <DemoPaymentSimulator />
             <UserNav />
           </div>
         </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 bg-background">
+        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 bg-muted/20">
           {children}
         </main>
       </div>

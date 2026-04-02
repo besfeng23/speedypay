@@ -1,121 +1,57 @@
-import 'server-only';
-import type { SpeedyPayWebhookEvent, PaymentObject, SettlementObject, RemittanceObject } from './types';
-import { addAuditLog, updatePaymentStatus, updateSettlementAndRemittanceStatus } from '@/lib/data';
+import type { SpeedyPayWebhookPayload } from './types';
+import { addAuditLog, getSettlementById, updateSettlement } from '@/lib/data';
+import { mapProviderStateToInternal, providerStateLabels } from './mappers';
+import { formatISO } from 'date-fns';
 
 /**
  * Handles the logic for processing a verified webhook event from SpeedyPay.
- * This function acts as a dispatcher, routing the event to the appropriate handler based on its type.
- * @param event - The verified SpeedyPayWebhookEvent object.
+ * This is triggered by a POST to `/api/webhooks/speedypay`.
+ * @param payload - The verified SpeedyPayWebhookPayload object from the form-urlencoded body.
  */
-export async function processWebhookEvent(event: SpeedyPayWebhookEvent): Promise<void> {
-  console.log(`[SpeedyPay Event Processor] Processing event type: ${event.type}`);
+export async function processWebhookEvent(payload: SpeedyPayWebhookPayload): Promise<void> {
+  console.log(`[SpeedyPay Event Processor] Processing webhook for orderSeq: ${payload.orderSeq}`);
 
-  switch (event.type) {
-    // --- Payment Events ---
-    case 'payment.succeeded':
-      await handlePaymentSucceeded(event.data.object as PaymentObject);
-      break;
-    case 'payment.failed':
-      await handlePaymentFailed(event.data.object as PaymentObject);
-      break;
+  // The orderSeq from the provider maps to our internal settlement ID.
+  const settlementId = payload.orderSeq;
+  const settlement = await getSettlementById(settlementId);
 
-    // --- Settlement Events ---
-    case 'settlement.created':
-      // Usually informational, status is 'processing'.
-      break;
-    case 'settlement.completed':
-      await handleSettlementCompleted(event.data.object as SettlementObject);
-      break;
-    case 'settlement.failed':
-       await handleSettlementFailed(event.data.object as SettlementObject);
-      break;
-
-    // --- Remittance Events ---
-    case 'remittance.sent':
-       await handleRemittanceSent(event.data.object as RemittanceObject);
-      break;
-    case 'remittance.failed':
-       await handleRemittanceFailed(event.data.object as RemittanceObject);
-      break;
-    
-    default:
-      console.warn(`[SpeedyPay Event Processor] Unhandled event type: ${event.type}`);
-      await addAuditLog({
-        eventType: 'webhook.unhandled',
+  if (!settlement) {
+    // This could happen if the webhook arrives before our DB is updated,
+    // or if the orderSeq is not one of ours. Log it and throw an error.
+    const errorMsg = `Webhook received for unknown settlement ID (orderSeq): ${settlementId}`;
+    await addAuditLog({
+        eventType: 'webhook.processing.failed',
         user: 'SpeedyPay Webhook',
-        details: `Received an unhandled event type: ${event.type}`,
-        entityId: event.data.object.id
-      });
+        details: errorMsg,
+        entityId: settlementId,
+        entityType: 'settlement'
+    });
+    throw new Error(errorMsg);
   }
-}
 
-// --- Specific Event Handlers ---
+  const internalRemittanceStatus = mapProviderStateToInternal(payload.transState);
 
-async function handlePaymentSucceeded(payment: PaymentObject) {
-    // A payment succeeded. Now it is ready for settlement.
-    await updatePaymentStatus(payment.metadata.internal_payment_id, 'succeeded', 'pending');
-    await addAuditLog({
-        eventType: 'payment.status.succeeded',
-        user: 'SpeedyPay Webhook',
-        details: 'Payment confirmed as successful by provider.',
-        entityId: payment.metadata.internal_payment_id,
-    });
-    // TODO: Trigger the creation of a settlement instruction via `createSettlementInstruction`.
-}
+  const updatedSettlement = {
+      ...settlement,
+      remittanceStatus: internalRemittanceStatus,
+      providerTransSeq: payload.transSeq,
+      providerRespCode: payload.respCode,
+      providerRespMessage: payload.respMessage,
+      providerTransState: payload.transState,
+      providerTransStateLabel: providerStateLabels[payload.transState] || 'Unknown',
+      signatureVerified: true, // Already verified in the API route
+      providerTimestamp: payload.timestamp,
+      failureReason: payload.transState !== '00' ? payload.respMessage : null,
+      updatedAt: formatISO(new Date()),
+  };
+  
+  await updateSettlement(settlementId, updatedSettlement);
 
-async function handlePaymentFailed(payment: PaymentObject) {
-    // A payment failed. No further action is needed.
-    await updatePaymentStatus(payment.metadata.internal_payment_id, 'failed', 'N/A');
-    await addAuditLog({
-        eventType: 'payment.status.failed',
-        user: 'SpeedyPay Webhook',
-        details: `Payment failed. Reason: ${payment.failure_reason || 'Unknown'}`,
-        entityId: payment.metadata.internal_payment_id,
-    });
-}
-
-async function handleSettlementCompleted(settlement: SettlementObject) {
-    // The funds have been successfully allocated and are ready for remittance.
-    // This doesn't mean the money is in the merchant's bank account yet.
-    await updateSettlementAndRemittanceStatus(settlement.metadata.internal_settlement_id, 'completed', 'pending');
-    await addAuditLog({
-        eventType: 'settlement.status.completed',
-        user: 'SpeedyPay Webhook',
-        details: 'Settlement confirmed as completed by provider. Awaiting remittance.',
-        entityId: settlement.metadata.internal_settlement_id,
-    });
-    // TODO: Trigger the remittance to the merchant via `remitToMerchant`.
-}
-
-async function handleSettlementFailed(settlement: SettlementObject) {
-    // The settlement process failed.
-    await updateSettlementAndRemittanceStatus(settlement.metadata.internal_settlement_id, 'failed', 'N/A', settlement.failure_reason);
-    await addAuditLog({
-        eventType: 'settlement.status.failed',
-        user: 'SpeedyPay Webhook',
-        details: `Settlement failed. Reason: ${settlement.failure_reason || 'Unknown'}`,
-        entityId: settlement.metadata.internal_settlement_id,
-    });
-}
-
-async function handleRemittanceSent(remittance: RemittanceObject) {
-    // The final payout has been sent to the merchant's account.
-    await updateSettlementAndRemittanceStatus(remittance.settlement_id, 'completed', 'sent');
-    await addAuditLog({
-        eventType: 'remittance.status.sent',
-        user: 'SpeedyPay Webhook',
-        details: 'Remittance to merchant has been successfully sent by the provider.',
-        entityId: remittance.settlement_id, // Link back to the settlement
-    });
-}
-
-async function handleRemittanceFailed(remittance: RemittanceObject) {
-    // The final payout to the merchant failed. This requires manual intervention.
-    await updateSettlementAndRemittanceStatus(remittance.settlement_id, 'completed', 'failed', remittance.failure_reason);
-     await addAuditLog({
-        eventType: 'remittance.status.failed',
-        user: 'SpeedyPay Webhook',
-        details: `Remittance to merchant failed. Reason: ${remittance.failure_reason || 'Unknown'}`,
-        entityId: remittance.settlement_id,
-    });
+  await addAuditLog({
+    eventType: 'payout.status.updated',
+    user: 'SpeedyPay Webhook',
+    details: `Payout status updated via webhook. New provider state: ${payload.transState} (${payload.respMessage})`,
+    entityId: settlement.id,
+    entityType: 'settlement'
+  });
 }

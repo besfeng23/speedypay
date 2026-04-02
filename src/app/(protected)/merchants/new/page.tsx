@@ -25,18 +25,15 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { getMerchantOnboardingSuggestions } from "@/ai/flows/merchant-onboarding-suggestions";
-import { Bot, Loader2, Sparkles } from "lucide-react";
 import { useState, useTransition } from "react";
 import { MerchantSchema, type MerchantFormValues } from "@/lib/schemas";
 import { createMerchant } from "@/lib/actions";
-import { payoutChannels } from "@/lib/speedypay/payout-channels";
+import { Loader2 } from "lucide-react";
 
 
 export default function NewMerchantPage() {
   const { toast } = useToast();
   const router = useRouter();
-  const [isSuggesting, setIsSuggesting] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const form = useForm<MerchantFormValues>({
@@ -49,36 +46,13 @@ export default function NewMerchantPage() {
       mobile: "",
       settlementAccountName: "",
       settlementAccountNumberOrWalletId: "",
-      settlementChannel: "Bank Account",
-      defaultPayoutChannelProcId: "BPI",
+      defaultPayoutChannel: "GCASH",
       onboardingStatus: "Pending",
       defaultFeeType: "percentage",
       defaultFeeValue: 2.9,
       notes: "",
     },
   });
-
-  async function handleGetSuggestion() {
-    setIsSuggesting(true);
-    const businessType = form.getValues("businessName");
-    if (!businessType) {
-        toast({ variant: "destructive", title: "Business Name Required", description: "Please enter a business name to get suggestions." });
-        setIsSuggesting(false);
-        return;
-    }
-    try {
-        const suggestions = await getMerchantOnboardingSuggestions({ businessType, country: "USA" });
-        form.setValue("defaultFeeType", suggestions.suggestedFeeConfig.type);
-        form.setValue("defaultFeeValue", suggestions.suggestedFeeConfig.value);
-        form.setValue("notes", (form.getValues("notes") || "") + "\n\nAI KYC Summary:\n" + suggestions.kycRequirementsSummary);
-        toast({ title: "AI Suggestions Applied", description: "Fee configuration and KYC notes have been updated." });
-    } catch(e) {
-        toast({ variant: "destructive", title: "Failed to get suggestions." });
-    } finally {
-        setIsSuggesting(false);
-    }
-  }
-
 
   function onSubmit(values: MerchantFormValues) {
     startTransition(async () => {
@@ -112,27 +86,26 @@ export default function NewMerchantPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Business Details</CardTitle>
-                  <CardDescription>Enter the primary information for the merchant.</CardDescription>
+                   <CardDescription>Enter the legal and contact information for the merchant.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField control={form.control} name="businessName" render={({ field }) => ( <FormItem> <FormLabel>Business Name</FormLabel> <FormControl> <Input placeholder="e.g., Starlight Apartments" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                     <FormField control={form.control} name="displayName" render={({ field }) => ( <FormItem> <FormLabel>Display Name</FormLabel> <FormControl> <Input placeholder="e.g., Starlight Apts" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                     <FormField control={form.control} name="contactName" render={({ field }) => ( <FormItem> <FormLabel>Contact Name</FormLabel> <FormControl> <Input placeholder="e.g., Alice Johnson" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                     <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>Contact Email</FormLabel> <FormControl> <Input type="email" placeholder="e.g., alice@starlight.com" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-                    <FormField control={form.control} name="mobile" render={({ field }) => ( <FormItem> <FormLabel>Mobile Number</FormLabel> <FormControl> <Input placeholder="e.g., 09171234567" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="mobile" render={({ field }) => ( <FormItem> <FormLabel>Mobile Number</FormLabel> <FormControl> <Input placeholder="e.g., +1 555 123 4567" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
                   <CardTitle>Settlement & Fees</CardTitle>
-                  <CardDescription>Configure where and how to send money to this merchant.</CardDescription>
+                   <CardDescription>Configure how the merchant will receive payouts and how fees are applied.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField control={form.control} name="settlementChannel" render={({ field }) => ( <FormItem> <FormLabel>Internal Channel Type</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a channel"/> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="Bank Account">Bank Account</SelectItem> <SelectItem value="Digital Wallet">Digital Wallet</SelectItem> </SelectContent> </Select> <FormDescription>Used for internal classification.</FormDescription><FormMessage /> </FormItem> )}/>
-                    <FormField control={form.control} name="settlementAccountName" render={({ field }) => ( <FormItem> <FormLabel>Recipient Full Name</FormLabel> <FormControl> <Input placeholder="e.g., Alice B. Johnson" {...field} /> </FormControl><FormDescription>Full legal name of the account holder.</FormDescription> <FormMessage /> </FormItem> )}/>
-                    <FormField control={form.control} name="settlementAccountNumberOrWalletId" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>Recipient Account / Wallet ID</FormLabel> <FormControl> <Input placeholder="Enter account details (e.g., bank account # or mobile #)" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
-                     <FormField control={form.control} name="defaultPayoutChannelProcId" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>Default Payout Channel</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a provider payout channel"/> </SelectTrigger> </FormControl> <SelectContent> {payoutChannels.map(channel => <SelectItem key={channel.procId} value={channel.procId}>{channel.description}</SelectItem>)} </SelectContent> </Select> <FormDescription>The specific provider channel to use for payouts.</FormDescription><FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="defaultPayoutChannel" render={({ field }) => ( <FormItem> <FormLabel>Default Payout Channel</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a channel"/> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="GCASH">GCash</SelectItem> <SelectItem value="BPI">BPI</SelectItem> <SelectItem value="UBP">Unionbank</SelectItem> <SelectItem value="PAYMAYA">PayMaya</SelectItem></SelectContent> </Select> <FormDescription>The default method for sending payouts.</FormDescription><FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="settlementAccountName" render={({ field }) => ( <FormItem> <FormLabel>Recipient Account Name</FormLabel> <FormControl> <Input placeholder="e.g., Alice B. Johnson" {...field} /> </FormControl><FormDescription>Full legal name of the account holder.</FormDescription> <FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="settlementAccountNumberOrWalletId" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>Recipient Account / Wallet ID</FormLabel> <FormControl> <Input placeholder="Enter bank account # or mobile #" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                     <FormField control={form.control} name="defaultFeeType" render={({ field }) => ( <FormItem> <FormLabel>Default Fee Type</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a fee type"/> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="percentage">Percentage</SelectItem> <SelectItem value="fixed">Fixed</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )}/>
                     <FormField control={form.control} name="defaultFeeValue" render={({ field }) => ( <FormItem> <FormLabel>Default Fee Value</FormLabel> <FormControl> <Input type="number" step="0.01" placeholder="e.g., 2.9" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                 </CardContent>
@@ -142,19 +115,8 @@ export default function NewMerchantPage() {
             <div className="space-y-8">
                 <Card>
                     <CardHeader>
-                        <CardTitle>AI Onboarding Assistant</CardTitle>
-                        <CardDescription>Get AI-powered suggestions for fee structures and KYC requirements.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Button type="button" variant="outline" className="w-full" onClick={handleGetSuggestion} disabled={isSuggesting || isPending}>
-                           {isSuggesting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Sparkles className="mr-2 h-4 w-4 text-primary"/>}
-                            {isSuggesting ? 'Analyzing...' : 'Get AI Suggestions'}
-                        </Button>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
                         <CardTitle>Status & Notes</CardTitle>
+                         <CardDescription>Set the initial onboarding status and add any internal notes.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
                         <FormField control={form.control} name="onboardingStatus" render={({ field }) => ( <FormItem> <FormLabel>Onboarding Status</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a status"/> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="Pending">Pending</SelectItem> <SelectItem value="In Review">In Review</SelectItem> <SelectItem value="Completed">Completed</SelectItem> <SelectItem value="Rejected">Rejected</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )}/>

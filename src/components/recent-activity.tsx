@@ -5,11 +5,12 @@ import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { StatusBadge } from "./status-badge";
 import type { Merchant } from "@/lib/types";
+import { EmptyState } from "./empty-state";
 
-const formatCurrency = (amount: number) => {
+const formatCurrency = (amount: number, currency: string = "USD") => {
     return new Intl.NumberFormat("en-US", {
         style: "currency",
-        currency: "USD",
+        currency: currency,
     }).format(amount);
 };
 
@@ -29,12 +30,12 @@ export async function RecentActivity() {
         <Card>
             <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>A feed of recent payments and settlements.</CardDescription>
+                 <CardDescription>A live feed of the latest transactions and settlements.</CardDescription>
             </CardHeader>
             <CardContent>
                 {combinedActivity.length > 0 ? (
                     <div className="space-y-6">
-                        {combinedActivity.slice(0, 8).map(item => (
+                        {combinedActivity.slice(0, 5).map(item => (
                             <div key={`${item.type}-${item.id}`} className="flex items-center gap-4">
                                 <div className="p-2 bg-secondary rounded-full">
                                     {item.type === 'payment' ? <CreditCard className="h-4 w-4 text-muted-foreground" /> : <ArrowRightLeft className="h-4 w-4 text-muted-foreground" />}
@@ -42,35 +43,37 @@ export async function RecentActivity() {
                                 <div className="flex-1 text-sm">
                                     {item.type === 'payment' && (
                                         <>
-                                            <p>Payment from <span className="font-medium">{item.customerName}</span></p>
-                                            <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                                <Link href={`/transactions/${item.id}`} className="hover:underline">{formatCurrency(item.grossAmount)}</Link>
-                                                <span>•</span>
-                                                <span>For {merchantMap.get(item.merchantId) || 'Unknown'}</span>
-                                            </div>
+                                            <div>Payment from <span className="font-medium">{item.customerName}</span></div>
+                                            <div className="text-xs text-muted-foreground">For {merchantMap.get(item.merchantId) || 'Unknown'}</div>
                                         </>
                                     )}
                                     {item.type === 'settlement' && (
                                         <>
-                                            <p>Settlement for <span className="font-medium">{merchantMap.get(item.merchantId) || 'Unknown'}</span></p>
-                                            <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                                <Link href={`/settlements/${item.id}`} className="hover:underline">{formatCurrency(item.merchantNetAmount)}</Link>
-                                                <span>•</span>
+                                            <div>Settlement for <span className="font-medium">{merchantMap.get(item.merchantId) || 'Unknown'}</span></div>
+                                            <div className="text-xs text-muted-foreground">
                                                 <StatusBadge status={item.settlementStatus} />
                                             </div>
                                         </>
                                     )}
                                 </div>
-                                <div className="text-xs text-muted-foreground text-right shrink-0">
-                                    {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+                                <div className="text-right">
+                                    <div className="font-mono text-sm">{formatCurrency(item.type === 'payment' ? item.grossAmount : item.merchantNetAmount)}</div>
+                                    <div className="text-xs text-muted-foreground">
+                                        <Link href={item.type === 'payment' ? `/transactions/${item.id}` : `/settlements/${item.id}`} className="hover:underline">
+                                            {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+                                        </Link>
+                                    </div>
                                 </div>
                             </div>
                         ))}
                     </div>
                 ) : (
-                    <div className="text-center text-sm text-muted-foreground py-8">
-                        No recent activity found.
-                    </div>
+                    <EmptyState 
+                        icon={<Activity />}
+                        title="No Activity Yet"
+                        description="As payments and settlements occur, they will appear here."
+                        className="py-1"
+                    />
                 )}
             </CardContent>
         </Card>

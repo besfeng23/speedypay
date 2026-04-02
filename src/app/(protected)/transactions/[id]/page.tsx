@@ -6,21 +6,21 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription
+  CardDescription,
 } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Wallet, Landmark, HandCoins, Minus, Equals } from "lucide-react";
+import { ArrowRight, Wallet, Landmark, HandCoins, Minus, Equals, Link as LinkIcon, CheckCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { StatCard } from "@/components/stat-card";
 import { Separator } from "@/components/ui/separator";
 
 function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
     return (
-        <div className="grid grid-cols-3 items-start gap-4 py-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 items-start gap-4 py-3">
             <dt className="text-sm text-muted-foreground">{label}</dt>
-            <dd className="text-sm col-span-2 font-medium">{value}</dd>
+            <dd className="text-sm col-span-1 md:col-span-2 font-medium break-all">{value}</dd>
         </div>
     )
 }
@@ -62,12 +62,12 @@ export default async function TransactionDetailPage({
   
   const merchant = await getMerchantById(payment.merchantId);
   const settlement = await getSettlementByPaymentId(payment.id);
-  const events = await getAuditLogsByEntity(payment.id);
+  const events = await getAuditLogsByEntity('payment', payment.id);
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number, currency: string = "USD") => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency: "USD",
+      currency: currency,
     }).format(amount);
   };
 
@@ -75,15 +75,17 @@ export default async function TransactionDetailPage({
     <>
       <PageHeader
         title="Transaction Details"
-        description={`Payment ID: ${payment.id}`}
-      />
+        description="A complete record of the payment from collection to internal settlement."
+      >
+        <div className="font-mono text-sm text-muted-foreground bg-muted px-3 py-1.5 rounded-md">{payment.id}</div>
+      </PageHeader>
       
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 grid gap-6">
             <Card>
                 <CardHeader>
                     <CardTitle>Financial Breakdown</CardTitle>
-                    <CardDescription>The flow of funds for this transaction.</CardDescription>
+                    <CardDescription>The flow of funds from gross payment to merchant net.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-3 gap-4 items-center">
                     <StatCard title="Gross Payment" value={formatCurrency(payment.grossAmount)} icon={<Wallet />} className="shadow-none border-0" />
@@ -91,33 +93,53 @@ export default async function TransactionDetailPage({
                     <StatCard title="Platform Fee" value={formatCurrency(payment.platformFeeAmount)} icon={<HandCoins />} className="shadow-none border-0" />
                     <div className="col-span-full"><Separator /></div>
                     <div className="text-muted-foreground flex justify-center md:col-start-2"><Equals /></div>
-                    <StatCard title="Net Amount to Merchant" value={formatCurrency(payment.merchantNetAmount)} icon={<Landmark />} className="shadow-none border-0 md:col-start-3" />
+                    <StatCard title="Net Amount to Settle" value={formatCurrency(payment.merchantNetAmount)} icon={<Landmark />} className="shadow-none border-0 md:col-start-3" />
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Payment Summary</CardTitle>
-                    <CardDescription>Core details and references for this payment.</CardDescription>
+                    <CardTitle>Core Details</CardTitle>
+                    <CardDescription>Internal record of the payment transaction.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <dl className="divide-y">
                         <DetailItem label="Customer" value={payment.customerName} />
                         <DetailItem label="Customer Email" value={payment.customerEmail} />
                         <DetailItem label="Merchant" value={<Link href={`/merchants/${payment.merchantId}`} className="text-primary hover:underline">{merchant?.displayName || 'Unknown'}</Link>} />
-                        <DetailItem label="External Reference" value={<Badge variant="secondary">{payment.externalReference}</Badge>} />
-                        <DetailItem label="Invoice Reference" value={<Badge variant="secondary">{payment.bookingReferenceOrInvoiceReference}</Badge>} />
+                        <DetailItem label="Description" value={payment.bookingReferenceOrInvoiceReference} />
                         <DetailItem label="Source Channel" value={<Badge variant="outline">{payment.sourceChannel}</Badge>} />
                         <DetailItem label="Created At" value={format(new Date(payment.createdAt), "PPP p")} />
-                         {settlement && <DetailItem label="Settlement" value={<Link href={`/settlements/${settlement.id}`} className="text-primary hover:underline font-mono text-xs">{settlement.id}</Link>} />}
+                         {settlement && <DetailItem label="Resulting Settlement" value={<Link href={`/settlements/${settlement.id}`} className="text-primary hover:underline font-mono text-xs">{settlement.id}</Link>} />}
                     </dl>
+                </CardContent>
+            </Card>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle>Collection Details (Provider)</CardTitle>
+                    <CardDescription>Data from the external payment collection provider.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {payment.providerPaymentUrl || payment.providerCollectionRespCode ? (
+                         <dl className="divide-y">
+                            {payment.providerPaymentUrl && <DetailItem label="Payment URL" value={<a href={payment.providerPaymentUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-2"><LinkIcon className="h-4 w-4" /> Link</a>} />}
+                            <DetailItem label="Provider Resp Code" value={<Badge variant="secondary">{payment.providerCollectionRespCode}</Badge>} />
+                            <DetailItem label="Provider Resp Message" value={payment.providerCollectionRespMessage} />
+                            <DetailItem label="Signature Verified" value={payment.providerCollectionSignatureVerified ? <CheckCircle className="text-green-500"/> : <AlertCircle className="text-red-500" />} />
+                         </dl>
+                    ) : (
+                         <div className="text-center py-8 text-muted-foreground">
+                            <p className="text-sm">No provider collection data available for this payment.</p>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
             <Card>
                 <CardHeader>
                     <CardTitle>Event History</CardTitle>
-                    <CardDescription>The chronological log of events related to this transaction.</CardDescription>
+                    <CardDescription>The chronological log of events related to this payment.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <EventTimeline events={events} />
@@ -129,7 +151,7 @@ export default async function TransactionDetailPage({
             <Card>
                 <CardHeader>
                     <CardTitle>Status Timeline</CardTitle>
-                    <CardDescription>The end-to-end lifecycle of the funds.</CardDescription>
+                    <CardDescription>The progression of the transaction through the system.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex items-center gap-4">
