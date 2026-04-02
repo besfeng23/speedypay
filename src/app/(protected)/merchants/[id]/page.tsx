@@ -151,7 +151,7 @@ export default async function MerchantDetailPage({
                 <DetailItem label="Recipient Account Name" value={merchant.settlementAccountName} />
                 <DetailItem label="Recipient Account Number" value={merchant.settlementAccountNumberOrWalletId} />
                 <DetailItem label="Default Fee Type" value={<Badge variant="outline" className="capitalize">{merchant.defaultFeeType}</Badge>} />
-                <DetailItem label="Default Fee Value" value={merchant.defaultFeeType === 'percentage' ? `${merchant.defaultFeeValue}%` : `$${merchant.defaultFeeValue.toFixed(2)}`} />
+                <DetailItem label="Default Fee Value" value={merchant.defaultFeeType === 'percentage' ? `${merchant.defaultFeeValue}%` : `PHP ${merchant.defaultFeeValue.toFixed(2)}`} />
               </dl>
             </CardContent>
           </Card>
