@@ -22,7 +22,7 @@ export default async function SettlementsPage() {
   const merchants: Merchant[] = await getMerchants();
   const merchantMap = new Map(merchants.map(m => [m.id, m.displayName]));
 
-  const formatCurrency = (amount: number, currency: string = 'USD') => {
+  const formatCurrency = (amount: number, currency: string = 'PHP') => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: currency,

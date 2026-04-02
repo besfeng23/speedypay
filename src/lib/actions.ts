@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
-import { formatISO } from 'date-fns';
+import { format, formatISO } from 'date-fns';
 import { MerchantSchema, CreatePaymentSchema, type MerchantFormValues, type CreatePaymentFormValues } from './schemas';
 import { merchants, addAuditLog, payments, settlements, updatePayment } from './data';
 import type { Merchant, Settlement, Payment } from './types';
@@ -188,23 +188,28 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
     const orderSeq = settlement.id;
     const channelInfo = payoutChannelMap.get(merchant.defaultPayoutChannel);
 
+    // Use contact name for first/last name as it's more reliable than account name
+    const names = merchant.contactName.split(' ');
+    const firstName = names[0];
+    const lastName = names.length > 1 ? names.slice(1).join(' ') : names[0];
+
+
     try {
         const response = await cashOut({
             orderSeq,
             amount: settlement.merchantNetAmount,
             procId: merchant.defaultPayoutChannel,
             procDetail: merchant.settlementAccountNumberOrWalletId,
-            firstName: merchant.settlementAccountName.split(' ')[0],
-            lastName: merchant.settlementAccountName.split(' ').slice(-1)[0],
+            firstName,
+            lastName,
             email: merchant.email,
             mobilePhone: merchant.mobile,
-            // other fields as needed...
+            remark: `Payout for settlement ${settlement.id}`,
         });
 
         const internalRemittanceStatus = mapProviderStateToInternal(response.transState);
 
-        const updatedSettlement: Settlement = {
-            ...settlement,
+        const updatedSettlement: Partial<Settlement> = {
             providerName: 'SpeedyPay',
             remittanceStatus: internalRemittanceStatus,
             providerOrderSeq: response.orderSeq,
@@ -233,6 +238,7 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
 
         revalidatePath(`/settlements/${settlement.id}`);
         revalidatePath('/dashboard');
+        revalidatePath('/settlements');
         return { success: true, message: 'Payout initiated successfully.' };
 
     } catch (error) {
@@ -259,8 +265,7 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
         
         const internalRemittanceStatus = mapProviderStateToInternal(response.transState);
 
-        const updatedSettlement: Settlement = {
-            ...settlement,
+        const updatedSettlement: Partial<Settlement> = {
             remittanceStatus: internalRemittanceStatus,
             providerTransSeq: response.transSeq,
             providerRespCode: response.respCode,
@@ -286,6 +291,7 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
 
         revalidatePath(`/settlements/${settlement.id}`);
         revalidatePath('/dashboard');
+        revalidatePath('/settlements');
         return { success: true, message: 'Status updated from provider.' };
 
     } catch (error) {

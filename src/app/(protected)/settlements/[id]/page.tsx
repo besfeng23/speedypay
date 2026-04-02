@@ -65,7 +65,7 @@ export default async function SettlementDetailPage({
   const payment = await getPaymentById(settlement.paymentId);
   const events = await getAuditLogsByEntity('settlement', settlement.id);
 
-  const formatCurrency = (amount: number, currency: string = "USD") => {
+  const formatCurrency = (amount: number, currency: string = "PHP") => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: currency,
