@@ -11,7 +11,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Wallet, Landmark, HandCoins, Minus, Equals, Link as LinkIcon, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowRight, Wallet, Landmark, HandCoins, Minus, Equals, Link as LinkIcon, CheckCircle, AlertCircle, Clock } from "lucide-react";
 import Link from "next/link";
 import { StatCard } from "@/components/stat-card";
 import { Separator } from "@/components/ui/separator";
@@ -126,17 +126,22 @@ export default async function TransactionDetailPage({
                     {payment.providerPaymentUrl || payment.providerCollectionRespCode ? (
                          <dl className="divide-y">
                             {payment.providerPaymentUrl && <DetailItem label="Payment URL" value={<a href={payment.providerPaymentUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline flex items-center gap-2"><LinkIcon className="h-4 w-4" /> Link</a>} />}
+                            <DetailItem label="Provider Trans Seq" value={<span className="font-mono text-xs">{payment.providerTransSeq || 'N/A'}</span>} />
                             <Separator className="my-2" />
+                            <DetailItem label="Provider State" value={<StatusBadge status={payment.providerStateLabel || payment.providerTransState} />} />
                             <DetailItem label="Provider Resp Code" value={<Badge variant="secondary">{payment.providerCollectionRespCode}</Badge>} />
                             <DetailItem label="Provider Resp Message" value={payment.providerCollectionRespMessage} />
                             <DetailItem label="Signature Verified" value={payment.providerCollectionSignatureVerified ? <CheckCircle className="text-green-500"/> : <AlertCircle className="text-red-500" />} />
                              <Separator className="my-2"/>
-                            <DetailItem label="Provider State" value={<StatusBadge status={payment.providerStateLabel || payment.providerTransState} />} />
-                             <DetailItem label="Last Queried" value={payment.lastQueryAt ? format(new Date(payment.lastQueryAt), "PPpp") : 'Never'} />
+                            <DetailItem label="Provider Create Time" value={payment.providerCreateTime ? format(new Date(payment.providerCreateTime), "PPpp") : 'N/A'} />
+                            <DetailItem label="Provider Notify Time" value={payment.providerNotifyTime ? format(new Date(payment.providerNotifyTime), "PPpp") : 'N/A'} />
+                            <DetailItem label="Last Queried" value={payment.lastQueryAt ? format(new Date(payment.lastQueryAt), "PPpp") : 'Never'} />
                          </dl>
                     ) : (
                          <div className="text-center py-8 text-muted-foreground">
-                            <p className="text-sm">No provider collection data available for this payment.</p>
+                             <Clock className="mx-auto h-8 w-8 mb-2" />
+                            <p className="font-semibold">No Provider Data</p>
+                            <p className="text-sm">No collection data available for this payment yet.</p>
                         </div>
                     )}
                 </CardContent>

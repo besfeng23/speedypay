@@ -43,10 +43,12 @@ export type Payment = {
   providerQrCodePayload?: string;
   providerCollectionRespCode?: string;
   providerCollectionRespMessage?: string;
-al
   providerCollectionSignatureVerified?: boolean;
+  providerTransSeq?: string;
   providerTransState?: string;
   providerStateLabel?: string;
+  providerCreateTime?: string;
+  providerNotifyTime?: string;
   lastQueryAt?: string;
 };
 

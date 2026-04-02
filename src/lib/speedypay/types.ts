@@ -127,11 +127,20 @@ export interface QrPayResponse {
 }
 
 
-// --- Webhook ---
+// --- Webhook Payloads ---
 
 /**
- * This represents the payload received from SpeedyPay's webhook.
+ * This represents the payload received from SpeedyPay's payout webhook.
  * Based on the documentation, it seems the webhook sends a form-urlencoded
  * payload that mirrors the `qryOrder` response shape.
  */
-export type SpeedyPayWebhookPayload = SpeedyPayResponse;
+export type SpeedyPayPayoutWebhookPayload = SpeedyPayResponse;
+
+
+/**
+ * This represents the payload received from SpeedyPay's collection webhook.
+ * It mirrors the `qryCollectionOrder` response shape.
+ */
+export type SpeedyPayCollectionWebhookPayload = QryCollectionOrderResponse & {
+    extInfo?: string;
+};
