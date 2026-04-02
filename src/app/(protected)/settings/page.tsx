@@ -29,6 +29,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { getProviderBalance } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 function IntegrationStatus() {
   const isConfigured = isSpeedyPayConfigured();
