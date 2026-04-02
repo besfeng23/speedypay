@@ -1,4 +1,3 @@
-import 'server-only';
 
 /**
  * Centralized configuration for the SpeedyPay provider.
