@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { getProviderBalance, getCollectionProviderBalance } from "@/lib/actions";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/empty-state";
 
 function IntegrationStatus() {
   const isConfigured = isSpeedyPayConfigured();
