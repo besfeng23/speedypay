@@ -43,21 +43,21 @@ export async function RecentActivity() {
                                     {item.type === 'payment' && (
                                         <>
                                             <p>Payment from <span className="font-medium">{item.customerName}</span></p>
-                                            <p className="text-xs text-muted-foreground">
+                                            <div className="text-xs text-muted-foreground flex items-center gap-1">
                                                 <Link href={`/transactions/${item.id}`} className="hover:underline">{formatCurrency(item.grossAmount)}</Link>
-                                                <span className="mx-1">•</span>
+                                                <span>•</span>
                                                 <span>For {merchantMap.get(item.merchantId) || 'Unknown'}</span>
-                                            </p>
+                                            </div>
                                         </>
                                     )}
                                     {item.type === 'settlement' && (
                                         <>
                                             <p>Settlement for <span className="font-medium">{merchantMap.get(item.merchantId) || 'Unknown'}</span></p>
-                                            <p className="text-xs text-muted-foreground">
+                                            <div className="text-xs text-muted-foreground flex items-center gap-1">
                                                 <Link href={`/settlements/${item.id}`} className="hover:underline">{formatCurrency(item.merchantNetAmount)}</Link>
-                                                <span className="mx-1">•</span>
+                                                <span>•</span>
                                                 <StatusBadge status={item.settlementStatus} />
-                                            </p>
+                                            </div>
                                         </>
                                     )}
                                 </div>
