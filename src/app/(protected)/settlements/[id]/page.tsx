@@ -21,7 +21,7 @@ function DetailItem({ label, value }: { label: string; value: React.ReactNode })
     return (
         <div className="grid grid-cols-2 md:grid-cols-3 items-start gap-4 py-3">
             <dt className="text-sm text-muted-foreground">{label}</dt>
-            <dd className="text-sm col-span-1 md:col-span-2 font-medium">{value}</dd>
+            <dd className="text-sm col-span-1 md:col-span-2 font-medium break-words">{value}</dd>
         </div>
     )
 }
@@ -77,7 +77,7 @@ export default async function SettlementDetailPage({
   return (
     <>
       <PageHeader
-        title="Settlement Details"
+        title="Settlement & Payout Details"
         description={`Track the journey of funds from internal settlement to merchant payout.`}
       >
         <div className="font-mono text-sm text-muted-foreground bg-muted px-3 py-1.5 rounded-md">{settlement.id}</div>
@@ -120,7 +120,7 @@ export default async function SettlementDetailPage({
             <Card>
                 <CardHeader>
                     <CardTitle>Event History</CardTitle>
-                    <CardDescription>The chronological log of events related to this settlement.</CardDescription>
+                    <CardDescription>The chronological log of events related to this settlement and its payout.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <EventTimeline events={events} />

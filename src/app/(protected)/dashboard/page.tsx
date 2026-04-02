@@ -1,4 +1,4 @@
-import { DollarSign, Users, Activity, Banknote, RefreshCw, AlertCircle } from "lucide-react";
+import { DollarSign, Users, Activity, Banknote, RefreshCw, AlertCircle, Building, HandCoins } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
@@ -78,44 +78,44 @@ export default async function Dashboard() {
             icon={<Activity />}
             description="Your total revenue from transaction fees."
           />
-          <StatCard
+           <StatCard
+            title="Active Merchants"
+            value={`${stats.activeMerchants}`}
+            icon={<Users />}
+            description="Merchants with a completed onboarding."
+          />
+           <StatCard
             title="Merchant Net Remittances"
             value={formatCurrency(stats.totalMerchantNetRemittances, 'PHP')}
             icon={<Banknote />}
             description="Total net amount successfully paid out."
           />
-          <StatCard
-            title="Active Merchants"
-            value={`${stats.activeMerchants}`}
-            icon={<Users />}
-            description="Merchants actively transacting."
-          />
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <StatCard
-                title="Processing Payments"
+                title="Processing Collections"
                 value={`${stats.processingPayments}`}
-                icon={<RefreshCw />}
-                description="Collections currently in-process with the provider."
+                icon={<RefreshCw className="text-blue-500" />}
+                description="Payments currently in-process with the provider."
             />
              <StatCard
-                title="Failed Payments"
+                title="Failed Collections"
                 value={`${stats.failedPayments}`}
-                icon={<AlertCircle />}
-                description="Collections that have failed or were cancelled."
+                icon={<AlertCircle className="text-red-500" />}
+                description="Payments that have failed, expired, or were cancelled."
             />
             <StatCard
-                title="Pending Settlements"
+                title="Pending Payouts"
                 value={`${stats.pendingSettlements}`}
-                icon={<RefreshCw />}
+                icon={<RefreshCw className="text-yellow-500" />}
                 description="Internal settlements awaiting payout initiation."
             />
              <StatCard
                 title="Failed Payouts"
                 value={`${stats.failedSettlements}`}
-                icon={<AlertCircle />}
-                description="Payouts that failed at the provider."
+                icon={<AlertCircle className="text-red-500" />}
+                description="Remittances that failed at the provider."
             />
         </div>
 

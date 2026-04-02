@@ -5,13 +5,15 @@ import type { SpeedyPayPayoutWebhookPayload, SpeedyPayCollectionWebhookPayload }
 import { addAuditLog, getPaymentById, getSettlementById } from '@/lib/data';
 import { speedypayConfig } from '@/lib/speedypay/config';
 
-// A mock store for processed event IDs to ensure idempotency.
-// In a production environment, this should be a persistent store like Redis or a database table.
+// In a production environment, this should be a persistent, distributed store 
+// like Redis or a database table to ensure idempotency across multiple server instances.
+// Using a simple in-memory Set is NOT suitable for production as it's not shared
+// between serverless function instances and will be cleared on restarts.
 const processedEventIds = new Set<string>();
 
 /**
  * API route to handle incoming webhooks from SpeedyPay for BOTH payouts and collections.
- * It distinguishes the webhook type by checking if the orderSeq matches a settlement or a payment.
+ * It verifies the signature, ensures idempotency, and then delegates to the appropriate processor.
  */
 export async function POST(req: Request) {
   let payload: Record<string, any>;
@@ -30,11 +32,12 @@ export async function POST(req: Request) {
   const orderSeq = payload.orderSeq as string;
   const transSeq = payload.transSeq as string;
 
+  // 1. Basic validation
   if (!orderSeq || !transSeq) {
     return new NextResponse('Missing orderSeq or transSeq', { status: 400 });
   }
 
-  // 1. Verify webhook signature
+  // 2. Verify webhook signature
   if (!signature || !verifySignature(payload, speedypayConfig.secretKey!)) {
     await addAuditLog({
       eventType: 'webhook.security.failure',
@@ -43,11 +46,12 @@ export async function POST(req: Request) {
       entityId: orderSeq,
       entityType: null,
     });
-    // According to docs, return "failed"
+    // According to docs, return "failed" to signal an issue to the provider.
     return new NextResponse('failed', { status: 400 });
   }
 
-  // 2. Protect against duplicate events (idempotency)
+  // 3. Protect against duplicate events (idempotency)
+  // The unique identifier for an event is the combination of the order and transaction sequence.
   const eventIdentifier = `${orderSeq}-${transSeq}`;
   if (processedEventIds.has(eventIdentifier)) {
     await addAuditLog({
@@ -57,24 +61,25 @@ export async function POST(req: Request) {
       entityId: orderSeq,
       entityType: null
     });
+    // Return "success" to acknowledge receipt and prevent the provider from resending.
     return new NextResponse('success');
   }
   processedEventIds.add(eventIdentifier);
   
-  // 3. Determine if this is for a Payout or a Collection
+  // 4. Determine if this is for a Payout or a Collection by checking our internal records.
+  // Payout `orderSeq` corresponds to our internal `Settlement` ID.
   const settlement = await getSettlementById(orderSeq);
   if (settlement) {
-    // It's a PAYOUT notification
     return handlePayoutWebhook(payload as SpeedyPayPayoutWebhookPayload);
   }
 
+  // Collection `orderSeq` corresponds to our internal `Payment` ID.
   const payment = await getPaymentById(orderSeq);
   if (payment) {
-    // It's a COLLECTION notification
     return handleCollectionWebhook(payload as SpeedyPayCollectionWebhookPayload);
   }
 
-  // 4. If neither is found, it's an unknown webhook
+  // 5. If neither is found, it's an unknown webhook.
   await addAuditLog({
     eventType: 'webhook.unknown.received',
     user: 'SpeedyPay Webhook',

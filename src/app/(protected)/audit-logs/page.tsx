@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import type { AuditLog } from "@/lib/types";
 import { EmptyState } from "@/components/empty-state";
-import { FileClock, CircleUser, Server, ArrowRightLeft, HandCoins } from "lucide-react";
+import { FileClock, CircleUser, Server, ArrowRightLeft, HandCoins, Building, Settings, CreditCard, Banknote } from "lucide-react";
 import Link from "next/link";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -22,10 +22,16 @@ const eventTypeIcons: Record<string, React.ReactNode> = {
     'user': <CircleUser />,
     'system': <Server />,
     'payout': <HandCoins />,
+    'collection': <CreditCard />,
+    'merchant': <Building />,
+    'settlement': <Banknote />,
+    'provider': <Settings />,
+    'simulation': <FileClock />,
+    'webhook': <ArrowRightLeft />,
 }
 
 const getIconForEventType = (eventType: string) => {
-    const category = eventType.split('.')[0];
+    const category = eventType.split('.')[0]?.toLowerCase();
     return eventTypeIcons[category] || eventTypeIcons['default'];
 }
 
@@ -69,7 +75,7 @@ export default async function AuditLogsPage() {
                                                 {format(new Date(log.timestamp), 'MMM d, yyyy, h:mm:ss a')}
                                             </TooltipContent>
                                         </Tooltip>
-                                        <div className="text-xs text-muted-foreground">{log.id}</div>
+                                        <div className="text-xs text-muted-foreground font-mono">{log.id}</div>
                                     </TableCell>
                                     <TableCell className="hidden md:table-cell">
                                         <div className="p-2 bg-muted rounded-full w-fit">
