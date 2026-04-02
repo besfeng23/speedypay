@@ -69,9 +69,7 @@
     --chart-4: 30 80% 55%;
     --chart-5: 280 65% 60%;
   }
-}
-
-@layer base {
+  
   * {
     @apply border-border;
   }
@@ -79,5 +77,19 @@
     @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
   }
 }
