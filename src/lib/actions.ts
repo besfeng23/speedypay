@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 import { format, formatISO, parseISO } from 'date-fns';
 import { MerchantSchema, CreatePaymentSchema, type MerchantFormValues, type CreatePaymentFormValues } from './schemas';
-import { merchants, addAuditLog, payments, settlements, updatePayment } from './data';
+import { merchants, addAuditLog, payments, settlements, updatePayment, addUATLog } from './data';
 import type { Merchant, Settlement, Payment } from './types';
 import { updateSettlement as dbUpdateSettlement, getSettlementById, getMerchantById, getPaymentById } from './data';
 import { cashOut, qryOrder, qryBalance, createCollectionPayment as apiCreateCollectionPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
@@ -135,12 +135,12 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
     revalidatePath(`/transactions/${orderSeq}`);
     revalidatePath('/dashboard');
 
-    return { success: true, data: { paymentUrl: response.url } };
+    return { success: true, data: { paymentUrl: response.url, ...response } };
 
   } catch (error) {
     console.error('Failed to create collection payment:', error);
     const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-    return { success: false, message };
+    return { success: false, message, data: error };
   }
 }
 
@@ -242,7 +242,7 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
         revalidatePath(`/settlements/${settlement.id}`);
         revalidatePath('/dashboard');
         revalidatePath('/settlements');
-        return { success: true, message: 'Payout initiated successfully.' };
+        return { success: true, message: 'Payout initiated successfully.', data: response };
 
     } catch (error) {
         const message = error instanceof Error ? error.message : "An unknown error occurred during payout initiation.";
@@ -253,7 +253,7 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
             entityId: settlement.id,
             entityType: 'settlement'
         });
-        return { success: false, message };
+        return { success: false, message, data: error };
     }
 }
 
@@ -299,7 +299,7 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
         revalidatePath(`/settlements/${settlement.id}`);
         revalidatePath('/dashboard');
         revalidatePath('/settlements');
-        return { success: true, message: 'Status updated from provider.' };
+        return { success: true, message: 'Status updated from provider.', data: response };
 
     } catch (error) {
         const message = error instanceof Error ? error.message : "An unknown error occurred during status query.";
@@ -310,7 +310,7 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
             entityId: settlement.id,
             entityType: 'settlement'
         });
-        return { success: false, message };
+        return { success: false, message, data: error };
     }
 }
 
@@ -351,7 +351,7 @@ export async function queryCollectionStatus(paymentId: string): Promise<ActionRe
 
         revalidatePath(`/transactions/${payment.id}`);
         revalidatePath('/dashboard');
-        return { success: true, message: 'Status updated from provider.' };
+        return { success: true, message: 'Status updated from provider.', data: response };
 
     } catch (error) {
         const message = error instanceof Error ? error.message : "An unknown error occurred during status query.";
@@ -362,7 +362,7 @@ export async function queryCollectionStatus(paymentId: string): Promise<ActionRe
             entityId: payment.id,
             entityType: 'payment'
         });
-        return { success: false, message };
+        return { success: false, message, data: error };
     }
 }
 
@@ -379,10 +379,10 @@ export async function getProviderBalance(): Promise<ActionResult> {
             entityId: null,
             entityType: null,
         });
-        return { success: true, data: { amount: response.amount } };
+        return { success: true, data: response };
     } catch (error) {
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message };
+        return { success: false, message, data: error };
     }
 }
 
@@ -399,9 +399,92 @@ export async function getCollectionProviderBalance(): Promise<ActionResult> {
             entityId: null,
             entityType: null,
         });
-        return { success: true, data: { balance: response.balance } };
+        return { success: true, data: response };
     } catch (error) {
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message };
+        return { success: false, message, data: error };
+    }
+}
+
+
+export async function runUATTestAction(testCaseId: string, payload?: any): Promise<ActionResult> {
+    let result: ActionResult = { success: false, message: "Test case not found." };
+    let entityId: string | null = null;
+    let entityType: 'payment' | 'settlement' | 'merchant' | null = null;
+
+    try {
+        switch (testCaseId) {
+            case 'COL-01': {
+                const createData = CreatePaymentSchema.parse(payload);
+                result = await createCollectionPayment(createData);
+                if (result.data?.url) {
+                    const url = new URL(result.data.url);
+                    entityId = url.searchParams.get('orderid');
+                } else if (result.data?.orderSeq) {
+                    entityId = result.data.orderSeq;
+                }
+                entityType = 'payment';
+                break;
+            }
+            case 'COL-02': {
+                const { entityId: paymentId } = payload;
+                result = await queryCollectionStatus(paymentId);
+                entityId = paymentId;
+                entityType = 'payment';
+                break;
+            }
+            case 'PAY-01': {
+                const { entityId: settlementId } = payload;
+                result = await initiateRemittance(settlementId);
+                entityId = settlementId;
+                entityType = 'settlement';
+                break;
+            }
+             case 'PAY-02': {
+                const { entityId: settlementId } = payload;
+                result = await querySettlementStatus(settlementId);
+                entityId = settlementId;
+                entityType = 'settlement';
+                break;
+            }
+            case 'SYS-01':
+                result = await getCollectionProviderBalance();
+                break;
+            case 'SYS-02':
+                result = await getProviderBalance();
+                break;
+            default:
+                throw new Error(`Unknown test case ID: ${testCaseId}`);
+        }
+
+        if (!result.success) {
+            throw new Error(result.message || 'The action failed without a specific error message.');
+        }
+
+        await addUATLog({
+            testCaseId,
+            status: 'passed',
+            notes: result.message || 'Test passed successfully.',
+            entityId,
+            entityType,
+            providerResponse: JSON.stringify(result.data, null, 2),
+        });
+
+        revalidatePath('/testing');
+        return result;
+
+    } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : "An unknown error occurred during the test.";
+        await addUATLog({
+            testCaseId,
+            status: 'failed',
+            notes: errorMessage,
+            entityId,
+            entityType,
+            providerResponse: JSON.stringify(e, null, 2),
+        });
+        revalidatePath('/testing');
+        // Return a failed action result so the client knows it failed
+        return { success: false, message: errorMessage, data: e };
     }
 }

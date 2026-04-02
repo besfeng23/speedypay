@@ -17,6 +17,7 @@ import {
   FileClock,
   Settings,
   AlertTriangle,
+  Beaker,
 } from "lucide-react";
 import { Icons } from "@/components/icons";
 import Link from "next/link";
@@ -149,6 +150,13 @@ export default function ProtectedLayout({
                 >
                     <FileClock className="h-5 w-5" />
                     Audit Logs
+                </Link>
+                 <Link
+                    href="/testing"
+                    className="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
+                >
+                    <Beaker className="h-5 w-5" />
+                    Testing
                 </Link>
                 <Link
                     href="/settings"

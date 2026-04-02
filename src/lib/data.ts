@@ -1,4 +1,4 @@
-import type { Merchant, Payment, Settlement, AuditLog, DashboardStats } from '@/lib/types';
+import type { Merchant, Payment, Settlement, AuditLog, DashboardStats, UATTestCase, UATLog } from '@/lib/types';
 import { subDays, subHours, subMinutes, formatISO } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -274,6 +274,58 @@ export let auditLogs: AuditLog[] = [
     },
 ];
 
+export let uatLogs: UATLog[] = [];
+
+export const uatTestCases: UATTestCase[] = [
+    {
+        id: 'COL-01',
+        section: 'Collections',
+        title: 'Create Collection Payment',
+        description: 'Tests creating a new payment link via the provider API. This should return a success code and a payment URL.',
+        actionLabel: 'Create Test Payment',
+        requiresInput: 'payment_amount'
+    },
+    {
+        id: 'COL-02',
+        section: 'Collections',
+        title: 'Query Collection Status',
+        description: 'Tests querying the status of a recently created payment from the provider.',
+        actionLabel: 'Query Payment',
+        requiresInput: 'latest_payment'
+    },
+    {
+        id: 'PAY-01',
+        section: 'Payouts',
+        title: 'Initiate Payout/Remittance',
+        description: 'Tests sending a settled amount to the provider for payout. Requires a settlement with status "Completed" and "Pending".',
+        actionLabel: 'Initiate Payout',
+        requiresInput: 'latest_settlement'
+    },
+    {
+        id: 'PAY-02',
+        section: 'Payouts',
+        title: 'Query Payout Status',
+        description: 'Tests querying the status of a recently initiated payout from the provider.',
+        actionLabel: 'Query Payout',
+        requiresInput: 'latest_settlement'
+    },
+     {
+        id: 'SYS-01',
+        section: 'System',
+        title: 'Query Collection Balance',
+        description: 'Queries the live balance from the collections provider.',
+        actionLabel: 'Query Balance',
+    },
+     {
+        id: 'SYS-02',
+        section: 'System',
+        title: 'Query Payout Balance',
+        description: 'Queries the live balance from the payouts provider.',
+        actionLabel: 'Query Balance',
+    },
+];
+
+
 // --- Data Fetching Functions (Simulated) ---
 
 export const getDashboardStats = async (): Promise<DashboardStats> => {
@@ -366,6 +418,15 @@ export const getAuditLogsByEntity = async (entityType: string, entityId: string)
     return new Promise(resolve => setTimeout(() => resolve(entityLogs), 200));
 }
 
+export const getUATTestCases = async (): Promise<UATTestCase[]> => {
+    return new Promise(resolve => setTimeout(() => resolve(uatTestCases), 100));
+}
+
+export const getUATLogs = async (): Promise<UATLog[]> => {
+    const sorted = [...uatLogs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return new Promise(resolve => setTimeout(() => resolve(sorted), 100));
+}
+
 
 // --- Data Mutation Functions (Server-side) ---
 
@@ -377,6 +438,17 @@ export async function addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>): Prom
         timestamp: formatISO(new Date()),
     };
     auditLogs.unshift(newLog);
+    return newLog;
+}
+
+export async function addUATLog(log: Omit<UATLog, 'id' | 'timestamp'>): Promise<UATLog> {
+    console.log(`[UAT Log - ${log.status.toUpperCase()}]`, log.notes);
+    const newLog: UATLog = {
+        ...log,
+        id: `uatlog-${uuidv4()}`,
+        timestamp: formatISO(new Date()),
+    };
+    uatLogs.unshift(newLog);
     return newLog;
 }
 

@@ -9,7 +9,7 @@ import {
   Banknote,
   FileClock,
   Settings,
-  ShieldCheck,
+  Beaker,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ const navItems: NavItem[] = [
   { title: "Transactions", href: "/transactions", icon: ArrowRightLeft },
   { title: "Settlements", href: "/settlements", icon: Banknote },
   { title: "Audit Logs", href: "/audit-logs", icon: FileClock },
+  { title: "Testing", href: "/testing", icon: Beaker },
   { title: "Settings", href: "/settings", icon: Settings },
 ];
 

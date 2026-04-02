@@ -119,3 +119,27 @@ export type DashboardStats = {
   processingPayments: number;
   failedPayments: number;
 }
+
+// --- UAT Types ---
+
+export type UATStatus = 'not tested' | 'passed' | 'failed' | 'needs retest';
+
+export type UATLog = {
+  id: string;
+  timestamp: string;
+  testCaseId: string;
+  status: 'passed' | 'failed';
+  notes: string;
+  entityId: string | null;
+  entityType: 'payment' | 'settlement' | 'merchant' | null;
+  providerResponse?: string;
+};
+
+export type UATTestCase = {
+    id: string;
+    section: 'Collections' | 'Payouts' | 'System';
+    title: string;
+    description: string;
+    actionLabel: string;
+    requiresInput?: 'latest_payment' | 'latest_settlement' | 'payment_amount';
+};
