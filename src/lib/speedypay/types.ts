@@ -68,6 +68,7 @@ export interface CashOutRequest extends BaseRequest {
 
 export interface QryOrderRequest extends Omit<BaseRequest, 'sign'> {
     orderSeq: string;
+    orderDate?: string; // YYYY-MM-DD, often required for partitioning
 }
 
 export interface QryCollectionOrderResponse extends SpeedyPayResponse {

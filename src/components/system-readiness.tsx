@@ -40,6 +40,10 @@ export function SystemReadiness() {
     const isProviderConfigured = isSpeedyPayConfigured();
     const { user } = useAuth();
     const isAuthMocked = user?.uid === 'mock-user-id';
+    
+    // This is a conceptual check. In a real app, you'd have a more robust way
+    // to determine if a persistent store is being used for idempotency.
+    const isProdIdempotency = process.env.NODE_ENV !== 'production';
 
     return (
         <Card>
@@ -63,10 +67,10 @@ export function SystemReadiness() {
                     fixSuggestion="Add `SPEEDYPAY_MERCH_SEQ` and `SPEEDYPAY_SECRET_KEY` to your environment variables."
                 />
                  <CheckItem 
-                    isReady={true}
-                    title="Webhook Handler"
-                    description="The webhook endpoint at `/api/webhooks/speedypay` is available to receive events."
-                    fixSuggestion="Ensure this URL is publicly accessible and configured in your SpeedyPay dashboard."
+                    isReady={isProdIdempotency}
+                    title="Webhook Idempotency"
+                    description={isProdIdempotency ? "Webhook handler is using a non-production in-memory store for idempotency." : "Webhook idempotency store is not suitable for production."}
+                    fixSuggestion="For production, replace the in-memory Set in `/src/api/webhooks/speedypay/route.ts` with a persistent store like Redis or a database table."
                 />
                  <CheckItem 
                     isReady={true}

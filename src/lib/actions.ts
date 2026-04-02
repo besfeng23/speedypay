@@ -3,12 +3,12 @@
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
-import { format, formatISO } from 'date-fns';
+import { format, formatISO, parseISO } from 'date-fns';
 import { MerchantSchema, CreatePaymentSchema, type MerchantFormValues, type CreatePaymentFormValues } from './schemas';
 import { merchants, addAuditLog, payments, settlements, updatePayment } from './data';
 import type { Merchant, Settlement, Payment } from './types';
 import { updateSettlement as dbUpdateSettlement, getSettlementById, getMerchantById, getPaymentById } from './data';
-import { cashOut, qryOrder, qryBalance, createQrPhDirectPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
+import { cashOut, qryOrder, qryBalance, createCollectionPayment as apiCreateCollectionPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
 import { mapProviderStateToInternal, providerStateLabels, mapCollectionStateToPaymentStatus } from './speedypay/mappers';
 import { payoutChannelMap } from './speedypay/payout-channels';
 import { speedypayConfig } from './speedypay/config';
@@ -103,7 +103,7 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
 
 
     // 2. Call provider API
-    const response = await createQrPhDirectPayment({
+    const response = await apiCreateCollectionPayment({
         orderSeq: orderSeq,
         amount: amount,
         busiName: merchant.displayName,
@@ -264,7 +264,11 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
     }
 
     try {
-        const response = await qryOrder({ orderSeq: settlement.providerOrderSeq });
+        const orderDate = format(parseISO(settlement.createdAt), 'yyyy-MM-dd');
+        const response = await qryOrder({ 
+            orderSeq: settlement.providerOrderSeq,
+            orderDate: orderDate
+        });
         
         const internalRemittanceStatus = mapProviderStateToInternal(response.transState);
 
@@ -317,7 +321,11 @@ export async function queryCollectionStatus(paymentId: string): Promise<ActionRe
     }
 
     try {
-        const response = await qryCollectionOrder({ orderSeq: payment.id });
+        const orderDate = format(parseISO(payment.createdAt), 'yyyy-MM-dd');
+        const response = await qryCollectionOrder({ 
+            orderSeq: payment.id,
+            orderDate: orderDate,
+        });
 
         const internalPaymentStatus = mapCollectionStateToPaymentStatus(response.transState);
         

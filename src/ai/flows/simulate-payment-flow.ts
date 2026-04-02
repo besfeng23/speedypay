@@ -102,7 +102,7 @@ Follow these rules for generating the output:
 5.  **Fee Calculation (CRITICAL):**
     - Calculate 'platformFeeAmount' with precision. If 'feeType' is 'percentage', 'platformFeeAmount' = (grossAmount * feeValue / 100). If 'feeType' is 'fixed', 'platformFeeAmount' = feeValue.
     - 'merchantNetAmount' = grossAmount - platformFeeAmount.
-    - **All currency amounts ('grossAmount', 'platformFeeAmount', 'merchantNetAmount') must be numbers rounded to exactly two decimal places.** For example, 12.3 should be 12.30.
+    - **All currency amounts ('grossAmount', 'platformFeeAmount', 'merchantNetAmount') must be numbers rounded to exactly two decimal places.** For example, 12.3 should be 12.30, and 15 should be 15.00.
 6.  **Status Determination:** Based on 'scenarioType':
     - **'success'**: All systems go.
         - 'paymentStatus': 'payment succeeded'

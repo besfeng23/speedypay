@@ -123,12 +123,12 @@ export async function qryCollectionBalance() {
 
 
 /**
- * Creates a QRPh Direct Payment request.
+ * Creates a collection payment link via the QR Pay endpoint.
  * Corresponds to the `/cashier/qrPay.do` endpoint.
  * @param params The payment details.
  * @returns The provider's response, including the payment URL.
  */
-export async function createQrPhDirectPayment(params: Omit<QrPayRequest, 'merchSeq' | 'timestamp' | 'sign' | 'signType' | 'orderDate' | 'currency' | 'fee' | 'busiType' | 'notifyUrl'>) {
+export async function createCollectionPayment(params: Omit<QrPayRequest, 'merchSeq' | 'timestamp' | 'sign' | 'signType' | 'orderDate' | 'currency' | 'fee' | 'busiType' | 'notifyUrl'>) {
     const orderDate = format(new Date(), 'yyyy-MM-dd');
     const fullParams: Partial<QrPayRequest> = {
         ...params,

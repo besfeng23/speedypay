@@ -5,8 +5,18 @@ import type { SpeedyPayPayoutWebhookPayload, SpeedyPayCollectionWebhookPayload }
 import { addAuditLog, getPaymentById, getSettlementById } from '@/lib/data';
 import { speedypayConfig } from '@/lib/speedypay/config';
 
-// In a production environment, this should be a persistent, distributed store 
-// like Redis or a database table to ensure idempotency across multiple server instances.
+
+// ##################################################################################
+// IMPORTANT: PRODUCTION IDEMPOTENCY CONSIDERATIONS
+// ##################################################################################
+// The `processedEventIds` Set is an in-memory store. This is NOT suitable for a
+// production environment with multiple serverless function instances or container
+// replicas, as each instance will have its own separate memory space.
+//
+// FOR PRODUCTION: This MUST be replaced with a persistent, distributed data store
+// like Redis, a database table (e.g., Firestore, DynamoDB), or a similar solution
+// that can be shared across all instances of your application.
+// ##################################################################################
 const processedEventIds = new Set<string>();
 
 /**

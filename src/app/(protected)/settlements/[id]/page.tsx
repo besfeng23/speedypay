@@ -16,6 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { PayoutActions } from "./payout-actions";
 import { Separator } from "@/components/ui/separator";
+import type { AuditLog } from "@/lib/types";
 
 function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
     return (
@@ -26,7 +27,7 @@ function DetailItem({ label, value }: { label: string; value: React.ReactNode })
     )
 }
 
-function EventTimeline({ events }: { events: any[] }) {
+function EventTimeline({ events }: { events: AuditLog[] }) {
     if (events.length === 0) {
         return <p className="text-sm text-muted-foreground">No events found for this settlement.</p>
     }
@@ -41,7 +42,9 @@ function EventTimeline({ events }: { events: any[] }) {
                         {index < events.length - 1 && <div className="absolute left-[5px] top-[1.2rem] h-full w-px bg-border" />}
                         <div className="relative flex items-center gap-2">
                            <div className="h-2.5 w-2.5 rounded-full bg-primary z-10" />
-                           <p className="text-sm">{event.details}</p>
+                           <p className="text-sm">
+                             <span className="font-semibold capitalize text-muted-foreground">[{event.entityType}]</span> {event.details}
+                           </p>
                         </div>
                     </div>
                 </div>
