@@ -8,7 +8,7 @@ import {
   signInWithEmailAndPassword,
   type User,
 } from 'firebase/auth';
-import { initializeFirebase } from '@/firebase';
+import { initializeFirebase } from '../init';
 
 export async function signInWithGoogle(): Promise<User | null> {
   const { auth } = initializeFirebase();

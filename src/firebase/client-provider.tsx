@@ -1,6 +1,7 @@
 'use client';
 
-import { initializeFirebase, FirebaseProvider } from '@/firebase';
+import { initializeFirebase } from './init';
+import { FirebaseProvider } from './provider';
 
 // This ensures Firebase is initialized only once on the client
 const { app, auth, firestore } = initializeFirebase();
