@@ -281,7 +281,7 @@ export const uatTestCases: UATTestCase[] = [
         id: 'COL-01',
         section: 'Collections',
         title: 'Create Collection Payment',
-        description: 'Tests creating a new payment link via the provider API. This should return a success code and a payment URL.',
+        description: 'Tests creating a payment link. A successful payment should trigger a webhook and automatically create a corresponding settlement record.',
         actionLabel: 'Create Test Payment',
         requiresInput: 'payment_amount'
     },
@@ -289,7 +289,7 @@ export const uatTestCases: UATTestCase[] = [
         id: 'COL-02',
         section: 'Collections',
         title: 'Query Collection Status',
-        description: 'Tests querying the status of a recently created payment from the provider.',
+        description: 'Tests querying the status of a pending or in-process payment directly from the provider API.',
         actionLabel: 'Query Payment',
         requiresInput: 'latest_payment'
     },
@@ -305,22 +305,22 @@ export const uatTestCases: UATTestCase[] = [
         id: 'PAY-02',
         section: 'Payouts',
         title: 'Query Payout Status',
-        description: 'Tests querying the status of a recently initiated payout from the provider.',
+        description: 'Tests querying the status of a recently initiated payout from the provider, which confirms API communication.',
         actionLabel: 'Query Payout',
         requiresInput: 'latest_settlement'
     },
      {
         id: 'SYS-01',
-        section: 'System',
+        section: 'System & Treasury',
         title: 'Query Collection Balance',
-        description: 'Queries the live balance from the collections provider.',
+        description: 'Queries the live balance from the collections provider to ensure API credentials and connectivity are correct.',
         actionLabel: 'Query Balance',
     },
      {
         id: 'SYS-02',
-        section: 'System',
+        section: 'System & Treasury',
         title: 'Query Payout Balance',
-        description: 'Queries the live balance from the payouts provider.',
+        description: 'Queries the live balance from the payouts provider to ensure API credentials and connectivity are correct.',
         actionLabel: 'Query Balance',
     },
 ];
@@ -416,6 +416,13 @@ export const getAuditLogsByEntity = async (entityType: 'payment' | 'settlement',
     const entityLogs = auditLogs.filter(log => log.entityId && relatedIds.includes(log.entityId))
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
     return new Promise(resolve => setTimeout(() => resolve(entityLogs), 200));
+}
+
+export const getAuditLogsByEventTypePrefix = async (prefix: string, limit = 5): Promise<AuditLog[]> => {
+  const filteredLogs = auditLogs.filter(log => log.eventType.startsWith(prefix))
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  const result = limit ? filteredLogs.slice(0, limit) : filteredLogs;
+  return new Promise(resolve => setTimeout(() => resolve(result), 200));
 }
 
 export const getUATTestCases = async (): Promise<UATTestCase[]> => {

@@ -24,6 +24,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "../ui/button";
+import { useRouter } from "next/navigation";
+import { formatDistanceToNow } from "date-fns";
 
 interface UATRunnerProps {
   testCases: UATTestCase[];
@@ -44,6 +46,7 @@ export function UATRunner({
   const [selectedLog, setSelectedLog] = useState<UATLog | null>(null);
   const [inputModalOpen, setInputModalOpen] = useState(false);
   const [currentTest, setCurrentTest] = useState<UATTestCase | null>(null);
+  const router = useRouter();
 
   // State for inputs
   const [amount, setAmount] = useState("10.00");
@@ -89,6 +92,10 @@ export function UATRunner({
             description: `UAT Test - ${currentTest.title}`
         };
     } else {
+         if (!selectedEntity) {
+            toast({ variant: "destructive", title: "Input Required", description: "Please select an entity to run this test." });
+            return;
+        }
         payload = { entityId: selectedEntity };
     }
     
@@ -112,6 +119,8 @@ export function UATRunner({
           description: result.message,
         });
       }
+      // Refresh the page to show new logs and data
+      router.refresh();
     } catch (error) {
       const message = error instanceof Error ? error.message : "An unexpected error occurred.";
       toast({
@@ -149,6 +158,7 @@ export function UATRunner({
                 {recentPayments.map(p => <SelectItem key={p.id} value={p.id}>{p.id} ({p.customerName})</SelectItem>)}
               </SelectContent>
             </Select>
+             <p className="text-xs text-muted-foreground mt-2">Select a payment to query its status.</p>
           </div>
         );
         break;
@@ -162,6 +172,7 @@ export function UATRunner({
                 {recentSettlements.map(s => <SelectItem key={s.id} value={s.id}>{s.id} (For Mer: {s.merchantId})</SelectItem>)}
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground mt-2">Select a settlement to query or initiate its payout.</p>
           </div>
         );
         break;
@@ -174,7 +185,7 @@ export function UATRunner({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Input Required for: {currentTest.title}</DialogTitle>
-            <DialogDescription>Please provide the necessary information to run this test.</DialogDescription>
+            <DialogDescription>{currentTest.description}</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">{inputField}</div>
           <DialogFooter>
@@ -192,9 +203,11 @@ export function UATRunner({
   return (
     <div className="space-y-8">
         {Object.entries(groupedCases).map(([section, cases]) => (
-             <div key={section}>
-                <h2 className="text-xl font-semibold tracking-tight mb-4">{section}</h2>
-                <div className="grid gap-6">
+             <Card key={section}>
+                <CardHeader>
+                    <CardTitle>{section}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                     {cases.map((tc) => {
                         const logs = logsByTestCaseId[tc.id] || [];
                         const latestLog = logs.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
@@ -209,8 +222,8 @@ export function UATRunner({
                         />
                         );
                     })}
-                </div>
-            </div>
+                </CardContent>
+            </Card>
         ))}
       
       {renderInputModal()}
@@ -220,12 +233,12 @@ export function UATRunner({
           <DialogHeader>
             <DialogTitle>UAT Log Details</DialogTitle>
             <DialogDescription>
-              Raw provider response from the test run on {selectedLog && formatDistanceToNow(new Date(selectedLog.timestamp))} ago.
+              Test run from {selectedLog && formatDistanceToNow(new Date(selectedLog.timestamp))} ago.
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4 bg-muted text-muted-foreground rounded-md p-4 text-xs max-h-96 overflow-auto">
             <pre>
-              <code>{selectedLog?.providerResponse || "No provider response was logged."}</code>
+              <code>{selectedLog?.providerResponse ? JSON.stringify(JSON.parse(selectedLog.providerResponse), null, 2) : "No provider response was logged."}</code>
             </pre>
           </div>
         </DialogContent>

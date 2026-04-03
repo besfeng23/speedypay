@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { speedypayConfig } from "@/lib/speedypay/config";
-import { CheckCircle, AlertTriangle, Copy, Wallet, Loader2, Server, Landmark, Building } from "lucide-react";
+import { Copy, Wallet, Loader2, Server, Landmark, Building, HandCoins, Link as LinkIcon, Settings } from "lucide-react";
 import { SystemReadiness } from "@/components/system-readiness";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { payoutChannels } from "@/lib/speedypay/payout-channels";
@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { getProviderBalance, getCollectionProviderBalance } from "@/lib/actions";
 import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/empty-state";
+import Link from "next/link";
 
 function WebhookInfo() {
   const { toast } = useToast();
@@ -68,13 +68,22 @@ function PayoutProviderConfig() {
       <CardHeader>
         <CardTitle>Payout API Config</CardTitle>
         <CardDescription>
-          Configuration for sending funds out.
+          Configuration for sending funds out (remittances).
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="payout-base-url">Payout API URL</Label>
           <Input id="payout-base-url" value={speedypayConfig.payoutBaseUrl} readOnly disabled />
+           <p className="text-xs text-muted-foreground">From `SPEEDYPAY_PAYOUT_BASE_URL...` env vars.</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="payout-merch-seq">Merchant Sequence (merchSeq)</Label>
+          <Input id="payout-merch-seq" value={speedypayConfig.merchSeq || 'Not Set'} readOnly disabled />
+        </div>
+         <div className="space-y-2">
+          <Label htmlFor="payout-api-secret">Secret Key</Label>
+          <Input id="payout-api-secret" type="password" value={speedypayConfig.secretKey ? '••••••••••••••••' : ''} readOnly disabled />
         </div>
       </CardContent>
     </Card>
@@ -87,41 +96,28 @@ function CollectionProviderConfig() {
       <CardHeader>
         <CardTitle>Collection API Config</CardTitle>
         <CardDescription>
-          Configuration for receiving funds.
+          Configuration for receiving funds from customers.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="cashier-base-url">Collection API URL</Label>
           <Input id="cashier-base-url" value={speedypayConfig.cashierBaseUrl} readOnly disabled />
+           <p className="text-xs text-muted-foreground">From `SPEEDYPAY_CASHIER_BASE_URL...` env vars.</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="collection-merch-seq">Merchant Sequence (merchSeq)</Label>
+          <Input id="collection-merch-seq" value={speedypayConfig.merchSeq || 'Not Set'} readOnly disabled />
+        </div>
+         <div className="space-y-2">
+          <Label htmlFor="collection-api-secret">Secret Key</Label>
+          <Input id="collection-api-secret" type="password" value={speedypayConfig.secretKey ? '••••••••••••••••' : ''} readOnly disabled />
         </div>
       </CardContent>
     </Card>
   )
 }
 
-function SharedProviderConfig() {
-    return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Shared Merchant Credentials</CardTitle>
-        <CardDescription>
-          Values read from server environment variables.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="merch-seq">Merchant Sequence (merchSeq)</Label>
-          <Input id="merch-seq" value={speedypayConfig.merchSeq || 'Not Set'} readOnly disabled />
-        </div>
-         <div className="space-y-2">
-          <Label htmlFor="api-secret">Secret Key</Label>
-          <Input id="api-secret" type="password" value={speedypayConfig.secretKey ? '••••••••••••••••' : ''} readOnly disabled />
-        </div>
-      </CardContent>
-    </Card>
-    )
-}
 
 function PayoutChannels() {
     return (
@@ -237,22 +233,27 @@ export default function SettingsPage() {
         description="Manage your integration, fee structures, and system configurations."
       />
 
-      <Tabs defaultValue="integration" className="space-y-4">
+      <Tabs defaultValue="system" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="integration">Integration</TabsTrigger>
+          <TabsTrigger value="system">System Readiness</TabsTrigger>
+          <TabsTrigger value="provider">Provider Configuration</TabsTrigger>
           <TabsTrigger value="treasury">Treasury</TabsTrigger>
           <TabsTrigger value="fees">Fee Configs</TabsTrigger>
-          <TabsTrigger value="system">System</TabsTrigger>
           <TabsTrigger value="release">About</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="integration" className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <CollectionProviderConfig />
+        <TabsContent value="system" className="space-y-4">
+          <SystemReadiness />
+        </TabsContent>
+
+        <TabsContent value="provider" className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="space-y-6">
+                <CollectionProviderConfig />
+            </div>
+             <div className="space-y-6">
               <PayoutProviderConfig />
             </div>
             <div className="space-y-6">
-              <SharedProviderConfig />
               <WebhookInfo />
             </div>
         </TabsContent>
@@ -268,24 +269,28 @@ export default function SettingsPage() {
         <TabsContent value="fees" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Global Fee Configurations</CardTitle>
+              <CardTitle>Fee Configurations</CardTitle>
               <CardDescription>
-                Manage global fee settings. These can be overridden at the merchant level.
+                How transaction fees are calculated and applied.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-                 <EmptyState
-                    icon={<Server />}
-                    title="Feature Not Implemented"
-                    description="Global and merchant-level fee configuration management will be available in a future update."
-                    className="py-8"
-                />
+            <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                    Currently, fee configurations are managed on a per-merchant basis. Each merchant has a `defaultFeeType` (`percentage` or `fixed`) and a `defaultFeeValue` which are set when the merchant is created or edited.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                    This provides flexibility to offer different rates to different merchants. All fee calculations are performed by trusted server-side logic to ensure integrity.
+                </p>
+                <Link href="/merchants">
+                    <Button variant="outline">
+                        <Settings className="mr-2 h-4 w-4" />
+                        Manage Merchant Fees
+                    </Button>
+                </Link>
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="system" className="space-y-4">
-          <SystemReadiness />
-        </TabsContent>
+        
         <TabsContent value="release" className="space-y-4">
           <Card>
             <CardHeader>

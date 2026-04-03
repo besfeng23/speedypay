@@ -74,6 +74,16 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
       return { success: false, message: 'Merchant not found.' };
     }
 
+    // Server-side fee calculation and validation
+    const platformFeeAmount = merchant.defaultFeeType === 'percentage' 
+      ? amount * (merchant.defaultFeeValue / 100) 
+      : merchant.defaultFeeValue;
+    const merchantNetAmount = amount - platformFeeAmount;
+    
+    if (merchantNetAmount < 0) {
+      return { success: false, message: 'Error: Fee configuration results in a negative net amount for the merchant. Please adjust merchant fees.' };
+    }
+
     const orderSeq = `pay-${uuidv4()}`;
     const now = new Date();
 
@@ -86,11 +96,11 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
         customerEmail: 'N/A',
         merchantId: merchantId,
         grossAmount: amount,
-        currency: 'PHP', // Provider uses PHP, so internal currency should match
+        currency: 'PHP',
         feeType: merchant.defaultFeeType,
         feeValue: merchant.defaultFeeValue,
-        platformFeeAmount: merchant.defaultFeeType === 'percentage' ? amount * (merchant.defaultFeeValue / 100) : merchant.defaultFeeValue,
-        merchantNetAmount: merchant.defaultFeeType === 'percentage' ? amount - (amount * (merchant.defaultFeeValue / 100)) : amount - merchant.defaultFeeValue,
+        platformFeeAmount,
+        merchantNetAmount,
         paymentStatus: 'pending',
         settlementStatus: 'pending',
         remittanceStatus: 'pending',
@@ -490,7 +500,7 @@ export async function runUATTestAction(testCaseId: string, payload?: any): Promi
             notes: errorMessage,
             entityId,
             entityType,
-            providerResponse: JSON.stringify(e, null, 2),
+            providerResponse: JSON.stringify(result.data, null, 2), // log the result even on failure
         });
         await addAuditLog({
             eventType: 'uat.test.failed',
