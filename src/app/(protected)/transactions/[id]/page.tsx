@@ -11,7 +11,7 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Wallet, Landmark, HandCoins, Minus, Equals, Link as LinkIcon, CheckCircle, AlertCircle, Clock } from "lucide-react";
+import { ArrowRight, Wallet, Landmark, HandCoins, Minus, Equal, Link as LinkIcon, CheckCircle, AlertCircle, Clock } from "lucide-react";
 import Link from "next/link";
 import { StatCard } from "@/components/stat-card";
 import { Separator } from "@/components/ui/separator";
@@ -97,7 +97,7 @@ export default async function TransactionDetailPage({
                     <div className="text-muted-foreground flex justify-center"><Minus /></div>
                     <StatCard title="Platform Fee" value={formatCurrency(payment.platformFeeAmount)} icon={<HandCoins />} className="shadow-none border-0" />
                     <div className="col-span-full"><Separator /></div>
-                    <div className="text-muted-foreground flex justify-center md:col-start-2"><Equals /></div>
+                    <div className="text-muted-foreground flex justify-center md:col-start-2"><Equal /></div>
                     <StatCard title="Net Amount to Settle" value={formatCurrency(payment.merchantNetAmount)} icon={<Landmark />} className="shadow-none border-0 md:col-start-3" />
                 </CardContent>
             </Card>
