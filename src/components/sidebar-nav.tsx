@@ -36,21 +36,21 @@ export function SidebarNav({ isCollapsed }: { isCollapsed: boolean }) {
   const pathname = usePathname();
 
   return (
-    <TooltipProvider>
-      <nav className="grid gap-1 px-2">
+    <TooltipProvider delayDuration={0}>
+      <nav className="grid gap-2 px-2">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
           return isCollapsed ? (
-            <Tooltip key={item.href} delayDuration={0}>
+            <Tooltip key={item.href}>
               <TooltipTrigger asChild>
                 <Link href={item.href}>
                   <Button
                     variant={isActive ? "secondary" : "ghost"}
                     size="icon"
-                    className="h-9 w-9"
+                    className="h-10 w-10"
                     aria-label={item.title}
                   >
-                    <item.icon className="h-4 w-4" />
+                    <item.icon className="h-5 w-5" />
                   </Button>
                 </Link>
               </TooltipTrigger>
@@ -62,9 +62,9 @@ export function SidebarNav({ isCollapsed }: { isCollapsed: boolean }) {
             <Link key={item.href} href={item.href}>
               <Button
                 variant={isActive ? "secondary" : "ghost"}
-                className="w-full justify-start"
+                className="w-full justify-start h-10 text-base"
               >
-                <item.icon className="mr-2 h-4 w-4" />
+                <item.icon className="mr-4 h-5 w-5" />
                 {item.title}
               </Button>
             </Link>

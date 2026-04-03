@@ -45,18 +45,15 @@ function WebhookInfo() {
     <Card>
       <CardHeader>
         <CardTitle>Webhook Endpoint</CardTitle>
-        <CardDescription>The URL to receive real-time events from SpeedyPay.</CardDescription>
+        <CardDescription>The URL to receive real-time events from SpeedyPay. This value is read from the `SPEEDYPAY_NOTIFY_URL` environment variable.</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-2">
-        <div className="flex items-center gap-4 p-2 rounded-md bg-muted">
+      <CardContent>
+        <div className="flex items-center gap-4 p-2 rounded-md bg-muted/50 border">
             <code className="text-sm font-mono flex-1 truncate">{webhookUrl}</code>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopy}>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleCopy}>
                 <Copy className="h-4 w-4" />
             </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          This value is read from the `SPEEDYPAY_NOTIFY_URL` environment variable.
-        </p>
       </CardContent>
     </Card>
   )
@@ -68,14 +65,13 @@ function PayoutProviderConfig() {
       <CardHeader>
         <CardTitle>Payout API Config</CardTitle>
         <CardDescription>
-          Configuration for sending funds out (remittances).
+          Configuration for sending funds out (remittances). Read from `SPEEDYPAY_...` env vars.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="payout-base-url">Payout API URL</Label>
           <Input id="payout-base-url" value={speedypayConfig.payoutBaseUrl} readOnly disabled />
-           <p className="text-xs text-muted-foreground">From `SPEEDYPAY_PAYOUT_BASE_URL...` env vars.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="payout-merch-seq">Merchant Sequence (merchSeq)</Label>
@@ -83,7 +79,7 @@ function PayoutProviderConfig() {
         </div>
          <div className="space-y-2">
           <Label htmlFor="payout-api-secret">Secret Key</Label>
-          <Input id="payout-api-secret" type="password" value={speedypayConfig.secretKey ? '••••••••••••••••' : ''} readOnly disabled />
+          <Input id="payout-api-secret" type="password" value={speedypayConfig.secretKey ? '••••••••••••••••' : 'Not Set'} readOnly disabled />
         </div>
       </CardContent>
     </Card>
@@ -96,14 +92,13 @@ function CollectionProviderConfig() {
       <CardHeader>
         <CardTitle>Collection API Config</CardTitle>
         <CardDescription>
-          Configuration for receiving funds from customers.
+          Configuration for receiving funds from customers. Read from `SPEEDYPAY_...` env vars.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="cashier-base-url">Collection API URL</Label>
           <Input id="cashier-base-url" value={speedypayConfig.cashierBaseUrl} readOnly disabled />
-           <p className="text-xs text-muted-foreground">From `SPEEDYPAY_CASHIER_BASE_URL...` env vars.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="collection-merch-seq">Merchant Sequence (merchSeq)</Label>
@@ -111,7 +106,7 @@ function CollectionProviderConfig() {
         </div>
          <div className="space-y-2">
           <Label htmlFor="collection-api-secret">Secret Key</Label>
-          <Input id="collection-api-secret" type="password" value={speedypayConfig.secretKey ? '••••••••••••••••' : ''} readOnly disabled />
+          <Input id="collection-api-secret" type="password" value={speedypayConfig.secretKey ? '••••••••••••••••' : 'Not Set'} readOnly disabled />
         </div>
       </CardContent>
     </Card>
@@ -130,17 +125,17 @@ function PayoutChannels() {
                  <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>procId</TableHead>
                             <TableHead>Description</TableHead>
                             <TableHead>Type</TableHead>
+                            <TableHead>procId</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {payoutChannels.map((channel) => (
                             <TableRow key={channel.procId}>
-                                <TableCell className="font-mono text-xs">{channel.procId}</TableCell>
-                                <TableCell>{channel.description}</TableCell>
+                                <TableCell className="font-medium">{channel.description}</TableCell>
                                 <TableCell><Badge variant="outline">{channel.type}</Badge></TableCell>
+                                <TableCell className="font-mono text-xs">{channel.procId}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
@@ -176,11 +171,11 @@ function PayoutBalanceQuery() {
             </CardHeader>
             <CardContent className="flex items-center justify-between">
                 <div className="text-2xl font-bold">
-                    {balance !== null ? `PHP ${balance.toFixed(2)}` : <span className="text-muted-foreground">N/A</span>}
+                    {balance !== null ? `PHP ${balance.toFixed(2)}` : <span className="text-muted-foreground text-base">Not queried</span>}
                 </div>
                 <Button onClick={handleQuery} disabled={isLoading}>
                     {isLoading ? <Loader2 className="animate-spin" /> : <Wallet />}
-                    <span className="ml-2">{isLoading ? 'Querying...' : 'Query Payout Balance'}</span>
+                    <span className="ml-2">{isLoading ? 'Querying...' : 'Query Now'}</span>
                 </Button>
             </CardContent>
         </Card>
@@ -213,11 +208,11 @@ function CollectionBalanceQuery() {
             </CardHeader>
             <CardContent className="flex items-center justify-between">
                 <div className="text-2xl font-bold">
-                    {balance !== null ? `PHP ${balance.toFixed(2)}` : <span className="text-muted-foreground">N/A</span>}
+                     {balance !== null ? `PHP ${balance.toFixed(2)}` : <span className="text-muted-foreground text-base">Not queried</span>}
                 </div>
                 <Button onClick={handleQuery} disabled={isLoading}>
                     {isLoading ? <Loader2 className="animate-spin" /> : <Wallet />}
-                    <span className="ml-2">{isLoading ? 'Querying...' : 'Query Collection Balance'}</span>
+                    <span className="ml-2">{isLoading ? 'Querying...' : 'Query Now'}</span>
                 </Button>
             </CardContent>
         </Card>
@@ -233,90 +228,105 @@ export default function SettingsPage() {
         description="Manage your integration, fee structures, and system configurations."
       />
 
-      <Tabs defaultValue="system" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="system">System Readiness</TabsTrigger>
-          <TabsTrigger value="provider">Provider Configuration</TabsTrigger>
-          <TabsTrigger value="treasury">Treasury</TabsTrigger>
-          <TabsTrigger value="fees">Fee Configs</TabsTrigger>
-          <TabsTrigger value="release">About</TabsTrigger>
-        </TabsList>
+      <div className="grid md:grid-cols-[200px_1fr] lg:grid-cols-[250px_1fr] gap-10">
+        <Tabs defaultValue="system" className="space-y-4 md:hidden">
+            <TabsList>
+            <TabsTrigger value="system">System</TabsTrigger>
+            <TabsTrigger value="provider">Provider</TabsTrigger>
+            <TabsTrigger value="treasury">Treasury</TabsTrigger>
+            <TabsTrigger value="fees">Fees</TabsTrigger>
+            <TabsTrigger value="release">About</TabsTrigger>
+            </TabsList>
+        </Tabs>
+        <Tabs defaultValue="system" orientation="vertical" className="hidden md:block">
+            <TabsList className="w-full">
+            <TabsTrigger value="system" className="w-full justify-start">System Readiness</TabsTrigger>
+            <TabsTrigger value="provider" className="w-full justify-start">Provider Config</TabsTrigger>
+            <TabsTrigger value="treasury" className="w-full justify-start">Treasury</TabsTrigger>
+            <TabsTrigger value="fees" className="w-full justify-start">Fee Configs</TabsTrigger>
+            <TabsTrigger value="release" className="w-full justify-start">About</TabsTrigger>
+            </TabsList>
+        </Tabs>
 
-        <TabsContent value="system" className="space-y-4">
-          <SystemReadiness />
-        </TabsContent>
+        <div className="mt-2 md:mt-0">
+            <Tabs defaultValue="system" className="space-y-4">
+                <TabsContent value="system" className="space-y-4 m-0">
+                <SystemReadiness />
+                </TabsContent>
 
-        <TabsContent value="provider" className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="space-y-6">
-                <CollectionProviderConfig />
-            </div>
-             <div className="space-y-6">
-              <PayoutProviderConfig />
-            </div>
-            <div className="space-y-6">
-              <WebhookInfo />
-            </div>
-        </TabsContent>
-        <TabsContent value="treasury" className="grid md:grid-cols-2 gap-6">
-            <div className="space-y-6">
-                <CollectionBalanceQuery />
-                <PayoutBalanceQuery />
-            </div>
-            <div className="space-y-6">
-                <PayoutChannels />
-            </div>
-        </TabsContent>
-        <TabsContent value="fees" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Fee Configurations</CardTitle>
-              <CardDescription>
-                How transaction fees are calculated and applied.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                    Currently, fee configurations are managed on a per-merchant basis. Each merchant has a `defaultFeeType` (`percentage` or `fixed`) and a `defaultFeeValue` which are set when the merchant is created or edited.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                    This provides flexibility to offer different rates to different merchants. All fee calculations are performed by trusted server-side logic to ensure integrity.
-                </p>
-                <Link href="/merchants">
-                    <Button variant="outline">
-                        <Settings className="mr-2 h-4 w-4" />
-                        Manage Merchant Fees
-                    </Button>
-                </Link>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="release" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>About SpeedyPay Marketplace Console</CardTitle>
-              <CardDescription>
-                Version 1.0.0 - Production Ready
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <p className="text-sm text-muted-foreground">This console provides a comprehensive interface for managing a marketplace payments platform, including merchant onboarding, payment processing, settlement orchestration, and financial reconciliation.</p>
-                <h4 className="font-semibold mt-4 mb-2">Key Modules Implemented:</h4>
-                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                    <li>Executive Dashboard & Financial Overview</li>
-                    <li>Full Merchant CRUD and Management</li>
-                    <li>Payment Transaction Lifecycle Viewing</li>
-                    <li>Settlement & Remittance Orchestration</li>
-                    <li>Live Provider Balance & Status Querying</li>
-                    <li>End-to-End UAT & Operator Testing Suite</li>
-                    <li>Comprehensive Audit Logging</li>
-                    <li>AI-Powered Simulation & Insights Tools</li>
-                    <li>System Readiness & Deployment Checklist</li>
-                </ul>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                <TabsContent value="provider" className="grid lg:grid-cols-2 gap-6 m-0">
+                    <div className="space-y-6">
+                        <CollectionProviderConfig />
+                    </div>
+                    <div className="space-y-6">
+                        <PayoutProviderConfig />
+                    </div>
+                    <div className="lg:col-span-2">
+                        <WebhookInfo />
+                    </div>
+                </TabsContent>
+                <TabsContent value="treasury" className="grid lg:grid-cols-2 gap-6 m-0">
+                    <div className="lg:col-span-2 grid md:grid-cols-2 gap-6">
+                        <CollectionBalanceQuery />
+                        <PayoutBalanceQuery />
+                    </div>
+                    <div className="lg:col-span-2">
+                        <PayoutChannels />
+                    </div>
+                </TabsContent>
+                <TabsContent value="fees" className="space-y-4 m-0">
+                <Card>
+                    <CardHeader>
+                    <CardTitle>Fee Configurations</CardTitle>
+                    <CardDescription>
+                        How transaction fees are calculated and applied.
+                    </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <p className="text-sm text-muted-foreground">
+                            Currently, fee configurations are managed on a per-merchant basis. Each merchant has a `defaultFeeType` (`percentage` or `fixed`) and a `defaultFeeValue` which are set when the merchant is created or edited.
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                            This provides flexibility to offer different rates to different merchants. All fee calculations are performed by trusted server-side logic to ensure integrity. A validation check prevents payments where the fee exceeds the gross amount.
+                        </p>
+                        <Link href="/merchants">
+                            <Button variant="outline">
+                                <Settings className="mr-2 h-4 w-4" />
+                                Manage Merchant Fees
+                            </Button>
+                        </Link>
+                    </CardContent>
+                </Card>
+                </TabsContent>
+                
+                <TabsContent value="release" className="space-y-4 m-0">
+                <Card>
+                    <CardHeader>
+                    <CardTitle>About SpeedyPay Marketplace Console</CardTitle>
+                    <CardDescription>
+                        Version 1.0.0 - Production Ready
+                    </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground">This console provides a comprehensive interface for managing a marketplace payments platform, including merchant onboarding, payment processing, settlement orchestration, and financial reconciliation.</p>
+                        <h4 className="font-semibold mt-4 mb-2">Key Modules Implemented:</h4>
+                        <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                            <li>Executive Dashboard & Financial Overview</li>
+                            <li>Full Merchant CRUD and Management</li>
+                            <li>Payment Transaction Lifecycle Viewing</li>
+                            <li>Settlement & Remittance Orchestration</li>
+                            <li>Live Provider Balance & Status Querying</li>
+                            <li>End-to-End UAT & Operator Testing Suite</li>
+                            <li>Comprehensive Audit Logging</li>
+                            <li>AI-Powered Simulation & Insights Tools</li>
+                            <li>System Readiness & Deployment Checklist</li>
+                        </ul>
+                    </CardContent>
+                </Card>
+                </TabsContent>
+            </Tabs>
+        </div>
+      </div>
     </>
   );
 }

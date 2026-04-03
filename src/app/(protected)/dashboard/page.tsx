@@ -9,6 +9,7 @@ import { RecentActivity } from "@/components/recent-activity";
 import { DemoPaymentSimulator } from "@/components/demo-payment-simulator";
 import { DashboardInsights } from "@/components/dashboard-insights";
 import { getRecentPayments, getRecentSettlements } from "@/lib/data";
+import { Separator } from "@/components/ui/separator";
 
 const chartData = [
   { month: "January", volume: 18600, fees: 800 },
@@ -79,46 +80,66 @@ export default async function Dashboard() {
             description="Your total revenue from transaction fees."
           />
            <StatCard
-            title="Active Merchants"
-            value={`${stats.activeMerchants}`}
-            icon={<Users />}
-            description="Merchants with a completed onboarding."
-          />
-           <StatCard
             title="Merchant Net Payouts"
             value={formatCurrency(stats.totalMerchantNetRemittances, 'PHP')}
             icon={<Banknote />}
             description="Total net amount successfully paid out."
           />
+           <StatCard
+            title="Active Merchants"
+            value={`${stats.activeMerchants}`}
+            icon={<Users />}
+            description="Merchants with a completed onboarding."
+          />
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-                title="Processing Collections"
-                value={`${stats.processingPayments}`}
-                icon={<RefreshCw className="text-blue-500" />}
-                description="Payments currently in-process with the provider."
-            />
-             <StatCard
-                title="Failed Collections"
-                value={`${stats.failedPayments}`}
-                icon={<AlertCircle className="text-red-500" />}
-                description="Payments that have failed, expired, or were cancelled."
-            />
-            <StatCard
-                title="Pending Payouts"
-                value={`${stats.pendingSettlements}`}
-                icon={<RefreshCw className="text-yellow-500" />}
-                description="Internal settlements awaiting payout initiation."
-            />
-             <StatCard
-                title="Failed Payouts"
-                value={`${stats.failedSettlements}`}
-                icon={<AlertCircle className="text-red-500" />}
-                description="Remittances that failed at the provider."
-            />
+        <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Collections</CardTitle>
+                    <CardDescription>Status of incoming funds from customers.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                     <StatCard
+                        title="Processing"
+                        value={`${stats.processingPayments}`}
+                        icon={<RefreshCw className="text-blue-500" />}
+                        description="Payments currently in-process."
+                        className="shadow-none border"
+                    />
+                    <StatCard
+                        title="Failed"
+                        value={`${stats.failedPayments}`}
+                        icon={<AlertCircle className="text-red-500" />}
+                        description="Payments that have failed or expired."
+                        className="shadow-none border"
+                    />
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Payouts</CardTitle>
+                    <CardDescription>Status of outgoing funds to merchants.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-4">
+                     <StatCard
+                        title="Pending"
+                        value={`${stats.pendingSettlements}`}
+                        icon={<RefreshCw className="text-yellow-500" />}
+                        description="Internal settlements awaiting payout."
+                        className="shadow-none border"
+                    />
+                    <StatCard
+                        title="Failed"
+                        value={`${stats.failedSettlements}`}
+                        icon={<AlertCircle className="text-red-500" />}
+                        description="Remittances that failed at the provider."
+                        className="shadow-none border"
+                    />
+                </CardContent>
+            </Card>
         </div>
-
+        
         <div className="grid gap-6 lg:grid-cols-5">
           <Card className="lg:col-span-3">
             <CardHeader>

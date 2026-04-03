@@ -25,13 +25,15 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { speedypayConfig } from "@/lib/speedypay/config";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 
 export default function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -61,11 +63,11 @@ export default function ProtectedLayout({
       <div
         className={cn(
           "hidden md:flex md:flex-col md:fixed md:inset-y-0 z-50 h-full border-r bg-card transition-all",
-          isCollapsed ? "w-14" : "w-64"
+          isCollapsed ? "w-20" : "w-64"
         )}
       >
         <div className="flex h-16 items-center border-b px-4 lg:px-6 shrink-0">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
+          <Link href="/" className={cn("flex items-center gap-2 font-semibold", isCollapsed && "justify-center w-full")}>
             <Icons.logo className="h-6 w-6 text-primary" />
             {!isCollapsed && <span className="">SpeedyPay</span>}
           </Link>
@@ -73,28 +75,37 @@ export default function ProtectedLayout({
         <div className="flex-1 overflow-auto py-4">
           <SidebarNav isCollapsed={isCollapsed} />
         </div>
-        <div className="mt-auto p-4 border-t">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className={cn(
-              "h-9 w-9 transition-transform",
-              isCollapsed && "rotate-180"
-            )}
-            aria-label="Toggle sidebar"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
+        <div className="mt-auto p-4 border-t flex justify-center">
+            <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setIsCollapsed(!isCollapsed)}
+                            className={cn(
+                            "h-9 w-9 transition-transform",
+                            isCollapsed && "rotate-180"
+                            )}
+                            aria-label="Toggle sidebar"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                        <p>{isCollapsed ? "Expand" : "Collapse"}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         </div>
       </div>
       <div
         className={cn(
           "flex flex-col transition-all",
-          isCollapsed ? "md:pl-14" : "md:pl-64"
+          isCollapsed ? "md:pl-20" : "md:pl-64"
         )}
       >
-        <header className="flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6 sticky top-0 z-40">
+        <header className="flex h-16 items-center gap-4 border-b bg-background px-4 md:px-6 sticky top-0 z-40">
           <Sheet>
             <SheetTrigger asChild>
               <Button
@@ -106,64 +117,59 @@ export default function ProtectedLayout({
                 <span className="sr-only">Toggle navigation menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="flex flex-col p-0">
-               <div className="p-4">
-                    <SheetTitle className="sr-only">Menu</SheetTitle>
-                    <SheetDescription className="sr-only">Main navigation menu</SheetDescription>
-                </div>
-              <nav className="grid gap-2 text-lg font-medium p-4">
-                <Link
-                  href="#"
-                  className="flex items-center gap-2 text-lg font-semibold mb-4"
-                >
-                  <Icons.logo className="h-6 w-6 text-primary" />
-                  <span className="">SpeedyPay</span>
+            <SheetContent side="left" className="flex flex-col p-0 max-w-xs">
+               <div className="flex h-16 items-center border-b px-6 shrink-0">
+                 <Link href="/" className="flex items-center gap-2 font-semibold">
+                    <Icons.logo className="h-6 w-6 text-primary" />
+                    <span className="">SpeedyPay</span>
                 </Link>
+               </div>
+              <nav className="grid gap-2 text-base font-medium p-4">
                 <Link
                   href="/dashboard"
-                  className="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-4 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground"
                 >
                   <Home className="h-5 w-5" />
                   Dashboard
                 </Link>
                 <Link
                   href="/merchants"
-                  className="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-4 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground"
                 >
                   <Users className="h-5 w-5" />
                   Merchants
                 </Link>
                 <Link
                   href="/transactions"
-                  className="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-4 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground"
                 >
                   <ArrowRightLeft className="h-5 w-5" />
                   Transactions
                 </Link>
                 <Link
                   href="/settlements"
-                  className="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-4 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground"
                 >
                   <Banknote className="h-5 w-5" />
                   Settlements
                 </Link>
                 <Link
                     href="/audit-logs"
-                    className="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
+                    className="flex items-center gap-4 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground"
                 >
                     <FileClock className="h-5 w-5" />
                     Audit Logs
                 </Link>
                  <Link
                     href="/testing"
-                    className="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
+                    className="flex items-center gap-4 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground"
                 >
                     <Beaker className="h-5 w-5" />
                     Testing
                 </Link>
                 <Link
                     href="/settings"
-                    className="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
+                    className="flex items-center gap-4 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground"
                 >
                     <Settings className="h-5 w-5" />
                     Settings
@@ -188,7 +194,7 @@ export default function ProtectedLayout({
             <UserNav />
           </div>
         </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 bg-muted/20">
+        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 bg-background">
           {children}
         </main>
       </div>
