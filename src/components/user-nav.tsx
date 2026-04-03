@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useAuth } from "@/lib/firebase/hooks";
+import { useAuth } from "@/hooks/use-auth";
 import { CreditCard, LogOut, User as UserIcon } from "lucide-react";
 
 export function UserNav() {

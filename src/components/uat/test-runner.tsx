@@ -5,7 +5,6 @@ import type { UATTestCase, UATLog, Payment, Settlement, Merchant } from "@/lib/t
 import { TestCaseCard } from "./test-case-card";
 import { useToast } from "@/hooks/use-toast";
 import { runUATTestAction } from "@/lib/actions";
-import { groupBy } from "lodash";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +25,17 @@ import { Label } from "@/components/ui/label";
 import { Button } from "../ui/button";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+
+// Helper function to avoid adding a large dependency like lodash
+function groupBy<T, K extends keyof T>(array: T[], key: K): Record<string, T[]> {
+  return array.reduce((result, currentValue) => {
+    const groupKey = currentValue[key] as string;
+    (result[groupKey] = result[groupKey] || []).push(currentValue);
+    return result;
+  }, {} as Record<string, T[]>);
+}
+
 
 interface UATRunnerProps {
   testCases: UATTestCase[];

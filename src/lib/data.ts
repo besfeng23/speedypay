@@ -281,7 +281,7 @@ export const uatTestCases: UATTestCase[] = [
         id: 'COL-01',
         section: 'Collections',
         title: 'Create Collection Payment',
-        description: 'Tests creating a payment link. A successful payment should trigger a webhook and automatically create a corresponding settlement record.',
+        description: 'Verifies payment link creation. A successful payment via the link should trigger a webhook, which in turn automatically creates a "completed" settlement record.',
         actionLabel: 'Create Test Payment',
         requiresInput: 'payment_amount'
     },
@@ -289,7 +289,7 @@ export const uatTestCases: UATTestCase[] = [
         id: 'COL-02',
         section: 'Collections',
         title: 'Query Collection Status',
-        description: 'Tests querying the status of a pending or in-process payment directly from the provider API.',
+        description: 'Verifies direct, server-to-server querying of a pending payment from the provider. This confirms API connectivity and signature generation.',
         actionLabel: 'Query Payment',
         requiresInput: 'latest_payment'
     },
@@ -297,7 +297,7 @@ export const uatTestCases: UATTestCase[] = [
         id: 'PAY-01',
         section: 'Payouts',
         title: 'Initiate Payout/Remittance',
-        description: 'Tests sending a settled amount to the provider for payout. Requires a settlement with status "Completed" and "Pending".',
+        description: 'Verifies the remittance creation process for a settled transaction. Requires a settlement with status "Completed" and remittance "Pending".',
         actionLabel: 'Initiate Payout',
         requiresInput: 'latest_settlement'
     },
@@ -305,7 +305,7 @@ export const uatTestCases: UATTestCase[] = [
         id: 'PAY-02',
         section: 'Payouts',
         title: 'Query Payout Status',
-        description: 'Tests querying the status of a recently initiated payout from the provider, which confirms API communication.',
+        description: 'Verifies direct, server-to-server querying of an initiated payout. This confirms API connectivity and correct request formatting for the payout API.',
         actionLabel: 'Query Payout',
         requiresInput: 'latest_settlement'
     },
@@ -313,14 +313,14 @@ export const uatTestCases: UATTestCase[] = [
         id: 'SYS-01',
         section: 'System & Treasury',
         title: 'Query Collection Balance',
-        description: 'Queries the live balance from the collections provider to ensure API credentials and connectivity are correct.',
+        description: 'Verifies API credentials and connectivity by querying the live balance from the collections provider.',
         actionLabel: 'Query Balance',
     },
      {
         id: 'SYS-02',
         section: 'System & Treasury',
         title: 'Query Payout Balance',
-        description: 'Queries the live balance from the payouts provider to ensure API credentials and connectivity are correct.',
+        description: 'Verifies API credentials and connectivity by querying the live balance from the payouts provider.',
         actionLabel: 'Query Balance',
     },
 ];

@@ -7,16 +7,17 @@ import { speedypayConfig } from '@/lib/speedypay/config';
 
 
 // ##################################################################################
-// IMPORTANT: PRODUCTION IDEMPOTENCY CONSIDERATIONS
+// CRITICAL: PRODUCTION IDEMPOTENCY IS NOT IMPLEMENTED
 // ##################################################################################
 // The `processedEventIds` Set is an in-memory store. This is NOT suitable for a
 // production environment with multiple serverless function instances or container
-// replicas, as each instance will have its own separate memory space, and the store
-// will be cleared on server restarts. This will lead to duplicate event processing.
+// replicas. In a distributed environment, each instance would have its own memory,
+// leading to duplicate event processing on different servers. Furthermore, this
+// store is cleared on every server restart.
 //
 // FOR PRODUCTION: This MUST be replaced with a persistent, distributed data store
-// like Redis, a database table (e.g., Firestore, DynamoDB), or a similar solution
-// that can be shared across all instances of your application.
+// such as Redis, or a dedicated database table (e.g., Firestore, DynamoDB).
+// This is a blocking issue for a production deployment.
 // ##################################################################################
 const processedEventIds = new Set<string>();
 

@@ -8,8 +8,8 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { CheckCircle, AlertTriangle, CircleDashed } from "lucide-react";
-import { speedypayConfig, isSpeedyPayConfigured } from "@/lib/speedypay/config";
-import { useAuth } from "@/lib/firebase/hooks";
+import { speedypayConfig } from "@/lib/speedypay/config";
+import { firebaseConfig } from "@/lib/firebase/config";
 
 interface CheckItemProps {
     isReady: boolean;
@@ -38,27 +38,24 @@ function CheckItem({ isReady, isBlocking = true, title, description, fixSuggesti
 }
 
 export function SystemReadiness() {
-    const { user } = useAuth();
-    const isAuthMocked = user?.uid === 'mock-user-id';
+    const isFirebaseReady = firebaseConfig.apiKey !== "YOUR_API_KEY";
     
     // Environment variables checks
-    const isMerchSeqSet = !!speedypayConfig.merchSeq;
-    const isSecretKeySet = !!speedypayConfig.secretKey;
-    const areAllCredsSet = isMerchSeqSet && isSecretKeySet;
+    const areAllCredsSet = !!speedypayConfig.merchSeq && !!speedypayConfig.secretKey;
+    const areAllUrlsSet = !!speedypayConfig.payoutBaseUrl && !!speedypayConfig.cashierBaseUrl;
     const isNotifyUrlSet = !!speedypayConfig.notifyUrl;
     const isProd = speedypayConfig.env === 'production';
 
-    // We warn if the app is in production env but still using the mock store for idempotency.
     // This is always false for this project, but is a critical check for a real implementation.
-    const isProdIdempotencyReady = !isProd; // Should be a check against a real persistent store in prod
+    const isProdIdempotencyReady = false; 
 
     const checks = [
         { 
-            isReady: !isAuthMocked, 
+            isReady: isFirebaseReady, 
             isBlocking: true,
             title: "Authentication Provider", 
-            description: isAuthMocked ? "Auth is in Demo Mode. Real users cannot sign in." : "Real Firebase Authentication is active.",
-            fixSuggestion: "Replace the mock provider in `src/lib/firebase/auth-provider.tsx` with a real Firebase Auth implementation."
+            description: isFirebaseReady ? "Real Firebase Authentication is configured." : "Auth is not configured. The app will not allow users to sign in.",
+            fixSuggestion: "Add your Firebase project configuration to `src/lib/firebase/config.ts` to enable authentication."
         },
         { 
             isReady: false, 
@@ -74,6 +71,13 @@ export function SystemReadiness() {
             description: areAllCredsSet ? "All required SpeedyPay API credentials are configured." : "One or more critical SpeedyPay API credentials are missing.",
             fixSuggestion: "Ensure `SPEEDYPAY_MERCH_SEQ` and `SPEEDYPAY_SECRET_KEY` are set in your environment variables."
         },
+         { 
+            isReady: areAllUrlsSet, 
+            isBlocking: true,
+            title: "Provider API URLs", 
+            description: areAllUrlsSet ? "Collection and Payout API base URLs are configured." : "One or both of the provider API base URLs are missing.",
+            fixSuggestion: "Ensure `SPEEDYPAY_PAYOUT_BASE_URL...` and `SPEEDYPAY_CASHIER_BASE_URL...` variables are set for the current environment."
+        },
         { 
             isReady: isNotifyUrlSet, 
             isBlocking: true,
@@ -82,10 +86,10 @@ export function SystemReadiness() {
             fixSuggestion: "Set the `SPEEDYPAY_NOTIFY_URL` environment variable to the public URL of your deployed webhook endpoint."
         },
         { 
-            isReady: isProdIdempotencyReady, 
-            isBlocking: isProd,
+            isReady: !isProd || isProdIdempotencyReady, 
+            isBlocking: isProd && !isProdIdempotencyReady,
             title: "Webhook Idempotency", 
-            description: isProdIdempotencyReady ? "Using a non-production in-memory store suitable for testing." : "CRITICAL: Handler is using an in-memory idempotency store in a production environment.",
+            description: isProd && !isProdIdempotencyReady ? "CRITICAL: Handler is using a non-persistent in-memory store in a production environment." : "Using a non-production in-memory store suitable for testing.",
             fixSuggestion: "For production, replace the in-memory Set in `/src/api/webhooks/speedypay/route.ts` with a persistent store like Redis or a database table."
         }
     ];

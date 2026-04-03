@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { Icons } from "@/components/icons";
 import Link from "next/link";
-import { useAuth } from "@/lib/firebase/hooks";
+import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
 import { speedypayConfig } from "@/lib/speedypay/config";
 
