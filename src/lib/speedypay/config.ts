@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { getServerEnv } from '@/lib/env/server';
+
 /**
  * Centralized configuration for the SpeedyPay provider.
  * Reads values from environment variables.
@@ -8,8 +10,10 @@ import 'server-only';
  * Server-side-only variables should not have this prefix.
  */
 
+const env = getServerEnv();
+
 // Use NEXT_PUBLIC_ for the environment so it can be read by client components for display purposes.
-const speedyPayEnv = process.env.NEXT_PUBLIC_SPEEDYPAY_ENV === 'production' ? 'production' : 'test';
+const speedyPayEnv = env.NEXT_PUBLIC_SPEEDYPAY_ENV === 'production' ? 'production' : 'test';
 
 export const speedypayConfig = {
   /** The environment for the SpeedyPay API. Can be 'test' or 'production'. Read from NEXT_PUBLIC_SPEEDYPAY_ENV. */
@@ -17,22 +21,22 @@ export const speedypayConfig = {
   
   /** The base URL for the SpeedyPay Payout API (e.g., cashOut, qryOrder). */
   payoutBaseUrl: speedyPayEnv === 'production'
-    ? (process.env.SPEEDYPAY_PAYOUT_BASE_URL_PROD || 'https://www.emangopay.com') 
-    : (process.env.SPEEDYPAY_PAYOUT_BASE_URL_TEST || 'https://test.emangopay.com'),
+    ? (env.SPEEDYPAY_PAYOUT_BASE_URL_PROD || 'https://www.emangopay.com') 
+    : (env.SPEEDYPAY_PAYOUT_BASE_URL_TEST || 'https://test.emangopay.com'),
 
   /** The base URL for the SpeedyPay Collection/Cashier API (e.g., qrPay, qryOrder). */
   cashierBaseUrl: speedyPayEnv === 'production'
-    ? (process.env.SPEEDYPAY_CASHIER_BASE_URL_PROD || 'https://pay.e-mango.ph')
-    : (process.env.SPEEDYPAY_CASHIER_BASE_URL_TEST || 'https://test.e-mango.ph'),
+    ? (env.SPEEDYPAY_CASHIER_BASE_URL_PROD || 'https://pay.e-mango.ph')
+    : (env.SPEEDYPAY_CASHIER_BASE_URL_TEST || 'https://test.e-mango.ph'),
   
   /** Your merchant sequence number (merchSeq) provided by SpeedyPay. Server-side only. */
-  merchSeq: process.env.SPEEDYPAY_MERCH_SEQ,
+  merchSeq: env.SPEEDYPAY_MERCH_SEQ,
   
   /** Your secret key for signing requests, provided by SpeedyPay. Server-side only. */
-  secretKey: process.env.SPEEDYPAY_SECRET_KEY,
+  secretKey: env.SPEEDYPAY_SECRET_KEY,
   
   /** The full public URL for your webhook notification endpoint. Server-side only. */
-  notifyUrl: process.env.SPEEDYPAY_NOTIFY_URL,
+  notifyUrl: env.SPEEDYPAY_NOTIFY_URL,
 };
 
 

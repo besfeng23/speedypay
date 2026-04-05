@@ -2,14 +2,16 @@ import 'server-only';
 
 import { SignJWT, jwtVerify, createRemoteJWKSet, JWTPayload } from 'jose';
 import { cookies } from 'next/headers';
+import { getServerEnv } from '@/lib/env/server';
 
 const SESSION_COOKIE_NAME = 'sp_admin_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8h
 
-const sessionSecret = process.env.AUTH_SESSION_SECRET;
-const firebaseProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+const env = getServerEnv();
+const sessionSecret = env.AUTH_SESSION_SECRET;
+const firebaseProjectId = env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 const adminEmailSet = new Set(
-  (process.env.ADMIN_EMAILS ?? '')
+  (env.ADMIN_EMAILS ?? '')
     .split(',')
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean)
