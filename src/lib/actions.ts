@@ -1,3 +1,4 @@
+
 'use server';
 
 import { z } from 'zod';
@@ -5,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 import { format, formatISO, parseISO } from 'date-fns';
 import { MerchantSchema, CreatePaymentSchema, type MerchantFormValues, type CreatePaymentFormValues } from './schemas';
-import { merchants, addAuditLog, payments, settlements, updatePayment, addUATLog } from './data';
+import { merchants, addAuditLog, payments, settlements, updatePayment, addUATLog, addPayment } from './data';
 import type { Merchant, Settlement, Payment, UATTestPayload } from './types';
 import { updateSettlement as dbUpdateSettlement, getSettlementById, getMerchantById, getPaymentById } from './data';
 import { cashOut, qryOrder, qryBalance, createCollectionPayment as apiCreateCollectionPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
@@ -28,7 +29,7 @@ export async function createMerchant(values: MerchantFormValues): Promise<Action
     const now = formatISO(new Date());
     const newMerchant: Merchant = {
       id: `mer-${uuidv4().slice(0, 8)}`,
-      status: 'Active',
+      status: 'active',
       propertyAssociations: [],
       createdAt: now,
       updatedAt: now,
@@ -85,9 +86,30 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
     }
 
     const orderSeq = `pay-${uuidv4()}`;
-    const now = new Date();
+    
+    // --- TRANSACTIONAL LOGIC ---
+    // Step 1: Call the external provider API FIRST.
+    // This avoids creating an internal "ghost" record if the provider call fails.
+    const response = await apiCreateCollectionPayment({
+        orderSeq: orderSeq,
+        amount: amount,
+        busiName: merchant.displayName,
+        dueTime: 60, // 60 minutes
+        remark: description
+    });
+    
+    // Step 2: Check for a successful response from the provider.
+    if (response.respCode !== '00000000' || !response.url) {
+      // If the provider returned an error, log it and fail the operation cleanly.
+      // No internal records were created, so the state is consistent.
+      await addAuditLog({ eventType: 'payment.provider.failed', user: 'System', details: `Provider failed to create payment link: ${response.respMessage}`, entityId: orderSeq, entityType: 'payment' });
+      throw new Error(response.respMessage || 'Failed to create payment link at provider.');
+    }
+    
+    const isSignatureVerified = verifySignature(response, speedypayConfig.secretKey!);
 
-    // 1. Create internal payment record first
+    // Step 3: Only after a successful provider response, create the internal payment record.
+    const now = new Date();
     const newPayment: Payment = {
         id: orderSeq,
         externalReference: 'N/A',
@@ -107,39 +129,17 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
         sourceChannel: 'Manual',
         createdAt: formatISO(now),
         updatedAt: formatISO(now),
-    };
-    payments.unshift(newPayment);
-    await addAuditLog({ eventType: 'payment.created', user: 'admin@speedypay.com', details: `Created manual payment link for ${merchant.displayName}`, entityId: orderSeq, entityType: 'payment' });
-
-
-    // 2. Call provider API
-    const response = await apiCreateCollectionPayment({
-        orderSeq: orderSeq,
-        amount: amount,
-        busiName: merchant.displayName,
-        dueTime: 60, // 60 minutes
-        remark: description
-    });
-    
-    // 3. Verify provider response signature (already done in API layer)
-    const isSignatureVerified = verifySignature(response, speedypayConfig.secretKey!);
-
-    // 4. Update internal record with provider response
-    const updatedPaymentData: Partial<Payment> = {
         providerPaymentUrl: response.url,
         providerCollectionRespCode: response.respCode,
         providerCollectionRespMessage: response.respMessage,
         providerCollectionSignatureVerified: isSignatureVerified,
-    }
-
-    if (response.respCode !== '00000000') {
-      updatedPaymentData.paymentStatus = 'failed';
-      await updatePayment(orderSeq, updatedPaymentData);
-      throw new Error(response.respMessage || 'Failed to create payment link at provider.');
-    }
-
-    await updatePayment(orderSeq, updatedPaymentData);
-     await addAuditLog({ eventType: 'payment.provider.sent', user: 'System', details: `Sent request to provider. URL: ${response.url}`, entityId: orderSeq, entityType: 'payment' });
+    };
+    
+    await addPayment(newPayment);
+    
+    // Step 4: Log the successful creation and provider interaction.
+    await addAuditLog({ eventType: 'payment.created', user: 'admin@speedypay.com', details: `Created manual payment link for ${merchant.displayName}`, entityId: orderSeq, entityType: 'payment' });
+    await addAuditLog({ eventType: 'payment.provider.sent', user: 'System', details: `Successfully created payment link at provider. URL: ${response.url}`, entityId: orderSeq, entityType: 'payment' });
 
     revalidatePath('/transactions');
     revalidatePath(`/transactions/${orderSeq}`);
@@ -156,7 +156,7 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
 
 export async function addSimulatedData(data: { paymentRecord: Payment, settlementRecord?: Settlement }): Promise<ActionResult> {
     try {
-        payments.unshift(data.paymentRecord);
+        await addPayment(data.paymentRecord);
         if (data.settlementRecord) {
             settlements.unshift(data.settlementRecord);
         }
@@ -518,3 +518,5 @@ export async function runUATTestAction(testCaseId: string, payload?: UATTestPayl
         return { success: false, message: errorMessage, data: e };
     }
 }
+
+    

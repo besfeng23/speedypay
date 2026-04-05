@@ -453,6 +453,12 @@ export async function addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>): Prom
     return newLog;
 }
 
+export async function addPayment(payment: Payment): Promise<Payment> {
+    console.log('[Data] Adding new payment:', payment.id);
+    payments.unshift(payment);
+    return payment;
+}
+
 export async function addUATLog(log: Omit<UATLog, 'id' | 'timestamp'>): Promise<UATLog> {
     console.log(`[UAT Log - ${log.status.toUpperCase()}]`, log.notes);
     const newLog: UATLog = {
@@ -481,3 +487,5 @@ export async function updatePayment(id: string, updatedData: Partial<Payment>): 
     }
     return undefined;
 }
+
+    
