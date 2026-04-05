@@ -1,4 +1,4 @@
-import type { RemittanceStatus, Payment } from '../types';
+import type { RemittanceStatus, Payment, ProviderTransState } from '../types';
 
 /**
  * Maps the provider's `transState` for a payout to our internal `remittanceStatus`.
@@ -6,7 +6,7 @@ import type { RemittanceStatus, Payment } from '../types';
  * @param providerState The `transState` from the SpeedyPay API response.
  * @returns The corresponding internal `RemittanceStatus`.
  */
-export function mapProviderStateToInternal(providerState: string): RemittanceStatus {
+export function mapProviderStateToInternal(providerState: ProviderTransState): RemittanceStatus {
   switch (providerState) {
     case '00': // transaction succeeded
       return 'sent';
@@ -28,7 +28,7 @@ export function mapProviderStateToInternal(providerState: string): RemittanceSta
  * @param providerState The `transState` from the SpeedyPay API response.
  * @returns The corresponding internal `Payment['paymentStatus']`.
  */
-export function mapCollectionStateToPaymentStatus(providerState: string): Payment['paymentStatus'] {
+export function mapCollectionStateToPaymentStatus(providerState: ProviderTransState): Payment['paymentStatus'] {
   switch (providerState) {
     case '00': // transaction succeeded
       return 'succeeded';

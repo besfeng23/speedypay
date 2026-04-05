@@ -38,7 +38,7 @@ function CheckItem({ isReady, isBlocking = true, title, description, fixSuggesti
 }
 
 export function SystemReadiness() {
-    const isFirebaseReady = firebaseConfig.apiKey !== "YOUR_API_KEY";
+    const isFirebaseReady = firebaseConfig.apiKey !== "YOUR_API_KEY" && firebaseConfig.projectId !== "your-project-id";
     
     // Environment variables checks
     const areAllCredsSet = !!speedypayConfig.merchSeq && !!speedypayConfig.secretKey;
@@ -53,9 +53,9 @@ export function SystemReadiness() {
         { 
             isReady: isFirebaseReady, 
             isBlocking: true,
-            title: "Authentication Provider", 
-            description: isFirebaseReady ? "Real Firebase Authentication is configured." : "Auth is not configured. The app will not allow users to sign in.",
-            fixSuggestion: "Add your Firebase project configuration to `src/lib/firebase/config.ts` to enable authentication."
+            title: "Firebase Authentication", 
+            description: isFirebaseReady ? "Firebase is configured for real user authentication." : "Auth is not configured. The app will not allow users to sign in.",
+            fixSuggestion: "Add your Firebase project configuration to `src/lib/firebase/config.ts` to enable real authentication."
         },
         { 
             isReady: false, 

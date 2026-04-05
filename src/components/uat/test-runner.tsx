@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { UATTestCase, UATLog, Payment, Settlement, Merchant } from "@/lib/types";
+import type { UATTestCase, UATLog, Payment, Settlement, Merchant, UATTestPayload } from "@/lib/types";
 import { TestCaseCard } from "./test-case-card";
 import { useToast } from "@/hooks/use-toast";
 import { runUATTestAction } from "@/lib/actions";
@@ -89,7 +89,7 @@ export function UATRunner({
   const handleModalSubmit = () => {
     if (!currentTest) return;
     
-    let payload: any = {};
+    let payload: UATTestPayload = {};
     if (currentTest.requiresInput === 'payment_amount') {
         const selectedMerchant = merchants[0]; // For simplicity, use the first merchant
         if (!selectedMerchant) {
@@ -113,7 +113,7 @@ export function UATRunner({
     executeTest(currentTest.id, payload);
   }
 
-  const executeTest = async (testCaseId: string, payload?: any) => {
+  const executeTest = async (testCaseId: string, payload?: UATTestPayload) => {
     setRunningTestId(testCaseId);
     try {
       const result = await runUATTestAction(testCaseId, payload);
@@ -207,6 +207,37 @@ export function UATRunner({
     );
   };
 
+  const renderLogDialog = () => {
+    if (!selectedLog) return null;
+
+    let prettyResponse = "No provider response was logged.";
+    if (selectedLog.providerResponse) {
+        try {
+            prettyResponse = JSON.stringify(JSON.parse(selectedLog.providerResponse), null, 2);
+        } catch (e) {
+            prettyResponse = selectedLog.providerResponse; // Fallback to raw string if not valid JSON
+        }
+    }
+
+    return (
+         <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
+            <DialogContent className="max-w-2xl">
+            <DialogHeader>
+                <DialogTitle>UAT Log Details</DialogTitle>
+                <DialogDescription>
+                Test run from {formatDistanceToNow(new Date(selectedLog.timestamp))} ago.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="mt-4 bg-muted text-muted-foreground rounded-md p-4 text-xs max-h-96 overflow-auto">
+                <pre>
+                <code>{prettyResponse}</code>
+                </pre>
+            </div>
+            </DialogContent>
+        </Dialog>
+    );
+  }
+
 
   const groupedCases = groupBy(testCases, 'section');
 
@@ -237,22 +268,7 @@ export function UATRunner({
         ))}
       
       {renderInputModal()}
-
-      <Dialog open={!!selectedLog} onOpenChange={(open) => !open && setSelectedLog(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>UAT Log Details</DialogTitle>
-            <DialogDescription>
-              Test run from {selectedLog && formatDistanceToNow(new Date(selectedLog.timestamp))} ago.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="mt-4 bg-muted text-muted-foreground rounded-md p-4 text-xs max-h-96 overflow-auto">
-            <pre>
-              <code>{selectedLog?.providerResponse ? JSON.stringify(JSON.parse(selectedLog.providerResponse), null, 2) : "No provider response was logged."}</code>
-            </pre>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {renderLogDialog()}
     </div>
   );
 }

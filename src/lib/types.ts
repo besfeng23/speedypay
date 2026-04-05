@@ -18,6 +18,8 @@ export type Merchant = {
   updatedAt: string;
 };
 
+export type ProviderTransState = '00' | '01' | '03' | '04' | '05' | '06' | '07' | '08' | '09';
+
 export type Payment = {
   id: string; // Our internal ID, used as provider's orderSeq
   externalReference: string;
@@ -45,7 +47,7 @@ export type Payment = {
   providerCollectionRespMessage?: string;
   providerCollectionSignatureVerified?: boolean;
   providerTransSeq?: string;
-  providerTransState?: string;
+  providerTransState?: ProviderTransState;
   providerStateLabel?: string;
   providerCreateTime?: string;
   providerNotifyTime?: string;
@@ -70,7 +72,7 @@ export type Settlement = {
   providerTransSeq?: string;
   providerRespCode?: string;
   providerRespMessage?: string;
-  providerTransState?: string;
+  providerTransState?: ProviderTransState;
   providerTransStateLabel?: string;
   signatureVerified?: boolean;
   payoutChannelProcId?: string;
@@ -137,9 +139,16 @@ export type UATLog = {
 
 export type UATTestCase = {
     id: string;
-    section: 'Collections' | 'Payouts' | 'System';
+    section: 'Collections' | 'Payouts' | 'System & Treasury';
     title: string;
     description: string;
     actionLabel: string;
     requiresInput?: 'latest_payment' | 'latest_settlement' | 'payment_amount';
+};
+
+export type UATTestPayload = {
+    amount?: number;
+    merchantId?: string;
+    description?: string;
+    entityId?: string;
 };

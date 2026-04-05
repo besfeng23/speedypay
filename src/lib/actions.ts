@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { format, formatISO, parseISO } from 'date-fns';
 import { MerchantSchema, CreatePaymentSchema, type MerchantFormValues, type CreatePaymentFormValues } from './schemas';
 import { merchants, addAuditLog, payments, settlements, updatePayment, addUATLog } from './data';
-import type { Merchant, Settlement, Payment } from './types';
+import type { Merchant, Settlement, Payment, UATTestPayload } from './types';
 import { updateSettlement as dbUpdateSettlement, getSettlementById, getMerchantById, getPaymentById } from './data';
 import { cashOut, qryOrder, qryBalance, createCollectionPayment as apiCreateCollectionPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
 import { mapProviderStateToInternal, providerStateLabels, mapCollectionStateToPaymentStatus } from './speedypay/mappers';
@@ -417,7 +417,7 @@ export async function getCollectionProviderBalance(): Promise<ActionResult> {
 }
 
 
-export async function runUATTestAction(testCaseId: string, payload?: any): Promise<ActionResult> {
+export async function runUATTestAction(testCaseId: string, payload?: UATTestPayload): Promise<ActionResult> {
     let result: ActionResult = { success: false, message: "Test case not found." };
     let entityId: string | null = null;
     let entityType: 'payment' | 'settlement' | 'merchant' | null = null;
@@ -426,6 +426,7 @@ export async function runUATTestAction(testCaseId: string, payload?: any): Promi
     try {
         switch (testCaseId) {
             case 'COL-01': {
+                if (!payload) throw new Error("Payload is required for COL-01");
                 const createData = CreatePaymentSchema.parse(payload);
                 result = await createCollectionPayment(createData);
                 if (result.data?.url) {
@@ -438,6 +439,7 @@ export async function runUATTestAction(testCaseId: string, payload?: any): Promi
                 break;
             }
             case 'COL-02': {
+                if (!payload?.entityId) throw new Error("Missing entityId for COL-02");
                 const { entityId: paymentId } = payload;
                 result = await queryCollectionStatus(paymentId);
                 entityId = paymentId;
@@ -445,6 +447,7 @@ export async function runUATTestAction(testCaseId: string, payload?: any): Promi
                 break;
             }
             case 'PAY-01': {
+                if (!payload?.entityId) throw new Error("Missing entityId for PAY-01");
                 const { entityId: settlementId } = payload;
                 result = await initiateRemittance(settlementId);
                 entityId = settlementId;
@@ -452,6 +455,7 @@ export async function runUATTestAction(testCaseId: string, payload?: any): Promi
                 break;
             }
              case 'PAY-02': {
+                if (!payload?.entityId) throw new Error("Missing entityId for PAY-02");
                 const { entityId: settlementId } = payload;
                 result = await querySettlementStatus(settlementId);
                 entityId = settlementId;
