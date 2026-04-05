@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { PageHeader } from "@/components/page-header";
 import { getUATTestCases, getUATLogs, getRecentPayments, getRecentSettlements, getMerchants, getAuditLogsByEventTypePrefix } from "@/lib/data";
 import { UATRunner } from "@/components/uat/test-runner";

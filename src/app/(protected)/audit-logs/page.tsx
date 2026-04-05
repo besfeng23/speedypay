@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { format, formatDistanceToNow } from "date-fns";
 import { PageHeader } from "@/components/page-header";
 import { getAuditLogs } from "@/lib/data";

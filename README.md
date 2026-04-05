@@ -16,6 +16,26 @@ Then, run the development server:
 npm run dev
 ```
 
+## Managed database requirements (production)
+
+This app now requires a managed PostgreSQL-compatible database and no longer supports local SQLite for production paths.
+
+Required environment variables:
+
+- `DATABASE_URL` (must be `postgres://` or `postgresql://`)
+- `DATABASE_REQUIRE_SSL=true` when your provider requires TLS (`sslmode=require` should be present in `DATABASE_URL`)
+
+Optional pool controls:
+
+- `DATABASE_POOL_MAX` (default: `10`)
+- `DATABASE_POOL_IDLE_MS` (default: `10000`)
+
+Run schema bootstrap/migrations:
+
+```bash
+npm run db:migrate
+```
+
 Open [http://localhost:9002](http://localhost:9002) with your browser to see the result.
 
 ## Key Features

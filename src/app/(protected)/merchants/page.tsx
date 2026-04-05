@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import Link from "next/link";
 import { PlusCircle, Users } from "lucide-react";
 import { format } from "date-fns";

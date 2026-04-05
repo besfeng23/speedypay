@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { DollarSign, Users, Activity, Banknote, RefreshCw, AlertCircle, Building } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
