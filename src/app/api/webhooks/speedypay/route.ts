@@ -57,9 +57,10 @@ export async function POST(req: Request) {
           await addAuditLog({
             eventType: 'webhook.duplicate.received',
             user: 'SpeedyPay Webhook',
-            details: `Duplicate event received and ignored: ${eventIdentifier}. Original log ID: ${existingEvent.id}`,
+            details: `Duplicate event received and ignored. Original log ID: ${existingEvent.id}`,
             entityId: orderSeq,
             entityType: null,
+            eventIdentifier,
           });
           // Return "success" to acknowledge receipt and prevent the provider from resending.
           return new NextResponse('success');
@@ -74,6 +75,7 @@ export async function POST(req: Request) {
             details: `Failed to check for duplicate webhooks. Error: ${errorMessage}`,
             entityId: orderSeq,
             entityType: null,
+            eventIdentifier,
         });
       return new NextResponse('failed', { status: 500 });
   }
