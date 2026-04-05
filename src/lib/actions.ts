@@ -6,9 +6,19 @@ import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 import { format, formatISO, parseISO } from 'date-fns';
 import { MerchantSchema, CreatePaymentSchema, type MerchantFormValues, type CreatePaymentFormValues } from './schemas';
-import { merchants, addAuditLog, payments, settlements, updatePayment, addUATLog, addPayment } from './data';
+import {
+  addAuditLog,
+  updatePayment,
+  addUATLog,
+  addPayment,
+  addMerchant,
+  addSettlement,
+  updateSettlement as dbUpdateSettlement,
+  getSettlementById,
+  getMerchantById,
+  getPaymentById
+} from './data';
 import type { Merchant, Settlement, Payment, UATTestPayload } from './types';
-import { updateSettlement as dbUpdateSettlement, getSettlementById, getMerchantById, getPaymentById } from './data';
 import { cashOut, qryOrder, qryBalance, createCollectionPayment as apiCreateCollectionPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
 import { mapProviderStateToInternal, providerStateLabels, mapCollectionStateToPaymentStatus } from './speedypay/mappers';
 import { payoutChannelMap } from './speedypay/payout-channels';
@@ -36,8 +46,7 @@ export async function createMerchant(values: MerchantFormValues): Promise<Action
       ...validatedData,
     };
     
-    // In a real app, you would save this to your database.
-    merchants.unshift(newMerchant);
+    await addMerchant(newMerchant);
 
     await addAuditLog({
       eventType: 'merchant.created',
@@ -158,7 +167,7 @@ export async function addSimulatedData(data: { paymentRecord: Payment, settlemen
     try {
         await addPayment(data.paymentRecord);
         if (data.settlementRecord) {
-            settlements.unshift(data.settlementRecord);
+            await addSettlement(data.settlementRecord);
         }
         await addAuditLog({
             eventType: 'simulation.created',
@@ -518,5 +527,7 @@ export async function runUATTestAction(testCaseId: string, payload?: UATTestPayl
         return { success: false, message: errorMessage, data: e };
     }
 }
+
+    
 
     
