@@ -125,6 +125,22 @@ export async function findAuditLogByEventIdentifier(eventIdentifier: string): Pr
     return new Promise(resolve => setTimeout(() => resolve(log), 50));
 }
 
+export async function claimWebhookEventForProcessing(
+  eventIdentifier: string,
+  orderSeq?: string,
+  transSeq?: string
+): Promise<'started' | 'already-processed' | 'in-progress'> {
+  return db.claimWebhookEventForProcessing(eventIdentifier, orderSeq, transSeq);
+}
+
+export async function markWebhookEventProcessed(eventIdentifier: string): Promise<void> {
+  db.markWebhookEventProcessed(eventIdentifier);
+}
+
+export async function releaseWebhookEventClaim(eventIdentifier: string, errorMessage?: string): Promise<void> {
+  db.releaseWebhookEventClaim(eventIdentifier, errorMessage);
+}
+
 export const getUATTestCases = async (): Promise<UATTestCase[]> => {
     return new Promise(resolve => setTimeout(() => resolve(db.getUATTestCases()), 100));
 }

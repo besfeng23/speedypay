@@ -11,7 +11,11 @@ import {
 } from "@/components/ui/chart";
 
 interface DashboardChartProps {
-    data: any[];
+    data: Array<{
+        month: string;
+        volume: number;
+        fees: number;
+    }>;
     config: ChartConfig;
 }
 

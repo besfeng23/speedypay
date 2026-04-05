@@ -10,7 +10,14 @@ import { createHash } from 'crypto';
  * @param payload The request or response payload object.
  * @returns The canonical string to be signed.
  */
-function buildCanonicalString(payload: Record<string, any>): string {
+type SignableValue = string | number | boolean | null | undefined;
+type SignablePayload = Record<string, SignableValue>;
+
+function toSignablePayload(payload: object): SignablePayload {
+  return Object.fromEntries(Object.entries(payload)) as SignablePayload;
+}
+
+function buildCanonicalString(payload: SignablePayload): string {
     const sortedKeys = Object.keys(payload).sort();
     
     const parts = sortedKeys
@@ -29,9 +36,10 @@ function buildCanonicalString(payload: Record<string, any>): string {
  * @param secret The merchant secret key to use for signing.
  * @returns The generated lowercase SHA256 signature.
  */
-export function generateSignature(payload: Record<string, any>, secret: string): string {
+export function generateSignature(payload: object, secret: string): string {
+  const normalizedPayload = toSignablePayload(payload);
   // Steps 1-3: Build the canonical string from the payload.
-  const canonicalString = buildCanonicalString(payload);
+  const canonicalString = buildCanonicalString(normalizedPayload);
   
   // Step 4: Append the merchant secret key.
   const stringToSign = `${canonicalString}&${secret}`;
@@ -56,16 +64,17 @@ export function generateSignature(payload: Record<string, any>, secret: string):
  * @param secret The merchant secret key.
  * @returns `true` if the signature is valid, `false` otherwise.
  */
-export function verifySignature(payload: Record<string, any>, secret: string): boolean {
+export function verifySignature(payload: object, secret: string): boolean {
+  const normalizedPayload = toSignablePayload(payload);
   // Step 7.1: Extract the signature from the payload.
-  const receivedSignature = payload.sign;
-  if (!receivedSignature) {
+  const receivedSignature = normalizedPayload.sign;
+  if (typeof receivedSignature !== 'string' || receivedSignature.length === 0) {
       console.error('[SpeedyPay Crypto] Verification failed: No signature found in payload.');
       return false;
   }
   
   // Step 7.2 & 7.3: Recompute the signature based on the rest of the payload.
-  const expectedSignature = generateSignature(payload, secret);
+  const expectedSignature = generateSignature(normalizedPayload, secret);
   
   console.log(`[SpeedyPay Crypto] Verifying. Received: ${receivedSignature}, Expected: ${expectedSignature}`);
 

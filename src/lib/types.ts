@@ -112,6 +112,12 @@ export type AuditLog = {
   entityType: 'merchant' | 'payment' | 'settlement' | 'user' | null;
   entityId: string | null;
   eventIdentifier?: string;
+  source?: 'admin' | 'system' | 'webhook' | 'provider' | 'auth';
+  action?: string;
+  previousState?: string | null;
+  newState?: string | null;
+  outcome?: 'success' | 'failed' | 'duplicate' | 'denied' | 'in-progress';
+  correlationId?: string | null;
 };
 
 export type FeeConfig = {

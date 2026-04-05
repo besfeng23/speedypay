@@ -90,7 +90,7 @@ export function DashboardInsights({ kpiData }: DashboardInsightsProps) {
                     !isLoading && !error && (
                         <div className="text-center text-sm text-muted-foreground py-6">
                             <Bot className="mx-auto h-8 w-8 mb-2" />
-                            Click 'Generate Insights' to get an AI-powered summary of your marketplace performance.
+                            Click &apos;Generate Insights&apos; to get an AI-powered summary of your marketplace performance.
                         </div>
                     )
                 )}

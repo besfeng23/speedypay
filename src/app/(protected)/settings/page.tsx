@@ -17,28 +17,31 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { speedypayConfig } from "@/lib/speedypay/config";
 import { Copy, Wallet, Loader2, Server, Landmark, Building, HandCoins, Link as LinkIcon, Settings } from "lucide-react";
 import { SystemReadiness } from "@/components/system-readiness";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { payoutChannels } from "@/lib/speedypay/payout-channels";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
-import { getProviderBalance, getCollectionProviderBalance } from "@/lib/actions";
+import { useEffect, useState } from "react";
+import { getProviderBalance, getCollectionProviderBalance, getPublicProviderConfig } from "@/lib/actions";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
-function WebhookInfo() {
+type PublicProviderConfig = {
+  env: string;
+  payoutBaseUrl: string;
+  cashierBaseUrl: string;
+  notifyUrlConfigured: boolean;
+  merchSeqConfigured: boolean;
+  secretKeyConfigured: boolean;
+};
+
+function WebhookInfo({ config }: { config: PublicProviderConfig | null }) {
   const { toast } = useToast();
-  const webhookUrl = speedypayConfig.notifyUrl || 'Not configured in environment';
+  const webhookUrl = config?.notifyUrlConfigured ? 'Configured (server-only value hidden)' : 'Not configured in environment';
 
   const handleCopy = () => {
-    if (speedypayConfig.notifyUrl) {
-        navigator.clipboard.writeText(speedypayConfig.notifyUrl);
-        toast({ title: "Copied!", description: "Webhook URL copied to clipboard." });
-    } else {
-        toast({ variant: "destructive", title: "Cannot Copy", description: "Webhook URL is not configured." });
-    }
+      toast({ title: "Security Notice", description: "Webhook URL is server-only and not exposed to the client." });
   }
 
   return (
@@ -59,7 +62,7 @@ function WebhookInfo() {
   )
 }
 
-function PayoutProviderConfig() {
+function PayoutProviderConfig({ config }: { config: PublicProviderConfig | null }) {
   return (
     <Card>
       <CardHeader>
@@ -71,22 +74,22 @@ function PayoutProviderConfig() {
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="payout-base-url">Payout API URL</Label>
-          <Input id="payout-base-url" value={speedypayConfig.payoutBaseUrl} readOnly disabled />
+          <Input id="payout-base-url" value={config?.payoutBaseUrl ?? 'Not Set'} readOnly disabled />
         </div>
         <div className="space-y-2">
           <Label htmlFor="payout-merch-seq">Merchant Sequence (merchSeq)</Label>
-          <Input id="payout-merch-seq" value={speedypayConfig.merchSeq || 'Not Set'} readOnly disabled />
+          <Input id="payout-merch-seq" value={config?.merchSeqConfigured ? 'Configured' : 'Not Set'} readOnly disabled />
         </div>
          <div className="space-y-2">
           <Label htmlFor="payout-api-secret">Secret Key</Label>
-          <Input id="payout-api-secret" type="password" value={speedypayConfig.secretKey ? '••••••••••••••••' : 'Not Set'} readOnly disabled />
+          <Input id="payout-api-secret" type="password" value={config?.secretKeyConfigured ? '••••••••••••••••' : 'Not Set'} readOnly disabled />
         </div>
       </CardContent>
     </Card>
   )
 }
 
-function CollectionProviderConfig() {
+function CollectionProviderConfig({ config }: { config: PublicProviderConfig | null }) {
    return (
     <Card>
       <CardHeader>
@@ -98,15 +101,15 @@ function CollectionProviderConfig() {
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="cashier-base-url">Collection API URL</Label>
-          <Input id="cashier-base-url" value={speedypayConfig.cashierBaseUrl} readOnly disabled />
+          <Input id="cashier-base-url" value={config?.cashierBaseUrl ?? 'Not Set'} readOnly disabled />
         </div>
         <div className="space-y-2">
           <Label htmlFor="collection-merch-seq">Merchant Sequence (merchSeq)</Label>
-          <Input id="collection-merch-seq" value={speedypayConfig.merchSeq || 'Not Set'} readOnly disabled />
+          <Input id="collection-merch-seq" value={config?.merchSeqConfigured ? 'Configured' : 'Not Set'} readOnly disabled />
         </div>
          <div className="space-y-2">
           <Label htmlFor="collection-api-secret">Secret Key</Label>
-          <Input id="collection-api-secret" type="password" value={speedypayConfig.secretKey ? '••••••••••••••••' : 'Not Set'} readOnly disabled />
+          <Input id="collection-api-secret" type="password" value={config?.secretKeyConfigured ? '••••••••••••••••' : 'Not Set'} readOnly disabled />
         </div>
       </CardContent>
     </Card>
@@ -221,6 +224,14 @@ function CollectionBalanceQuery() {
 
 
 export default function SettingsPage() {
+  const [providerConfig, setProviderConfig] = useState<PublicProviderConfig | null>(null);
+
+  useEffect(() => {
+    void getPublicProviderConfig().then((result) => {
+      if (result.success && result.data) setProviderConfig(result.data);
+    });
+  }, []);
+
   return (
     <>
       <PageHeader
@@ -256,13 +267,13 @@ export default function SettingsPage() {
 
                 <TabsContent value="provider" className="grid lg:grid-cols-2 gap-6 m-0">
                     <div className="space-y-6">
-                        <CollectionProviderConfig />
+                        <CollectionProviderConfig config={providerConfig} />
                     </div>
                     <div className="space-y-6">
-                        <PayoutProviderConfig />
+                        <PayoutProviderConfig config={providerConfig} />
                     </div>
                     <div className="lg:col-span-2">
-                        <WebhookInfo />
+                        <WebhookInfo config={providerConfig} />
                     </div>
                 </TabsContent>
                 <TabsContent value="treasury" className="grid lg:grid-cols-2 gap-6 m-0">

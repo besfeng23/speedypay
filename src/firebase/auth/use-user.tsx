@@ -1,37 +1,43 @@
 'use client';
 
-import type { User } from 'firebase/auth';
+import { useEffect, useState } from 'react';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { initializeFirebase } from '../init';
 
-// Mock user for demo mode when authentication is disabled
-const mockUser: User = {
-  uid: 'mock-user-id',
-  email: 'demo@speedypay.com',
-  displayName: 'Demo User',
-  photoURL: `https://avatar.vercel.sh/demo.png`,
-  emailVerified: true,
-  isAnonymous: false,
-  metadata: {},
-  providerData: [],
-  providerId: 'password',
-  tenantId: null,
-  delete: async () => {},
-  getIdToken: async () => 'mock-token',
-  getIdTokenResult: async () => ({
-    token: 'mock-token',
-    expirationTime: '',
-    authTime: '',
-    issuedAtTime: '',
-    signInProvider: null,
-    signInSecondFactor: null,
-    claims: {},
-  }),
-  reload: async () => {},
-  toJSON: () => ({}),
-};
+async function establishServerSession(user: User | null) {
+  if (!user) {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    return;
+  }
 
+  const idToken = await user.getIdToken();
+  await fetch('/api/auth/session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+  });
+}
 
 export function useUser() {
-  // In demo mode, we return a mock user and set loading to false.
-  // This bypasses all Firebase authentication checks.
-  return { user: mockUser, loading: false };
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const { auth } = initializeFirebase();
+
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
+      setUser(nextUser);
+      setLoading(false);
+      await establishServerSession(nextUser);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  return { user, loading };
 }

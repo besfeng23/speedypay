@@ -1,5 +1,3 @@
-'use client';
-
 import { DollarSign, Users, Activity, Banknote, RefreshCw, AlertCircle, Building } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -11,8 +9,6 @@ import { RecentActivity } from "@/components/recent-activity";
 import { DemoPaymentSimulator } from "@/components/demo-payment-simulator";
 import { DashboardInsights } from "@/components/dashboard-insights";
 import { getMerchants } from "@/lib/data";
-import { useEffect, useState } from "react";
-import type { DashboardStats, Merchant } from "@/lib/types";
 
 
 const chartData = [
@@ -43,44 +39,8 @@ const formatCurrency = (amount: number, currency: string = "PHP") => {
     }).format(amount);
   };
 
-export default function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [merchants, setMerchants] = useState<Merchant[]>([]);
-  const [loading, setLoading] = useState(true);
-
-   useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      const [statsData, merchantsData] = await Promise.all([
-        getDashboardStats(),
-        getMerchants(),
-      ]);
-      setStats(statsData);
-      setMerchants(merchantsData);
-      setLoading(false);
-    }
-    fetchData();
-  }, []);
-
-
-  if (loading || !stats) {
-    return (
-       <div className="grid gap-6">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <Card className="h-[126px] animate-pulse bg-muted" />
-            <Card className="h-[126px] animate-pulse bg-muted" />
-            <Card className="h-[126px] animate-pulse bg-muted" />
-            <Card className="h-[126px] animate-pulse bg-muted" />
-        </div>
-        <div className="grid gap-6 lg:grid-cols-5">
-            <Card className="lg:col-span-3 h-[400px] animate-pulse bg-muted" />
-            <div className="lg:col-span-2">
-                <Card className="h-[400px] animate-pulse bg-muted" />
-            </div>
-        </div>
-      </div>
-    );
-  }
+export default async function Dashboard() {
+  const [stats, merchants] = await Promise.all([getDashboardStats(), getMerchants()]);
   
   const kpiDataForAI = {
       totalGrossVolume: stats.totalGrossVolume,

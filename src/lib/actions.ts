@@ -20,20 +20,35 @@ import {
 } from './data';
 import type { Merchant, Settlement, Payment, UATTestPayload } from './types';
 import { cashOut, qryOrder, qryBalance, createCollectionPayment as apiCreateCollectionPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
+import type { QrPayResponse, QryBalanceResponse, QryCollectionBalanceResponse } from './speedypay/types';
 import { mapProviderStateToInternal, providerStateLabels, mapCollectionStateToPaymentStatus } from './speedypay/mappers';
 import { payoutChannelMap } from './speedypay/payout-channels';
 import { speedypayConfig } from './speedypay/config';
 import { verifySignature } from './speedypay/crypto';
+import { requireAdminSession } from './auth/session';
 
 
-interface ActionResult {
+interface ActionResult<TData = unknown> {
   success: boolean;
   message?: string;
-  data?: any;
+  data?: TData;
+}
+
+async function getAdminActorEmail(): Promise<string> {
+  const session = await requireAdminSession();
+  return session.email;
+}
+
+function getSpeedyPaySecretOrThrow(): string {
+  if (!speedypayConfig.secretKey) {
+    throw new Error('SPEEDYPAY_SECRET_KEY is not configured on the server.');
+  }
+  return speedypayConfig.secretKey;
 }
 
 export async function createMerchant(values: MerchantFormValues): Promise<ActionResult> {
   try {
+    const actorEmail = await getAdminActorEmail();
     const validatedData = MerchantSchema.parse(values);
 
     const now = formatISO(new Date());
@@ -44,13 +59,14 @@ export async function createMerchant(values: MerchantFormValues): Promise<Action
       createdAt: now,
       updatedAt: now,
       ...validatedData,
+      notes: validatedData.notes ?? '',
     };
     
     await addMerchant(newMerchant);
 
     await addAuditLog({
       eventType: 'merchant.created',
-      user: 'admin@speedypay.com', // In a real app, get this from the session
+      user: actorEmail,
       details: `Created new merchant: ${newMerchant.displayName} (ID: ${newMerchant.id})`,
       entityId: newMerchant.id,
       entityType: 'merchant'
@@ -74,8 +90,9 @@ export async function createMerchant(values: MerchantFormValues): Promise<Action
   }
 }
 
-export async function createCollectionPayment(values: CreatePaymentFormValues): Promise<ActionResult> {
+export async function createCollectionPayment(values: CreatePaymentFormValues): Promise<ActionResult<{ paymentUrl: string } & QrPayResponse>> {
   try {
+    const actorEmail = await getAdminActorEmail();
     const validatedData = CreatePaymentSchema.parse(values);
     const { amount, merchantId, description } = validatedData;
     
@@ -115,7 +132,7 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
       throw new Error(response.respMessage || 'Failed to create payment link at provider.');
     }
     
-    const isSignatureVerified = verifySignature(response, speedypayConfig.secretKey!);
+    const isSignatureVerified = verifySignature(response, getSpeedyPaySecretOrThrow());
 
     // Step 3: Only after a successful provider response, create the internal payment record.
     const now = new Date();
@@ -147,7 +164,7 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
     await addPayment(newPayment);
     
     // Step 4: Log the successful creation and provider interaction.
-    await addAuditLog({ eventType: 'payment.created', user: 'admin@speedypay.com', details: `Created manual payment link for ${merchant.displayName}`, entityId: orderSeq, entityType: 'payment' });
+    await addAuditLog({ eventType: 'payment.created', user: actorEmail, details: `Created manual payment link for ${merchant.displayName}`, entityId: orderSeq, entityType: 'payment' });
     await addAuditLog({ eventType: 'payment.provider.sent', user: 'System', details: `Successfully created payment link at provider. URL: ${response.url}`, entityId: orderSeq, entityType: 'payment' });
 
     revalidatePath('/transactions');
@@ -159,19 +176,20 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
   } catch (error) {
     console.error('Failed to create collection payment:', error);
     const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-    return { success: false, message, data: error };
+    return { success: false, message };
   }
 }
 
 export async function addSimulatedData(data: { paymentRecord: Payment, settlementRecord?: Settlement }): Promise<ActionResult> {
     try {
+        const actorEmail = await getAdminActorEmail();
         await addPayment(data.paymentRecord);
         if (data.settlementRecord) {
             await addSettlement(data.settlementRecord);
         }
         await addAuditLog({
             eventType: 'simulation.created',
-            user: 'admin@speedypay.com',
+            user: actorEmail,
             details: `Created simulated payment ${data.paymentRecord.id}`,
             entityId: data.paymentRecord.id,
             entityType: 'payment',
@@ -187,6 +205,7 @@ export async function addSimulatedData(data: { paymentRecord: Payment, settlemen
 }
 
 export async function initiateRemittance(settlementId: string): Promise<ActionResult> {
+    const actorEmail = await getAdminActorEmail();
     const settlement = await getSettlementById(settlementId);
     if (!settlement) {
         return { success: false, message: "Settlement not found." };
@@ -230,6 +249,7 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
         });
 
         const internalRemittanceStatus = mapProviderStateToInternal(response.transState);
+        const previousRemittanceStatus = settlement.remittanceStatus;
 
         const updatedSettlement: Partial<Settlement> = {
             providerName: 'SpeedyPay',
@@ -240,7 +260,7 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
             providerRespMessage: response.respMessage,
             providerTransState: response.transState,
             providerTransStateLabel: providerStateLabels[response.transState] || 'Unknown',
-            signatureVerified: verifySignature(response, speedypayConfig.secretKey!),
+            signatureVerified: verifySignature(response, getSpeedyPaySecretOrThrow()),
             payoutChannelProcId: merchant.defaultPayoutChannel,
             payoutChannelDescription: channelInfo.description,
             providerTimestamp: response.timestamp,
@@ -252,7 +272,7 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
 
         await addAuditLog({
             eventType: 'payout.initiated',
-            user: 'admin@speedypay.com',
+            user: actorEmail,
             details: `Initiated payout to provider. OrderSeq: ${orderSeq}. Provider response: ${response.respMessage}`,
             entityId: settlement.id,
             entityType: 'settlement'
@@ -272,11 +292,12 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
             entityId: settlement.id,
             entityType: 'settlement'
         });
-        return { success: false, message, data: error };
+        return { success: false, message };
     }
 }
 
 export async function querySettlementStatus(settlementId: string): Promise<ActionResult> {
+    const actorEmail = await getAdminActorEmail();
      const settlement = await getSettlementById(settlementId);
     if (!settlement || !settlement.providerOrderSeq) {
         return { success: false, message: "Settlement not found or has no provider order sequence." };
@@ -290,6 +311,7 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
         });
         
         const internalRemittanceStatus = mapProviderStateToInternal(response.transState);
+        const previousRemittanceStatus = settlement.remittanceStatus;
 
         const updatedSettlement: Partial<Settlement> = {
             remittanceStatus: internalRemittanceStatus,
@@ -298,7 +320,7 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
             providerRespMessage: response.respMessage,
             providerTransState: response.transState,
             providerTransStateLabel: providerStateLabels[response.transState] || 'Unknown',
-            signatureVerified: verifySignature(response, speedypayConfig.secretKey!),
+            signatureVerified: verifySignature(response, getSpeedyPaySecretOrThrow()),
             providerTimestamp: response.timestamp,
             lastQueryAt: formatISO(new Date()),
             failureReason: response.respCode !== '00000000' ? response.respMessage : settlement.failureReason,
@@ -309,10 +331,16 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
 
          await addAuditLog({
             eventType: 'payout.status.queried',
-            user: 'admin@speedypay.com',
+            user: actorEmail,
             details: `Queried payout status. New provider state: ${response.transState} (${response.respMessage})`,
             entityId: settlement.id,
-            entityType: 'settlement'
+            entityType: 'settlement',
+            source: 'admin',
+            action: 'query_payout_status',
+            previousState: previousRemittanceStatus,
+            newState: internalRemittanceStatus,
+            outcome: 'success',
+            correlationId: response.transSeq,
         });
 
         revalidatePath(`/settlements/${settlement.id}`);
@@ -329,11 +357,12 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
             entityId: settlement.id,
             entityType: 'settlement'
         });
-        return { success: false, message, data: error };
+        return { success: false, message };
     }
 }
 
 export async function queryCollectionStatus(paymentId: string): Promise<ActionResult> {
+    const actorEmail = await getAdminActorEmail();
      const payment = await getPaymentById(paymentId);
     if (!payment) {
         return { success: false, message: "Payment not found." };
@@ -347,6 +376,7 @@ export async function queryCollectionStatus(paymentId: string): Promise<ActionRe
         });
 
         const internalPaymentStatus = mapCollectionStateToPaymentStatus(response.transState);
+        const previousPaymentStatus = payment.paymentStatus;
         
         const updatedPayment: Partial<Payment> = {
             paymentStatus: internalPaymentStatus,
@@ -354,7 +384,7 @@ export async function queryCollectionStatus(paymentId: string): Promise<ActionRe
             providerStateLabel: providerStateLabels[response.transState] || 'Unknown',
             providerCollectionRespCode: response.respCode,
             providerCollectionRespMessage: response.respMessage,
-            providerCollectionSignatureVerified: verifySignature(response, speedypayConfig.secretKey!),
+            providerCollectionSignatureVerified: verifySignature(response, getSpeedyPaySecretOrThrow()),
             lastQueryAt: formatISO(new Date()),
         }
 
@@ -362,10 +392,16 @@ export async function queryCollectionStatus(paymentId: string): Promise<ActionRe
 
          await addAuditLog({
             eventType: 'collection.status.queried',
-            user: 'admin@speedypay.com',
+            user: actorEmail,
             details: `Queried collection status. New provider state: ${response.transState} (${response.respMessage})`,
             entityId: payment.id,
-            entityType: 'payment'
+            entityType: 'payment',
+            source: 'admin',
+            action: 'query_collection_status',
+            previousState: previousPaymentStatus,
+            newState: internalPaymentStatus,
+            outcome: 'success',
+            correlationId: response.transSeq,
         });
 
         revalidatePath(`/transactions/${payment.id}`);
@@ -381,19 +417,20 @@ export async function queryCollectionStatus(paymentId: string): Promise<ActionRe
             entityId: payment.id,
             entityType: 'payment'
         });
-        return { success: false, message, data: error };
+        return { success: false, message };
     }
 }
 
-export async function getProviderBalance(): Promise<ActionResult> {
+export async function getProviderBalance(): Promise<ActionResult<QryBalanceResponse>> {
     try {
+        const actorEmail = await getAdminActorEmail();
         const response = await qryBalance();
         if (response.respCode !== '00000000') {
             throw new Error(response.respMessage || 'Failed to query balance.');
         }
         await addAuditLog({
             eventType: 'provider.balance.queried',
-            user: 'admin@speedypay.com',
+            user: actorEmail,
             details: `Successfully queried provider payout balance: PHP ${response.amount}`,
             entityId: null,
             entityType: null,
@@ -401,19 +438,20 @@ export async function getProviderBalance(): Promise<ActionResult> {
         return { success: true, data: response };
     } catch (error) {
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message, data: error };
+        return { success: false, message };
     }
 }
 
-export async function getCollectionProviderBalance(): Promise<ActionResult> {
+export async function getCollectionProviderBalance(): Promise<ActionResult<QryCollectionBalanceResponse>> {
     try {
+        const actorEmail = await getAdminActorEmail();
         const response = await qryCollectionBalance();
         if (response.respCode !== '00000000') {
             throw new Error(response.respMessage || 'Failed to query collection balance.');
         }
         await addAuditLog({
             eventType: 'provider.collection_balance.queried',
-            user: 'admin@speedypay.com',
+            user: actorEmail,
             details: `Successfully queried provider collection balance: PHP ${response.balance}`,
             entityId: null,
             entityType: null,
@@ -421,12 +459,35 @@ export async function getCollectionProviderBalance(): Promise<ActionResult> {
         return { success: true, data: response };
     } catch (error) {
         const message = error instanceof Error ? error.message : "An unknown error occurred.";
-        return { success: false, message, data: error };
+        return { success: false, message };
     }
+}
+
+export async function getPublicProviderConfig(): Promise<ActionResult<{
+    env: string;
+    payoutBaseUrl: string;
+    cashierBaseUrl: string;
+    notifyUrlConfigured: boolean;
+    merchSeqConfigured: boolean;
+    secretKeyConfigured: boolean;
+}>> {
+    await getAdminActorEmail();
+    return {
+        success: true,
+        data: {
+            env: speedypayConfig.env,
+            payoutBaseUrl: speedypayConfig.payoutBaseUrl,
+            cashierBaseUrl: speedypayConfig.cashierBaseUrl,
+            notifyUrlConfigured: Boolean(speedypayConfig.notifyUrl),
+            merchSeqConfigured: Boolean(speedypayConfig.merchSeq),
+            secretKeyConfigured: Boolean(speedypayConfig.secretKey),
+        },
+    };
 }
 
 
 export async function runUATTestAction(testCaseId: string, payload?: UATTestPayload): Promise<ActionResult> {
+    await getAdminActorEmail();
     let result: ActionResult = { success: false, message: "Test case not found." };
     let entityId: string | null = null;
     let entityType: 'payment' | 'settlement' | 'merchant' | null = null;
@@ -438,10 +499,10 @@ export async function runUATTestAction(testCaseId: string, payload?: UATTestPayl
                 if (!payload) throw new Error("Payload is required for COL-01");
                 const createData = CreatePaymentSchema.parse(payload);
                 result = await createCollectionPayment(createData);
-                if (result.data?.url) {
+                if (result.data && typeof result.data === 'object' && 'url' in result.data && typeof result.data.url === 'string') {
                     const url = new URL(result.data.url);
                     entityId = url.searchParams.get('orderid');
-                } else if (result.data?.orderSeq) {
+                } else if (result.data && typeof result.data === 'object' && 'orderSeq' in result.data && typeof result.data.orderSeq === 'string') {
                     entityId = result.data.orderSeq;
                 }
                 entityType = 'payment';
