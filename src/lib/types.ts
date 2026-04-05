@@ -1,3 +1,22 @@
+// --- Status Enums (Single Source of Truth) ---
+
+export const MERCHANT_STATUSES = ['active', 'inactive', 'suspended'] as const;
+export const ONBOARDING_STATUSES = ['completed', 'pending', 'in-review', 'rejected'] as const;
+export const PAYMENT_STATUSES = ['pending', 'succeeded', 'failed', 'expired', 'processing'] as const;
+export const SETTLEMENT_STATUSES = ['pending', 'completed', 'N/A'] as const;
+export const REMITTANCE_STATUSES = ['pending', 'processing', 'sent', 'failed', 'N/A'] as const;
+export const PROVIDER_TRANS_STATES = ['00', '01', '03', '04', '05', '06', '07', '08', '09'] as const;
+
+// --- Core Domain Types ---
+
+export type MerchantStatus = (typeof MERCHANT_STATUSES)[number];
+export type OnboardingStatus = (typeof ONBOARDING_STATUSES)[number];
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+export type SettlementStatus = (typeof SETTLEMENT_STATUSES)[number];
+export type RemittanceStatus = (typeof REMITTANCE_STATUSES)[number];
+export type ProviderTransState = (typeof PROVIDER_TRANS_STATES)[number];
+
+
 export type Merchant = {
   id: string;
   businessName: string;
@@ -8,8 +27,8 @@ export type Merchant = {
   settlementAccountName: string;
   settlementAccountNumberOrWalletId: string;
   defaultPayoutChannel: string; // procId from payout channels
-  status: 'Active' | 'Inactive' | 'Suspended';
-  onboardingStatus: 'Completed' | 'Pending' | 'In Review' | 'Rejected';
+  status: MerchantStatus;
+  onboardingStatus: OnboardingStatus;
   propertyAssociations: string[];
   defaultFeeType: 'percentage' | 'fixed';
   defaultFeeValue: number;
@@ -18,7 +37,6 @@ export type Merchant = {
   updatedAt: string;
 };
 
-export type ProviderTransState = '00' | '01' | '03' | '04' | '05' | '06' | '07' | '08' | '09';
 
 export type Payment = {
   id: string; // Our internal ID, used as provider's orderSeq
@@ -33,9 +51,9 @@ export type Payment = {
   feeValue: number;
   platformFeeAmount: number;
   merchantNetAmount: number;
-  paymentStatus: 'pending' | 'succeeded' | 'failed' | 'expired' | 'processing';
-  settlementStatus: 'pending' | 'completed' | 'N/A';
-  remittanceStatus: 'pending' | 'processing' | 'sent' | 'failed' | 'N/A';
+  paymentStatus: PaymentStatus;
+  settlementStatus: SettlementStatus;
+  remittanceStatus: RemittanceStatus;
   sourceChannel: 'Web' | 'Mobile' | 'API' | 'Manual';
   createdAt: string;
   updatedAt: string;
@@ -83,8 +101,6 @@ export type Settlement = {
   createdAt: string;
   updatedAt: string;
 };
-
-export type RemittanceStatus = 'pending' | 'processing' | 'sent' | 'failed' | 'N/A';
 
 export type AuditLog = {
   id: string;

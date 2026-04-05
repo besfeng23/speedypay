@@ -1,4 +1,4 @@
-import type { RemittanceStatus, Payment, ProviderTransState } from '../types';
+import type { RemittanceStatus, PaymentStatus, ProviderTransState } from '../types';
 
 /**
  * Maps the provider's `transState` for a payout to our internal `remittanceStatus`.
@@ -28,7 +28,7 @@ export function mapProviderStateToInternal(providerState: ProviderTransState): R
  * @param providerState The `transState` from the SpeedyPay API response.
  * @returns The corresponding internal `Payment['paymentStatus']`.
  */
-export function mapCollectionStateToPaymentStatus(providerState: ProviderTransState): Payment['paymentStatus'] {
+export function mapCollectionStateToPaymentStatus(providerState: ProviderTransState): PaymentStatus {
   switch (providerState) {
     case '00': // transaction succeeded
       return 'succeeded';
@@ -49,15 +49,16 @@ export function mapCollectionStateToPaymentStatus(providerState: ProviderTransSt
 
 /**
  * A dictionary to provide human-readable labels for provider transaction states.
+ * All labels are lowercase for consistency.
  */
-export const providerStateLabels: { [key: string]: string } = {
-  '00': 'Succeeded',
-  '01': 'Failed',
-  '03': 'Partial Refund',
-  '04': 'Full Refund',
-  '05': 'Failed Refund',
-  '06': 'In Process',
-  '07': 'To Be Paid',
-  '08': 'Cancelled',
-  '09': 'Expired',
+export const providerStateLabels: { [key in ProviderTransState]?: string } = {
+  '00': 'succeeded',
+  '01': 'failed',
+  '03': 'partial-refund',
+  '04': 'full-refund',
+  '05': 'failed-refund',
+  '06': 'in-process',
+  '07': 'to-be-paid',
+  '08': 'cancelled',
+  '09': 'expired',
 };

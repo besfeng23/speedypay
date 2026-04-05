@@ -10,6 +10,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { v4 as uuidv4 } from 'uuid';
+import { PAYMENT_STATUSES, REMITTANCE_STATUSES, SETTLEMENT_STATUSES } from '@/lib/types';
 
 
 const SimulatePaymentInputSchema = z.object({
@@ -37,9 +38,9 @@ const PaymentRecordSchema = z.object({
   feeValue: z.number().describe('Value of the fee.'),
   platformFeeAmount: z.number().describe('Amount deducted as platform fee.'),
   merchantNetAmount: z.number().describe('Net amount remitted to the merchant.'),
-  paymentStatus: z.enum(['pending', 'succeeded', 'failed', 'expired', 'processing']).describe('Current status of the payment.'),
-  settlementStatus: z.enum(['pending', 'completed', 'N/A']).describe('Current status of settlement. Use N/A if not applicable.'),
-  remittanceStatus: z.enum(['pending', 'processing', 'sent', 'failed', 'N/A']).describe('Current status of remittance. Use N/A if not applicable.'),
+  paymentStatus: z.enum(PAYMENT_STATUSES).describe('Current status of the payment.'),
+  settlementStatus: z.enum(SETTLEMENT_STATUSES).describe('Current status of settlement. Use N/A if not applicable.'),
+  remittanceStatus: z.enum(REMITTANCE_STATUSES).describe('Current status of remittance. Use N/A if not applicable.'),
   sourceChannel: z.string().describe('Source channel of the payment (e.g., Web, Mobile).'),
   createdAt: z.string().datetime().describe('Timestamp when the payment record was created.'),
   updatedAt: z.string().datetime().describe('Timestamp when the payment record was last updated.'),
@@ -104,7 +105,7 @@ Follow these rules for generating the output:
     - Calculate 'platformFeeAmount'. If 'feeType' is 'percentage', 'platformFeeAmount' = (grossAmount * feeValue / 100). If 'feeType' is 'fixed', 'platformFeeAmount' = feeValue.
     - 'merchantNetAmount' = grossAmount - platformFeeAmount.
     - **All currency amounts ('grossAmount', 'platformFeeAmount', 'merchantNetAmount') must be numbers rounded to exactly two decimal places.** For example, 12.3 must be 12.30, and 15 must be 15.00.
-6.  **Status Determination:** Based on 'scenarioType':
+6.  **Status Determination:** Based on 'scenarioType', use the exact lowercase status strings as defined in the schemas.
     - **'success'**: All systems go.
         - 'paymentStatus': 'succeeded'
         - 'settlementStatus' (in both records): 'completed'
@@ -115,12 +116,12 @@ Follow these rules for generating the output:
         - 'settlementStatus': 'N/A'
         - 'remittanceStatus': 'N/A'
         - **Do not generate a settlementRecord.**
-        - A realistic failure reason should be included in the 'paymentRecord' in a new 'failureReason' field, e.g., "Payment declined by customer's bank due to insufficient funds."
+        - A realistic failure reason should be included in the 'paymentRecord' in a new 'failureReason' field, e.g., "Payment declined by customer\'s bank due to insufficient funds."
     - **'settlement_failed'**: Payment succeeded, but settlement failed.
         - 'paymentStatus': 'succeeded'
         - 'settlementStatus': 'failed' // This status would not exist in real-world logic, but for simulation it's ok.
         - 'remittanceStatus': 'pending'
-        - 'failureReason' (in settlementRecord): "Issue with merchant's settlement account details or bank processing."
+        - 'failureReason' (in settlementRecord): "Issue with merchant\'s settlement account details or bank processing."
     - **'remittance_failed'**: Payment and settlement succeeded, but remittance to merchant failed.
         - 'paymentStatus': 'succeeded'
         - 'settlementStatus': 'completed'

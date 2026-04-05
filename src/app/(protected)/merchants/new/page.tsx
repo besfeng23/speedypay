@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import { Button } from '@/components/ui/button';
 import {
   Form,
   FormControl,
@@ -11,25 +11,26 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { MerchantSchema, type MerchantFormValues } from "@/lib/schemas";
-import { createMerchant } from "@/lib/actions";
-import { Loader2 } from "lucide-react";
-import { payoutChannels } from "@/lib/speedypay/payout-channels";
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/page-header';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { useRouter } from 'next/navigation';
+import { useState, useTransition } from 'react';
+import { MerchantSchema, type MerchantFormValues } from '@/lib/schemas';
+import { createMerchant } from '@/lib/actions';
+import { Loader2 } from 'lucide-react';
+import { payoutChannels } from '@/lib/speedypay/payout-channels';
+import { ONBOARDING_STATUSES } from '@/lib/types';
 
 
 export default function NewMerchantPage() {
@@ -48,7 +49,7 @@ export default function NewMerchantPage() {
       settlementAccountName: "",
       settlementAccountNumberOrWalletId: "",
       defaultPayoutChannel: "GCASH",
-      onboardingStatus: "Pending",
+      onboardingStatus: "pending",
       defaultFeeType: "percentage",
       defaultFeeValue: 2.9,
       notes: "",
@@ -120,7 +121,7 @@ export default function NewMerchantPage() {
                          <CardDescription>Set the initial onboarding status and add any internal notes.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        <FormField control={form.control} name="onboardingStatus" render={({ field }) => ( <FormItem> <FormLabel>Onboarding Status</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a status"/> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="Pending">Pending</SelectItem> <SelectItem value="In Review">In Review</SelectItem> <SelectItem value="Completed">Completed</SelectItem> <SelectItem value="Rejected">Rejected</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )}/>
+                        <FormField control={form.control} name="onboardingStatus" render={({ field }) => ( <FormItem> <FormLabel>Onboarding Status</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a status"/> </SelectTrigger> </FormControl> <SelectContent> {ONBOARDING_STATUSES.map(status => ( <SelectItem key={status} value={status} className="capitalize">{status.replace('-', ' ')}</SelectItem> ))} </SelectContent> </Select> <FormMessage /> </FormItem> )}/>
                         <FormField control={form.control} name="notes" render={({ field }) => ( <FormItem> <FormLabel>Notes</FormLabel> <FormControl> <Textarea placeholder="Any internal notes about this merchant." className="min-h-[120px]" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
                     </CardContent>
                 </Card>

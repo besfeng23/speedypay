@@ -1,10 +1,9 @@
 import { z } from 'zod';
 import { payoutChannels } from './speedypay/payout-channels';
+import { ONBOARDING_STATUSES, MERCHANT_STATUSES } from './types';
 
 const validProcIds = payoutChannels.map(c => c.procId);
 
-export const OnboardingStatusSchema = z.enum(["Completed", "Pending", "In Review", "Rejected"]);
-export const MerchantStatusSchema = z.enum(["Active", "Inactive", "Suspended"]);
 export const FeeTypeSchema = z.enum(['percentage', 'fixed']);
 
 export const MerchantSchema = z.object({
@@ -20,7 +19,7 @@ export const MerchantSchema = z.object({
   settlementAccountName: z.string().min(2, "Account name is required"),
   settlementAccountNumberOrWalletId: z.string().min(5, "A valid account number or wallet ID is required"),
 
-  onboardingStatus: OnboardingStatusSchema,
+  onboardingStatus: z.enum(ONBOARDING_STATUSES),
   
   defaultFeeType: FeeTypeSchema,
   defaultFeeValue: z.coerce

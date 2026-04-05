@@ -1,106 +1,85 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const statusBadgeVariants = cva("flex items-center gap-2 capitalize text-sm", {
-  variants: {
-    status: {
-      // Positive Statuses
-      succeeded: "text-green-600",
-      completed: "text-green-600",
-      Active: "text-green-600",
-      sent: "text-sky-600",
-      '00': "text-green-600",
-      'Succeeded': "text-green-600",
-      
-      // Neutral/In-Progress Statuses
-      pending: "text-yellow-600",
-      processing: "text-blue-600",
-      "In Review": "text-blue-600",
-      '06': "text-blue-600",
-      'In Process': "text-blue-600",
-      '07': "text-yellow-600",
-      'To Be Paid': "text-yellow-600",
-
-
-      // Negative/Attention Statuses
-      failed: "text-red-600",
-      Suspended: "text-orange-600",
-      Rejected: "text-red-600",
-      '01': "text-red-600",
-      'Failed': "text-red-600",
-      '08': "text-gray-600",
-      'Cancelled': "text-gray-600",
-       '09': "text-orange-600",
-      'Expired': "text-orange-600",
-
-
-      // Other Statuses
-      Inactive: "text-slate-600",
-      "N/A": "text-gray-600",
-      default: "text-gray-600",
+const badgeVariants = cva(
+  "inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium",
+  {
+    variants: {
+      variant: {
+        success: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+        warning: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300",
+        danger: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+        info: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+        neutral: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
+      },
     },
-  },
-  defaultVariants: {
-    status: "default",
-  },
+    defaultVariants: {
+      variant: "neutral",
+    },
+  }
+);
+
+const dotVariants = cva("h-1.5 w-1.5 rounded-full", {
+    variants: {
+      variant: {
+        success: "bg-green-500",
+        warning: "bg-yellow-500",
+        danger: "bg-red-500",
+        info: "bg-blue-500",
+        neutral: "bg-gray-400",
+      },
+    },
+    defaultVariants: {
+      variant: "neutral",
+    },
 });
 
-const statusDotVariants = cva("h-2 w-2 rounded-full", {
-    variants: {
-    status: {
-      // Positive Statuses
-      succeeded: "bg-green-500",
-      completed: "bg-green-500",
-      Active: "bg-green-500",
-      sent: "bg-sky-500",
-      '00': "bg-green-500",
-      'Succeeded': "bg-green-500",
-      
-      // Neutral/In-Progress Statuses
-      pending: "bg-yellow-500",
-      processing: "bg-blue-500",
-      "In Review": "bg-blue-500",
-      '06': "bg-blue-500",
-      'In Process': "bg-blue-500",
-      '07': "bg-yellow-500",
-      'To Be Paid': "bg-yellow-500",
+type StatusVariant = VariantProps<typeof badgeVariants>['variant'];
 
+// Mapping from various status strings to a semantic variant
+const statusToVariantMap: Record<string, StatusVariant> = {
+    // Success states
+    succeeded: 'success',
+    completed: 'success',
+    active: 'success',
+    sent: 'success',
 
-      // Negative/Attention Statuses
-      failed: "bg-red-500",
-      Suspended: "bg-orange-500",
-      Rejected: "bg-red-500",
-      '01': "bg-red-500",
-      'Failed': "bg-red-500",
-      '08': "bg-gray-400",
-      'Cancelled': "bg-gray-400",
-       '09': "bg-orange-500",
-      'Expired': "bg-orange-500",
+    // Warning/Pending states
+    pending: 'warning',
+    'in-review': 'warning',
+    'to-be-paid': 'warning',
 
+    // Danger/Failed states
+    failed: 'danger',
+    rejected: 'danger',
+    suspended: 'danger',
+    expired: 'danger',
+    
+    // Info/Processing states
+    processing: 'info',
+    'in-process': 'info',
 
-      // Other Statuses
-      Inactive: "bg-slate-400",
-      "N/A": "bg-gray-400",
-      default: "bg-gray-400",
-    },
-  },
-  defaultVariants: {
-    status: "default",
-  },
-})
+    // Neutral states
+    inactive: 'neutral',
+    cancelled: 'neutral',
+    'N/A': 'neutral',
+};
 
-export interface StatusBadgeProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof statusBadgeVariants> {}
+export interface StatusBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
+    status?: string | null;
+}
 
 export function StatusBadge({ className, status, ...props }: StatusBadgeProps) {
-  const statusString = status || 'default';
+  const statusString = status || 'N/A';
+  const variant = statusToVariantMap[statusString.toLowerCase().replace(/ /g, '-')] || 'neutral';
   
   return (
     <div
-      className={cn(statusBadgeVariants({ status: statusString as any }), className)}
+      className={cn(badgeVariants({ variant }), className)}
       {...props}
     >
-      <div className={cn(statusDotVariants({ status: statusString as any }))} />
-      <span>{statusString.replace(/_/g, ' ')}</span>
+      <div className={cn(dotVariants({ variant }))} />
+      <span className="capitalize">{statusString.replace(/_/g, ' ')}</span>
     </div>
   );
 }
