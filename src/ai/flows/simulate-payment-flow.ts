@@ -53,6 +53,7 @@ const SettlementRecordSchema = z.object({
   paymentId: z.string().describe('ID of the associated payment.'),
   merchantId: z.string().describe('ID of the merchant.'),
   grossAmount: z.number().describe('Gross amount of the payment.'),
+  currency: z.string().length(3).describe('Currency code (e.g., USD).'),
   platformFeeAmount: z.number().describe('Amount deducted as platform fee.'),
   merchantNetAmount: z.number().describe('Net amount remitted to the merchant.'),
   settlementStatus: z.enum(['pending', 'completed']).describe('Current status of the settlement.'),
@@ -105,7 +106,8 @@ Follow these rules for generating the output:
     - Calculate 'platformFeeAmount'. If 'feeType' is 'percentage', 'platformFeeAmount' = (grossAmount * feeValue / 100). If 'feeType' is 'fixed', 'platformFeeAmount' = feeValue.
     - 'merchantNetAmount' = grossAmount - platformFeeAmount.
     - **All currency amounts ('grossAmount', 'platformFeeAmount', 'merchantNetAmount') must be numbers rounded to exactly two decimal places.** For example, 12.3 must be 12.30, and 15 must be 15.00.
-6.  **Status Determination:** Based on 'scenarioType', use the exact lowercase status strings as defined in the schemas.
+6.  **Currency:** The currency for the settlement record must be the same as the payment record.
+7.  **Status Determination:** Based on 'scenarioType', use the exact lowercase status strings as defined in the schemas.
     - **'success'**: All systems go.
         - 'paymentStatus': 'succeeded'
         - 'settlementStatus' (in both records): 'completed'
@@ -127,7 +129,7 @@ Follow these rules for generating the output:
         - 'settlementStatus': 'completed'
         - 'remittanceStatus': 'failed'
         - 'failureReason' (in settlementRecord): "Remittance transfer failed due to invalid beneficiary details or network error."
-7.  Ensure that if 'scenarioType' is 'payment_failed', the 'settlementRecord' field is entirely omitted from the output. For other scenarios, it must be present. Do not use an empty object for an optional field.
+8.  Ensure that if 'scenarioType' is 'payment_failed', the 'settlementRecord' field is entirely omitted from the output. For other scenarios, it must be present. Do not use an empty object for an optional field.
 `,
 });
 

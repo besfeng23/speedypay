@@ -66,7 +66,7 @@ export default async function SettlementsPage() {
                                     </div>
                                 </TableCell>
                                 <TableCell>{merchantMap.get(settlement.merchantId) || 'Unknown'}</TableCell>
-                                <TableCell className="text-right font-mono">{formatCurrency(settlement.merchantNetAmount)}</TableCell>
+                                <TableCell className="text-right font-mono">{formatCurrency(settlement.merchantNetAmount, settlement.currency)}</TableCell>
                                 <TableCell><StatusBadge status={settlement.settlementStatus} /></TableCell>
                                 <TableCell><StatusBadge status={settlement.remittanceStatus} /></TableCell>
                                 <TableCell className="hidden sm:table-cell">{format(new Date(settlement.createdAt), 'MMM d, yyyy')}</TableCell>

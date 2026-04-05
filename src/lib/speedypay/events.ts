@@ -105,6 +105,7 @@ export async function processCollectionWebhookEvent(payload: SpeedyPayCollection
               paymentId: payment.id,
               merchantId: payment.merchantId,
               grossAmount: payment.grossAmount,
+              currency: payment.currency,
               platformFeeAmount: payment.platformFeeAmount,
               merchantNetAmount: payment.merchantNetAmount,
               settlementStatus: 'completed', // Settlement is now ready for payout

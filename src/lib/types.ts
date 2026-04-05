@@ -77,6 +77,7 @@ export type Settlement = {
   paymentId: string;
   merchantId: string;
   grossAmount: number;
+  currency: string;
   platformFeeAmount: number;
   merchantNetAmount: number; // This is the payoutAmount for remittance
   settlementStatus: 'pending' | 'completed';
@@ -137,6 +138,8 @@ export type DashboardStats = {
   failedSettlements: number;
   processingPayments: number;
   failedPayments: number;
+  recentTransactionsCount: number;
+  recentSettlementEventsCount: number;
 }
 
 // --- UAT Types ---

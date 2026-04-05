@@ -80,7 +80,7 @@ export function DemoPaymentSimulator({ merchants }: { merchants: Merchant[] }) {
       const result = await simulatePayment({
         scenarioType: values.scenarioType,
         grossAmount: values.grossAmount,
-        currency: "USD",
+        currency: "PHP",
         feeType: merchant.defaultFeeType,
         feeValue: merchant.defaultFeeValue,
         merchantId: merchant.id,
@@ -173,7 +173,7 @@ export function DemoPaymentSimulator({ merchants }: { merchants: Merchant[] }) {
                   name="grossAmount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Gross Amount (USD)</FormLabel>
+                      <FormLabel>Gross Amount (PHP)</FormLabel>
                       <FormControl>
                         <Input type="number" placeholder="100.00" {...field} />
                       </FormControl>

@@ -110,9 +110,9 @@ export default async function SettlementDetailPage({
                         <DetailItem label="Source Payment ID" value={<Link href={`/transactions/${settlement.paymentId}`} className="text-primary hover:underline font-mono text-xs">{settlement.paymentId}</Link>} />
                         <DetailItem label="Merchant" value={<Link href={`/merchants/${settlement.merchantId}`} className="text-primary hover:underline">{merchant?.displayName || 'Unknown'}</Link>} />
                         <Separator className="my-2"/>
-                        <DetailItem label="Gross Amount" value={formatCurrency(settlement.grossAmount)} />
-                        <DetailItem label="Platform Fee" value={formatCurrency(settlement.platformFeeAmount)} />
-                        <DetailItem label="Merchant Net Amount" value={<span className="font-bold">{formatCurrency(settlement.merchantNetAmount)}</span>} />
+                        <DetailItem label="Gross Amount" value={formatCurrency(settlement.grossAmount, settlement.currency)} />
+                        <DetailItem label="Platform Fee" value={formatCurrency(settlement.platformFeeAmount, settlement.currency)} />
+                        <DetailItem label="Merchant Net Amount" value={<span className="font-bold">{formatCurrency(settlement.merchantNetAmount, settlement.currency)}</span>} />
                          <Separator className="my-2"/>
                         <DetailItem label="Internal Settlement Status" value={<StatusBadge status={settlement.settlementStatus} />} />
                         <DetailItem label="Internal Remittance Status" value={<StatusBadge status={settlement.remittanceStatus} />} />

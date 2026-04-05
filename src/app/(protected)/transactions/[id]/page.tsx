@@ -93,12 +93,12 @@ export default async function TransactionDetailPage({
                     <CardDescription>The flow of funds from gross payment to merchant net.</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-3 gap-4 items-center">
-                    <StatCard title="Gross Payment" value={formatCurrency(payment.grossAmount)} icon={<Wallet />} className="shadow-none border-0" />
+                    <StatCard title="Gross Payment" value={formatCurrency(payment.grossAmount, payment.currency)} icon={<Wallet />} className="shadow-none border-0" />
                     <div className="text-muted-foreground flex justify-center"><Minus /></div>
-                    <StatCard title="Platform Fee" value={formatCurrency(payment.platformFeeAmount)} icon={<HandCoins />} className="shadow-none border-0" />
+                    <StatCard title="Platform Fee" value={formatCurrency(payment.platformFeeAmount, payment.currency)} icon={<HandCoins />} className="shadow-none border-0" />
                     <div className="col-span-full"><Separator /></div>
                     <div className="text-muted-foreground flex justify-center md:col-start-2"><Equal /></div>
-                    <StatCard title="Net Amount to Settle" value={formatCurrency(payment.merchantNetAmount)} icon={<Landmark />} className="shadow-none border-0 md:col-start-3" />
+                    <StatCard title="Net Amount to Settle" value={formatCurrency(payment.merchantNetAmount, payment.currency)} icon={<Landmark />} className="shadow-none border-0 md:col-start-3" />
                 </CardContent>
             </Card>
 

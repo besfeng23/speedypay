@@ -213,6 +213,7 @@ export function UATRunner({
     let prettyResponse = "No provider response was logged.";
     if (selectedLog.providerResponse) {
         try {
+            // Ensure we are parsing a string, not undefined
             prettyResponse = JSON.stringify(JSON.parse(selectedLog.providerResponse), null, 2);
         } catch (e) {
             prettyResponse = selectedLog.providerResponse; // Fallback to raw string if not valid JSON
