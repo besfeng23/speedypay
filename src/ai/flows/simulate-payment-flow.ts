@@ -26,7 +26,7 @@ const SimulatePaymentInputSchema = z.object({
 export type SimulatePaymentInput = z.infer<typeof SimulatePaymentInputSchema>;
 
 const PaymentRecordSchema = z.object({
-  paymentId: z.string().describe('Unique identifier for the payment.'),
+  id: z.string().describe('Unique identifier for the payment.'),
   externalReference: z.string().describe('External reference for the payment, like from a payment gateway (e.g., ch_xxxxxxxx).'),
   bookingReferenceOrInvoiceReference: z.string().describe('Booking or invoice reference (e.g., inv-2024-xxxx).'),
   customerName: z.string().describe('Name of the customer.'),
@@ -41,15 +41,15 @@ const PaymentRecordSchema = z.object({
   paymentStatus: z.enum(PAYMENT_STATUSES).describe('Current status of the payment.'),
   settlementStatus: z.enum(SETTLEMENT_STATUSES).describe('Current status of settlement. Use N/A if not applicable.'),
   remittanceStatus: z.enum(REMITTANCE_STATUSES).describe('Current status of remittance. Use N/A if not applicable.'),
-  sourceChannel: z.string().describe('Source channel of the payment (e.g., Web, Mobile).'),
+  sourceChannel: z.enum(['Web', 'Mobile', 'API', 'Manual']).describe('Source channel of the payment.'),
   createdAt: z.string().datetime().describe('Timestamp when the payment record was created.'),
   updatedAt: z.string().datetime().describe('Timestamp when the payment record was last updated.'),
-  failureReason: z.string().optional().describe('Reason for payment failure. Omit if not applicable.'),
+  failureReason: z.string().nullable().describe('Reason for payment failure. Use null if not applicable.'),
 });
 export type PaymentRecord = z.infer<typeof PaymentRecordSchema>;
 
 const SettlementRecordSchema = z.object({
-  settlementId: z.string().describe('Unique identifier for the settlement.'),
+  id: z.string().describe('Unique identifier for the settlement.'),
   paymentId: z.string().describe('ID of the associated payment.'),
   merchantId: z.string().describe('ID of the merchant.'),
   grossAmount: z.number().describe('Gross amount of the payment.'),
@@ -58,8 +58,8 @@ const SettlementRecordSchema = z.object({
   merchantNetAmount: z.number().describe('Net amount remitted to the merchant.'),
   settlementStatus: z.enum(['pending', 'completed']).describe('Current status of the settlement.'),
   remittanceStatus: z.enum(['pending', 'processing', 'sent', 'failed']).describe('Current status of remittance.'),
-  payoutReference: z.string().optional().describe('Reference for the payout transaction (e.g., po_xxxxxxxx).'),
-  failureReason: z.string().optional().describe('Reason for settlement or remittance failure. Omit if not applicable.'),
+  payoutReference: z.string().nullable().describe('Reference for the payout transaction (e.g., po_xxxxxxxx). Use null when unavailable.'),
+  failureReason: z.string().nullable().describe('Reason for settlement or remittance failure. Use null if not applicable.'),
   createdAt: z.string().datetime().describe('Timestamp when the settlement record was created.'),
   updatedAt: z.string().datetime().describe('Timestamp when the settlement record was last updated.'),
 });
@@ -94,8 +94,8 @@ Here are the details for the simulation:
 
 Follow these rules for generating the output:
 1.  **Unique IDs:** Generate unique and realistic-looking string IDs:
-    - 'paymentId': "pay-" + 8 random hex characters.
-    - 'settlementId' (if applicable): "set-" + 8 random hex characters.
+    - 'id' in paymentRecord: "pay-" + 8 random hex characters.
+    - 'id' in settlementRecord (if applicable): "set-" + 8 random hex characters.
     - 'externalReference': "ch_" + 12 random alphanumeric characters.
     - 'bookingReferenceOrInvoiceReference': "inv-2024-" + 5 random digits.
     - 'payoutReference': "po_" + 12 random alphanumeric characters.
@@ -121,7 +121,7 @@ Follow these rules for generating the output:
         - A realistic failure reason should be included in the 'paymentRecord' in a new 'failureReason' field, e.g., "Payment declined by customer\'s bank due to insufficient funds."
     - **'settlement_failed'**: Payment succeeded, but settlement failed.
         - 'paymentStatus': 'succeeded'
-        - 'settlementStatus': 'failed' // This status would not exist in real-world logic, but for simulation it's ok.
+        - 'settlementStatus': 'completed'
         - 'remittanceStatus': 'pending'
         - 'failureReason' (in settlementRecord): "Issue with merchant\'s settlement account details or bank processing."
     - **'remittance_failed'**: Payment and settlement succeeded, but remittance to merchant failed.
@@ -154,10 +154,11 @@ const simulatePaymentFlow = ai.defineFlow(
     }
 
     // Post-process to ensure IDs are what we generated, as LLM can sometimes ignore instructions.
-    output.paymentRecord.paymentId = paymentId;
+    output.paymentRecord.id = paymentId;
     if (output.settlementRecord) {
-        output.settlementRecord.settlementId = settlementId;
+        output.settlementRecord.id = settlementId;
         output.settlementRecord.paymentId = paymentId;
+        output.settlementRecord.payoutReference = output.settlementRecord.payoutReference ?? null;
     }
 
     // Enforce 2-decimal rounding post-generation
@@ -165,11 +166,13 @@ const simulatePaymentFlow = ai.defineFlow(
     output.paymentRecord.grossAmount = roundToTwo(output.paymentRecord.grossAmount);
     output.paymentRecord.platformFeeAmount = roundToTwo(output.paymentRecord.platformFeeAmount);
     output.paymentRecord.merchantNetAmount = roundToTwo(output.paymentRecord.merchantNetAmount);
+    output.paymentRecord.failureReason = output.paymentRecord.failureReason ?? null;
 
     if (output.settlementRecord) {
        output.settlementRecord.grossAmount = roundToTwo(output.settlementRecord.grossAmount);
        output.settlementRecord.platformFeeAmount = roundToTwo(output.settlementRecord.platformFeeAmount);
        output.settlementRecord.merchantNetAmount = roundToTwo(output.settlementRecord.merchantNetAmount);
+       output.settlementRecord.failureReason = output.settlementRecord.failureReason ?? null;
     }
 
     return output;

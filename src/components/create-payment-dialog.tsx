@@ -48,7 +48,7 @@ export function CreatePaymentDialog({ merchants }: { merchants: Merchant[] }) {
     setIsLoading(false);
 
     if (result.success) {
-      setPaymentUrl(result.data.paymentUrl);
+      setPaymentUrl(result.data?.paymentUrl ?? null);
       toast({ title: "Payment Link Created", description: "The payment link is ready to be shared." });
       router.refresh(); // Refresh the page to show the new payment in the list
     } else {

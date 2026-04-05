@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { verifySignature } from '@/lib/speedypay/crypto';
 import { processPayoutWebhookEvent, processCollectionWebhookEvent } from '@/lib/speedypay/events';
 import type { SpeedyPayPayoutWebhookPayload, SpeedyPayCollectionWebhookPayload } from '@/lib/speedypay/types';
-import { addAuditLog, getPaymentById, getSettlementById, findAuditLogByEventIdentifier } from '@/lib/data';
+import { addAuditLog, getPaymentById, getSettlementById, findAuditLogByEventIdentifier, claimWebhookEventForProcessing, markWebhookEventProcessed, releaseWebhookEventClaim } from '@/lib/data';
 import { speedypayConfig } from '@/lib/speedypay/config';
 
 
@@ -11,7 +11,7 @@ import { speedypayConfig } from '@/lib/speedypay/config';
  * It verifies the signature, ensures idempotency, and then delegates to the appropriate processor.
  */
 export async function POST(req: Request) {
-  let payload: Record<string, any>;
+  let payload: Record<string, string>;
   let rawBody: string;
 
   try {
@@ -35,8 +35,20 @@ export async function POST(req: Request) {
   // A unique identifier for this specific event delivery, used for idempotency.
   const eventIdentifier = `webhook-${orderSeq}-${transSeq}`;
 
+  if (!speedypayConfig.secretKey) {
+    await addAuditLog({
+      eventType: 'webhook.security.failure',
+      user: 'SpeedyPay Webhook',
+      details: 'Webhook secret key is not configured on server.',
+      entityId: null,
+      entityType: null,
+      outcome: 'failed',
+    });
+    return new NextResponse('failed', { status: 500 });
+  }
+
   // 2. Verify webhook signature
-  if (!signature || !verifySignature(payload, speedypayConfig.secretKey!)) {
+  if (!signature || !verifySignature(payload, speedypayConfig.secretKey)) {
     await addAuditLog({
       eventType: 'webhook.security.failure',
       user: 'SpeedyPay Webhook',
@@ -44,26 +56,50 @@ export async function POST(req: Request) {
       entityId: orderSeq,
       entityType: null,
       eventIdentifier,
+      source: 'webhook',
+      action: 'verify_signature',
+      outcome: 'failed',
+      correlationId: eventIdentifier,
     });
     // According to docs, return "failed" to signal an issue to the provider.
     return new NextResponse('failed', { status: 400 });
   }
 
-  // 3. Durable Idempotency Check: Check if we have already successfully processed this exact event delivery.
+  // 3. Idempotency check and claim.
   try {
-      const existingEvent = await findAuditLogByEventIdentifier(eventIdentifier);
-      if (existingEvent) {
+      const claimResult = await claimWebhookEventForProcessing(eventIdentifier, orderSeq, transSeq);
+      if (claimResult === 'already-processed') {
+          const existingEvent = await findAuditLogByEventIdentifier(eventIdentifier);
           // This is a duplicate of an already processed event. Acknowledge it but do not re-process.
           await addAuditLog({
             eventType: 'webhook.duplicate.received',
             user: 'SpeedyPay Webhook',
-            details: `Duplicate event received and ignored. Original log ID: ${existingEvent.id}`,
+            details: `Duplicate event received and ignored. Original log ID: ${existingEvent?.id ?? 'N/A'}`,
             entityId: orderSeq,
             entityType: null,
             eventIdentifier,
+            source: 'webhook',
+            action: 'deduplicate',
+            outcome: 'duplicate',
+            correlationId: eventIdentifier,
           });
           // Return "success" to acknowledge receipt and prevent the provider from resending.
           return new NextResponse('success');
+      }
+      if (claimResult === 'in-progress') {
+        await addAuditLog({
+          eventType: 'webhook.processing.in_progress',
+          user: 'SpeedyPay Webhook',
+          details: `Concurrent webhook delivery detected for ${eventIdentifier}. Request rejected for retry.`,
+          entityId: orderSeq,
+          entityType: null,
+          eventIdentifier,
+          source: 'webhook',
+          action: 'process',
+          outcome: 'in-progress',
+          correlationId: eventIdentifier,
+        });
+        return new NextResponse('failed', { status: 409 });
       }
   } catch (dbError) {
       // If the check itself fails, we can't safely proceed.
@@ -76,6 +112,10 @@ export async function POST(req: Request) {
             entityId: orderSeq,
             entityType: null,
             eventIdentifier,
+            source: 'webhook',
+            action: 'claim',
+            outcome: 'failed',
+            correlationId: eventIdentifier,
         });
       return new NextResponse('failed', { status: 500 });
   }
@@ -84,13 +124,13 @@ export async function POST(req: Request) {
   // Payout `orderSeq` corresponds to our internal `Settlement` ID.
   const settlement = await getSettlementById(orderSeq);
   if (settlement) {
-    return handlePayoutWebhook(payload as SpeedyPayPayoutWebhookPayload, eventIdentifier);
+    return handlePayoutWebhook(payload as unknown as SpeedyPayPayoutWebhookPayload, eventIdentifier);
   }
 
   // Collection `orderSeq` corresponds to our internal `Payment` ID.
   const payment = await getPaymentById(orderSeq);
   if (payment) {
-    return handleCollectionWebhook(payload as SpeedyPayCollectionWebhookPayload, eventIdentifier);
+    return handleCollectionWebhook(payload as unknown as SpeedyPayCollectionWebhookPayload, eventIdentifier);
   }
 
   // 5. If neither is found, it's an unknown webhook.
@@ -101,7 +141,12 @@ export async function POST(req: Request) {
     entityId: orderSeq,
     entityType: null,
     eventIdentifier,
+    source: 'webhook',
+    action: 'route',
+    outcome: 'failed',
+    correlationId: eventIdentifier,
   });
+  await releaseWebhookEventClaim(eventIdentifier, 'Unknown order sequence');
   return new NextResponse('failed', { status: 404 });
 }
 
@@ -113,6 +158,10 @@ async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload, event
     details: `Received PAYOUT webhook for OrderSeq ${payload.orderSeq} with state ${payload.transState}`,
     entityId: payload.orderSeq,
     entityType: 'settlement',
+    source: 'webhook',
+    action: 'receive',
+    outcome: 'success',
+    correlationId: eventIdentifier,
   });
 
   try {
@@ -126,7 +175,12 @@ async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload, event
       entityId: payload.orderSeq,
       entityType: 'settlement',
       eventIdentifier, // The idempotency key is now stored.
+      source: 'webhook',
+      action: 'process',
+      outcome: 'success',
+      correlationId: eventIdentifier,
     });
+    await markWebhookEventProcessed(eventIdentifier);
     return new NextResponse('success');
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
@@ -137,7 +191,12 @@ async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload, event
       details: `Failed to process PAYOUT webhook. Error: ${errorMessage}`,
       entityId: payload.orderSeq,
       entityType: 'settlement',
+      source: 'webhook',
+      action: 'process',
+      outcome: 'failed',
+      correlationId: eventIdentifier,
     });
+    await releaseWebhookEventClaim(eventIdentifier, errorMessage);
     // Return 'failed' so the provider will retry. The idempotency key was not logged, so the retry will be processed.
     return new NextResponse('failed', { status: 500 });
   }
@@ -151,6 +210,10 @@ async function handleCollectionWebhook(payload: SpeedyPayCollectionWebhookPayloa
     details: `Received COLLECTION webhook for OrderSeq ${payload.orderSeq} with state ${payload.transState}`,
     entityId: payload.orderSeq,
     entityType: 'payment',
+    source: 'webhook',
+    action: 'receive',
+    outcome: 'success',
+    correlationId: eventIdentifier,
   });
 
   try {
@@ -164,7 +227,12 @@ async function handleCollectionWebhook(payload: SpeedyPayCollectionWebhookPayloa
       entityId: payload.orderSeq,
       entityType: 'payment',
       eventIdentifier, // The idempotency key is now stored.
+      source: 'webhook',
+      action: 'process',
+      outcome: 'success',
+      correlationId: eventIdentifier,
     });
+    await markWebhookEventProcessed(eventIdentifier);
     return new NextResponse('success');
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
@@ -175,7 +243,12 @@ async function handleCollectionWebhook(payload: SpeedyPayCollectionWebhookPayloa
       details: `Failed to process COLLECTION webhook. Error: ${errorMessage}`,
       entityId: payload.orderSeq,
       entityType: 'payment',
+      source: 'webhook',
+      action: 'process',
+      outcome: 'failed',
+      correlationId: eventIdentifier,
     });
+    await releaseWebhookEventClaim(eventIdentifier, errorMessage);
     // Return 'failed' so the provider will retry. The idempotency key was not logged, so the retry will be processed.
     return new NextResponse('failed', { status: 500 });
   }

@@ -41,7 +41,11 @@ export async function signInWithEmail(email: string, password: string): Promise<
 
 export async function signOutUser(): Promise<void> {
   const { auth } = initializeFirebase();
-  if (!auth) return;
+  if (!auth) {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    return;
+  }
   
   await signOut(auth);
+  await fetch('/api/auth/logout', { method: 'POST' });
 }

@@ -59,7 +59,8 @@ async function postToSpeedyPay<TRequest extends object, TResponse>(
   
   // Verify the response signature if a signature is present in the response
   if (responseData.sign && !verifySignature(responseData, secretKey)) {
-      console.error(`[SpeedyPay API] Invalid response signature for orderSeq:`, (responseData as any).orderSeq);
+      const unsafeResponse = responseData as { orderSeq?: string };
+      console.error(`[SpeedyPay API] Invalid response signature for orderSeq:`, unsafeResponse.orderSeq ?? 'unknown');
       throw new Error('SpeedyPay API Error: Invalid response signature.');
   }
 
@@ -91,7 +92,7 @@ export async function cashOut(params: Omit<CashOutRequest, 'merchSeq' | 'timesta
  * Corresponds to the `qryOrder.do` endpoint ON THE PAYOUT HOST.
  */
 export async function qryOrder(params: Omit<QryOrderRequest, 'merchSeq' | 'timestamp' | 'sign' | 'signType'>) {
-    return postToSpeedyPay<QryOrderRequest, SpeedyPayResponse>(speedypayConfig.payoutBaseUrl, '/emg/qryOrder.do', params);
+    return postToSpeedyPay<Omit<QryOrderRequest, 'merchSeq' | 'timestamp' | 'sign' | 'signType'>, SpeedyPayResponse>(speedypayConfig.payoutBaseUrl, '/emg/qryOrder.do', params);
 }
 
 /**
@@ -110,7 +111,7 @@ export async function qryBalance() {
  * Corresponds to the `/cashier/qryOrder.do` endpoint.
  */
 export async function qryCollectionOrder(params: Omit<QryOrderRequest, 'merchSeq' | 'timestamp' | 'sign' | 'signType'>) {
-    return postToSpeedyPay<QryOrderRequest, QryCollectionOrderResponse>(speedypayConfig.cashierBaseUrl, '/cashier/qryOrder.do', params);
+    return postToSpeedyPay<Omit<QryOrderRequest, 'merchSeq' | 'timestamp' | 'sign' | 'signType'>, QryCollectionOrderResponse>(speedypayConfig.cashierBaseUrl, '/cashier/qryOrder.do', params);
 }
 
 /**

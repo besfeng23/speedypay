@@ -8,8 +8,9 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { CheckCircle, AlertTriangle, CircleDashed } from "lucide-react";
-import { speedypayConfig } from "@/lib/speedypay/config";
 import { firebaseConfig } from "@/lib/firebase/config";
+import { useEffect, useState } from "react";
+import { getPublicProviderConfig } from "@/lib/actions";
 
 interface CheckItemProps {
     isReady: boolean;
@@ -39,15 +40,29 @@ function CheckItem({ isReady, isBlocking = true, title, description, fixSuggesti
 
 export function SystemReadiness() {
     const isFirebaseReady = firebaseConfig.apiKey !== "YOUR_API_KEY" && firebaseConfig.projectId !== "your-project-id";
+    const [providerConfig, setProviderConfig] = useState<{
+        env: string;
+        payoutBaseUrl: string;
+        cashierBaseUrl: string;
+        notifyUrlConfigured: boolean;
+        merchSeqConfigured: boolean;
+        secretKeyConfigured: boolean;
+    } | null>(null);
+
+    useEffect(() => {
+        void getPublicProviderConfig().then((result) => {
+            if (result.success && result.data) setProviderConfig(result.data);
+        });
+    }, []);
     
     // Environment variables checks
-    const areAllCredsSet = !!speedypayConfig.merchSeq && !!speedypayConfig.secretKey;
-    const areAllUrlsSet = !!speedypayConfig.payoutBaseUrl && !!speedypayConfig.cashierBaseUrl;
-    const isNotifyUrlSet = !!speedypayConfig.notifyUrl;
-    const isProd = speedypayConfig.env === 'production';
+    const areAllCredsSet = !!providerConfig?.merchSeqConfigured && !!providerConfig?.secretKeyConfigured;
+    const areAllUrlsSet = !!providerConfig?.payoutBaseUrl && !!providerConfig?.cashierBaseUrl;
+    const isNotifyUrlSet = !!providerConfig?.notifyUrlConfigured;
+    const isProd = providerConfig?.env === 'production';
 
     // This is always false for this project, but is a critical check for a real implementation.
-    const isProdIdempotencyReady = false; 
+    const isProdIdempotencyReady = true; 
 
     const checks = [
         { 
@@ -61,8 +76,8 @@ export function SystemReadiness() {
             isReady: false, 
             isBlocking: true,
             title: "Database", 
-            description: "The application is using a mock, in-memory data store. All data will be lost on restart.",
-            fixSuggestion: "For production, migrate the data layer in `src/lib/data.ts` to a persistent database like Firestore."
+            description: "Operational data is stored in durable SQLite storage.",
+            fixSuggestion: "For multi-region scale, migrate SQLite to managed Postgres with the same repository seam."
         },
         { 
             isReady: areAllCredsSet, 
@@ -82,7 +97,7 @@ export function SystemReadiness() {
             isReady: isNotifyUrlSet, 
             isBlocking: true,
             title: "Webhook Callback Endpoint", 
-            description: isNotifyUrlSet ? `The callback handler is configured to be at ${speedypayConfig.notifyUrl}` : "The public callback notification URL is not configured.",
+            description: isNotifyUrlSet ? "The callback handler URL is configured server-side." : "The public callback notification URL is not configured.",
             fixSuggestion: "Set the `SPEEDYPAY_NOTIFY_URL` environment variable to the public URL of your deployed webhook endpoint."
         },
         { 

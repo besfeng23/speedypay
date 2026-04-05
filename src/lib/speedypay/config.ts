@@ -1,3 +1,5 @@
+import 'server-only';
+
 /**
  * Centralized configuration for the SpeedyPay provider.
  * Reads values from environment variables.
@@ -40,4 +42,16 @@ export const speedypayConfig = {
  */
 export function isSpeedyPayConfigured(): boolean {
     return !!(speedypayConfig.merchSeq && speedypayConfig.secretKey);
+}
+
+export function validateSpeedyPayConfigForServer(): void {
+  if (!speedypayConfig.merchSeq) {
+    throw new Error('SPEEDYPAY_MERCH_SEQ is required.');
+  }
+  if (!speedypayConfig.secretKey) {
+    throw new Error('SPEEDYPAY_SECRET_KEY is required.');
+  }
+  if (!speedypayConfig.notifyUrl) {
+    throw new Error('SPEEDYPAY_NOTIFY_URL is required.');
+  }
 }

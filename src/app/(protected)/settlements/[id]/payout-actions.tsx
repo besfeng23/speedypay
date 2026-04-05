@@ -8,7 +8,6 @@ import { useToast } from "@/hooks/use-toast";
 import type { Settlement } from "@/lib/types";
 import { HandCoins, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { speedypayConfig } from "@/lib/speedypay/config";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,7 +28,7 @@ export function PayoutActions({ settlement }: { settlement: Settlement }) {
 
     const canInitiate = settlement.settlementStatus === 'completed' && settlement.remittanceStatus === 'pending';
     const canQuery = !!settlement.providerOrderSeq;
-    const isLiveEnv = speedypayConfig.env === 'production';
+    const isLiveEnv = process.env.NEXT_PUBLIC_SPEEDYPAY_ENV === 'production';
 
     const handleInitiate = () => {
         startInitiating(async () => {

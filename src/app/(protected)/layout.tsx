@@ -24,7 +24,6 @@ import { Icons } from "@/components/icons";
 import Link from "next/link";
 import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
-import { speedypayConfig } from "@/lib/speedypay/config";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 
@@ -56,7 +55,7 @@ export default function ProtectedLayout({
   }
 
   const isDemoMode = user?.uid === 'mock-user-id';
-  const isLiveEnv = speedypayConfig.env === 'production';
+  const isLiveEnv = process.env.NEXT_PUBLIC_SPEEDYPAY_ENV === 'production';
 
   return (
     <div className="min-h-screen w-full">

@@ -31,9 +31,10 @@ import { createMerchant } from '@/lib/actions';
 import { Loader2 } from 'lucide-react';
 import { payoutChannels } from '@/lib/speedypay/payout-channels';
 import { ONBOARDING_STATUSES } from '@/lib/types';
+import dynamic from 'next/dynamic';
 
 
-export default function NewMerchantPage() {
+function NewMerchantPageClient() {
   const { toast } = useToast();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -139,3 +140,7 @@ export default function NewMerchantPage() {
     </>
   );
 }
+
+export default dynamic(() => Promise.resolve(NewMerchantPageClient), {
+  ssr: false,
+});

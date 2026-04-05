@@ -11,11 +11,11 @@ export const useAuth = () => {
   const { user, loading } = useUser();
 
   const signInWithGoogle = async () => {
-    await firebaseSignInWithGoogle();
+    return firebaseSignInWithGoogle();
   };
 
   const signInWithEmail = async (email: string, password: string) => {
-    await firebaseSignInWithEmail(email, password);
+    return firebaseSignInWithEmail(email, password);
   }
 
   const logout = async () => {
