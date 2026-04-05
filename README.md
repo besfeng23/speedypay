@@ -48,3 +48,10 @@ Open [http://localhost:9002](http://localhost:9002) with your browser to see the
 - **Audit Logs:** A complete trail of all significant system events.
 - **AI-Powered Tools:** Includes a payment simulator and dashboard insights generator.
 # speedypay
+
+
+## Production deployment docs
+
+- Release runbook: `docs/release-runbook.md`
+- Smoke tests: `docs/smoke-test-checklist.md`
+
