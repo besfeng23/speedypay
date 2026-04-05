@@ -33,9 +33,9 @@ import { PlayCircle, Loader2 } from "lucide-react";
 import { simulatePayment, type SimulatePaymentOutput } from "@/ai/flows/simulate-payment-flow";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "./ui/scroll-area";
-import { merchants } from "@/lib/data";
 import { useRouter } from "next/navigation";
 import { addSimulatedData } from "@/lib/actions";
+import type { Merchant } from "@/lib/types";
 
 const formSchema = z.object({
   scenarioType: z.enum([
@@ -50,7 +50,7 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function DemoPaymentSimulator() {
+export function DemoPaymentSimulator({ merchants }: { merchants: Merchant[] }) {
   const [open, setOpen] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationResult, setSimulationResult] = useState<SimulatePaymentOutput | null>(null);
@@ -62,7 +62,7 @@ export function DemoPaymentSimulator() {
     defaultValues: {
       scenarioType: "success",
       grossAmount: 100,
-      merchantId: merchants[0].id,
+      merchantId: merchants[0]?.id,
     },
   });
 

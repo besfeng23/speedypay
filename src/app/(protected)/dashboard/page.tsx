@@ -1,3 +1,5 @@
+'use client';
+
 import { DollarSign, Users, Activity, Banknote, RefreshCw, AlertCircle, Building, HandCoins } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
@@ -8,8 +10,11 @@ import { DashboardChart } from "@/components/dashboard-chart";
 import { RecentActivity } from "@/components/recent-activity";
 import { DemoPaymentSimulator } from "@/components/demo-payment-simulator";
 import { DashboardInsights } from "@/components/dashboard-insights";
-import { getRecentPayments, getRecentSettlements } from "@/lib/data";
+import { getRecentPayments, getRecentSettlements, getMerchants } from "@/lib/data";
 import { Separator } from "@/components/ui/separator";
+import { useEffect, useState } from "react";
+import type { DashboardStats, Merchant } from "@/lib/types";
+
 
 const chartData = [
   { month: "January", volume: 18600, fees: 800 },
@@ -31,19 +36,52 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export default async function Dashboard() {
-  const stats = await getDashboardStats();
-  const recentPayments = await getRecentPayments();
-  const recentSettlements = await getRecentSettlements();
-
-
-  const formatCurrency = (amount: number, currency: string = "PHP") => {
+const formatCurrency = (amount: number, currency: string = "PHP") => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: currency,
       minimumFractionDigits: 2,
     }).format(amount);
   };
+
+export default function Dashboard() {
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [merchants, setMerchants] = useState<Merchant[]>([]);
+  const [loading, setLoading] = useState(true);
+
+   useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      const [statsData, merchantsData] = await Promise.all([
+        getDashboardStats(),
+        getMerchants(),
+      ]);
+      setStats(statsData);
+      setMerchants(merchantsData);
+      setLoading(false);
+    }
+    fetchData();
+  }, []);
+
+
+  if (loading || !stats) {
+    return (
+       <div className="grid gap-6">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <Card className="h-[126px] animate-pulse bg-muted" />
+            <Card className="h-[126px] animate-pulse bg-muted" />
+            <Card className="h-[126px] animate-pulse bg-muted" />
+            <Card className="h-[126px] animate-pulse bg-muted" />
+        </div>
+        <div className="grid gap-6 lg:grid-cols-5">
+            <Card className="lg:col-span-3 h-[400px] animate-pulse bg-muted" />
+            <div className="lg:col-span-2">
+                <Card className="h-[400px] animate-pulse bg-muted" />
+            </div>
+        </div>
+      </div>
+    );
+  }
   
   const kpiDataForAI = {
       totalGrossVolume: stats.totalGrossVolume,
@@ -52,8 +90,8 @@ export default async function Dashboard() {
       pendingSettlements: stats.pendingSettlements,
       failedSettlements: stats.failedSettlements,
       activeMerchants: stats.activeMerchants,
-      recentTransactionsCount: recentPayments.length,
-      recentSettlementEventsCount: recentSettlements.length,
+      recentTransactionsCount: stats.recentTransactionsCount,
+      recentSettlementEventsCount: stats.recentSettlementEventsCount,
       currency: 'PHP',
   };
 
@@ -63,7 +101,7 @@ export default async function Dashboard() {
         title="Dashboard"
         description="An executive overview of your marketplace's performance."
       >
-        <DemoPaymentSimulator />
+        <DemoPaymentSimulator merchants={merchants} />
       </PageHeader>
       <div className="grid gap-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
