@@ -1,5 +1,6 @@
+
 import type { SpeedyPayPayoutWebhookPayload, SpeedyPayCollectionWebhookPayload } from './types';
-import { addAuditLog, getSettlementById, updateSettlement, getPaymentById, updatePayment, settlements, getSettlementByPaymentId } from '@/lib/data';
+import { addAuditLog, getSettlementById, updateSettlement, getPaymentById, updatePayment, addSettlement, getSettlementByPaymentId } from '@/lib/data';
 import { mapProviderStateToInternal, providerStateLabels, mapCollectionStateToPaymentStatus } from './mappers';
 import { formatISO } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
@@ -113,7 +114,7 @@ export async function processCollectionWebhookEvent(payload: SpeedyPayCollection
               createdAt: formatISO(new Date()),
               updatedAt: formatISO(new Date()),
           };
-          settlements.unshift(newSettlement);
+          await addSettlement(newSettlement);
           updatedPayment.settlementStatus = 'completed'; // Update the payment's view of settlement
           await addAuditLog({
               eventType: 'settlement.created',
@@ -122,6 +123,9 @@ export async function processCollectionWebhookEvent(payload: SpeedyPayCollection
               entityId: newSettlement.id,
               entityType: 'settlement'
           });
+      } else {
+        // If settlement already exists, just make sure the payment's view of it is correct.
+        updatedPayment.settlementStatus = 'completed';
       }
   }
   
