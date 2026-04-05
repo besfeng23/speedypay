@@ -43,6 +43,7 @@ const PaymentRecordSchema = z.object({
   sourceChannel: z.string().describe('Source channel of the payment (e.g., Web, Mobile).'),
   createdAt: z.string().datetime().describe('Timestamp when the payment record was created.'),
   updatedAt: z.string().datetime().describe('Timestamp when the payment record was last updated.'),
+  failureReason: z.string().optional().describe('Reason for payment failure. Omit if not applicable.'),
 });
 export type PaymentRecord = z.infer<typeof PaymentRecordSchema>;
 

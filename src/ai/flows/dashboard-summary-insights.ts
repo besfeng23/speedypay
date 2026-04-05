@@ -41,7 +41,7 @@ const dashboardInsightsPrompt = ai.definePrompt({
   output: { schema: DashboardInsightsOutputSchema },
   prompt: `You are an expert financial analyst for SpeedyPay Marketplace Console, specializing in marketplace payment platforms. Your role is to provide a concise summary of key performance indicators and derive actionable insights from the provided data.
 
-Analyze the following metrics for the SpeedyPay Marketplace Console (all monetary values are in {{{currency 'USD'}} unless specified otherwise):
+Analyze the following metrics for the SpeedyPay Marketplace Console (all monetary values are in {{{currency}}} unless specified otherwise):
 
 - Total Gross Volume: {{{totalGrossVolume}}}
 - Total Platform Fees Earned: {{{totalPlatformFees}}}
