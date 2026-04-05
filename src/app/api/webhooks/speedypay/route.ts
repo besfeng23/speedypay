@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     return new NextResponse('Missing orderSeq or transSeq', { status: 400 });
   }
 
-  // A unique identifier for this specific event delivery.
+  // A unique identifier for this specific event delivery, used for idempotency.
   const eventIdentifier = `webhook-${orderSeq}-${transSeq}`;
 
   // 2. Verify webhook signature
@@ -49,19 +49,17 @@ export async function POST(req: Request) {
     return new NextResponse('failed', { status: 400 });
   }
 
-  // 3. Durable Idempotency Check
-  // Check if we have already processed this exact event delivery.
+  // 3. Durable Idempotency Check: Check if we have already successfully processed this exact event delivery.
   try {
       const existingEvent = await findAuditLogByEventIdentifier(eventIdentifier);
       if (existingEvent) {
-          // This is a duplicate. Acknowledge it but do not re-process.
+          // This is a duplicate of an already processed event. Acknowledge it but do not re-process.
           await addAuditLog({
             eventType: 'webhook.duplicate.received',
             user: 'SpeedyPay Webhook',
             details: `Duplicate event received and ignored: ${eventIdentifier}. Original log ID: ${existingEvent.id}`,
             entityId: orderSeq,
             entityType: null,
-            eventIdentifier,
           });
           // Return "success" to acknowledge receipt and prevent the provider from resending.
           return new NextResponse('success');
@@ -76,7 +74,6 @@ export async function POST(req: Request) {
             details: `Failed to check for duplicate webhooks. Error: ${errorMessage}`,
             entityId: orderSeq,
             entityType: null,
-            eventIdentifier,
         });
       return new NextResponse('failed', { status: 500 });
   }
@@ -107,24 +104,26 @@ export async function POST(req: Request) {
 }
 
 async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload, eventIdentifier: string) {
+  // Log that we received it, but do NOT include the idempotency key yet.
   await addAuditLog({
     eventType: 'webhook.received',
     user: 'SpeedyPay Webhook',
     details: `Received PAYOUT webhook for OrderSeq ${payload.orderSeq} with state ${payload.transState}`,
     entityId: payload.orderSeq,
     entityType: 'settlement',
-    eventIdentifier,
   });
 
   try {
     await processPayoutWebhookEvent(payload);
+
+    // CRITICAL: The idempotency key is only logged AFTER successful processing.
     await addAuditLog({
       eventType: 'webhook.processed',
       user: 'SpeedyPay Webhook',
       details: `Successfully processed PAYOUT webhook for OrderSeq: ${payload.orderSeq}`,
       entityId: payload.orderSeq,
       entityType: 'settlement',
-      eventIdentifier,
+      eventIdentifier, // The idempotency key is now stored.
     });
     return new NextResponse('success');
   } catch (error) {
@@ -136,31 +135,33 @@ async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload, event
       details: `Failed to process PAYOUT webhook. Error: ${errorMessage}`,
       entityId: payload.orderSeq,
       entityType: 'settlement',
-      eventIdentifier,
     });
+    // Return 'failed' so the provider will retry. The idempotency key was not logged, so the retry will be processed.
     return new NextResponse('failed', { status: 500 });
   }
 }
 
 async function handleCollectionWebhook(payload: SpeedyPayCollectionWebhookPayload, eventIdentifier: string) {
+   // Log that we received it, but do NOT include the idempotency key yet.
    await addAuditLog({
     eventType: 'webhook.received',
     user: 'SpeedyPay Webhook',
     details: `Received COLLECTION webhook for OrderSeq ${payload.orderSeq} with state ${payload.transState}`,
     entityId: payload.orderSeq,
     entityType: 'payment',
-    eventIdentifier,
   });
 
   try {
     await processCollectionWebhookEvent(payload);
+    
+    // CRITICAL: The idempotency key is only logged AFTER successful processing.
     await addAuditLog({
       eventType: 'webhook.processed',
       user: 'SpeedyPay Webhook',
       details: `Successfully processed COLLECTION webhook for OrderSeq: ${payload.orderSeq}`,
       entityId: payload.orderSeq,
       entityType: 'payment',
-      eventIdentifier,
+      eventIdentifier, // The idempotency key is now stored.
     });
     return new NextResponse('success');
   } catch (error) {
@@ -172,8 +173,8 @@ async function handleCollectionWebhook(payload: SpeedyPayCollectionWebhookPayloa
       details: `Failed to process COLLECTION webhook. Error: ${errorMessage}`,
       entityId: payload.orderSeq,
       entityType: 'payment',
-      eventIdentifier,
     });
+    // Return 'failed' so the provider will retry. The idempotency key was not logged, so the retry will be processed.
     return new NextResponse('failed', { status: 500 });
   }
 }
