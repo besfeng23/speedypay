@@ -10,8 +10,7 @@ import { DashboardChart } from "@/components/dashboard-chart";
 import { RecentActivity } from "@/components/recent-activity";
 import { DemoPaymentSimulator } from "@/components/demo-payment-simulator";
 import { DashboardInsights } from "@/components/dashboard-insights";
-import { getRecentPayments, getRecentSettlements, getMerchants } from "@/lib/data";
-import { Separator } from "@/components/ui/separator";
+import { getMerchants } from "@/lib/data";
 import { useEffect, useState } from "react";
 import type { DashboardStats, Merchant } from "@/lib/types";
 
@@ -189,7 +188,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
           <div className="lg:col-span-2">
-            <RecentActivity />
+            <RecentActivity merchants={merchants} />
           </div>
         </div>
         
