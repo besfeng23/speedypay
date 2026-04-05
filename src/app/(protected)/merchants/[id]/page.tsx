@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getMerchantById, getPaymentsByMerchantId, getSettlementsByMerchantId } from "@/lib/data";
 import { PageHeader } from "@/components/page-header";
 import { notFound } from "next/navigation";
