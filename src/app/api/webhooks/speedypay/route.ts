@@ -2,14 +2,9 @@ import { NextResponse } from 'next/server';
 import { verifySignature } from '@/lib/speedypay/crypto';
 import { processPayoutWebhookEvent, processCollectionWebhookEvent } from '@/lib/speedypay/events';
 import type { SpeedyPayPayoutWebhookPayload, SpeedyPayCollectionWebhookPayload } from '@/lib/speedypay/types';
-import { addAuditLog, getPaymentById, getSettlementById } from '@/lib/data';
+import { addAuditLog, getPaymentById, getSettlementById, findAuditLogByEventIdentifier } from '@/lib/data';
 import { speedypayConfig } from '@/lib/speedypay/config';
 
-// In a production environment, this should be a persistent, distributed store 
-// like Redis or a database table to ensure idempotency across multiple server instances.
-// Using a simple in-memory Set is NOT suitable for production as it's not shared
-// between serverless function instances and will be cleared on restarts.
-const processedEventIds = new Set<string>();
 
 /**
  * API route to handle incoming webhooks from SpeedyPay for BOTH payouts and collections.
@@ -37,6 +32,9 @@ export async function POST(req: Request) {
     return new NextResponse('Missing orderSeq or transSeq', { status: 400 });
   }
 
+  // A unique identifier for this specific event delivery.
+  const eventIdentifier = `webhook-${orderSeq}-${transSeq}`;
+
   // 2. Verify webhook signature
   if (!signature || !verifySignature(payload, speedypayConfig.secretKey!)) {
     await addAuditLog({
@@ -45,38 +43,55 @@ export async function POST(req: Request) {
       details: 'Webhook signature verification failed. Signature was missing or invalid.',
       entityId: orderSeq,
       entityType: null,
+      eventIdentifier,
     });
     // According to docs, return "failed" to signal an issue to the provider.
     return new NextResponse('failed', { status: 400 });
   }
 
-  // 3. Protect against duplicate events (idempotency)
-  // The unique identifier for an event is the combination of the order and transaction sequence.
-  const eventIdentifier = `${orderSeq}-${transSeq}`;
-  if (processedEventIds.has(eventIdentifier)) {
-    await addAuditLog({
-      eventType: 'webhook.duplicate.received',
-      user: 'SpeedyPay Webhook',
-      details: `Duplicate event received and ignored: ${eventIdentifier}`,
-      entityId: orderSeq,
-      entityType: null
-    });
-    // Return "success" to acknowledge receipt and prevent the provider from resending.
-    return new NextResponse('success');
+  // 3. Durable Idempotency Check
+  // Check if we have already processed this exact event delivery.
+  try {
+      const existingEvent = await findAuditLogByEventIdentifier(eventIdentifier);
+      if (existingEvent) {
+          // This is a duplicate. Acknowledge it but do not re-process.
+          await addAuditLog({
+            eventType: 'webhook.duplicate.received',
+            user: 'SpeedyPay Webhook',
+            details: `Duplicate event received and ignored: ${eventIdentifier}. Original log ID: ${existingEvent.id}`,
+            entityId: orderSeq,
+            entityType: null,
+            eventIdentifier,
+          });
+          // Return "success" to acknowledge receipt and prevent the provider from resending.
+          return new NextResponse('success');
+      }
+  } catch (dbError) {
+      // If the check itself fails, we can't safely proceed.
+      const errorMessage = dbError instanceof Error ? dbError.message : 'Database error during idempotency check.';
+      console.error(`[SpeedyPay Webhook Idempotency Error] for ${eventIdentifier}:`, errorMessage);
+       await addAuditLog({
+            eventType: 'webhook.idempotency.failed',
+            user: 'System',
+            details: `Failed to check for duplicate webhooks. Error: ${errorMessage}`,
+            entityId: orderSeq,
+            entityType: null,
+            eventIdentifier,
+        });
+      return new NextResponse('failed', { status: 500 });
   }
-  processedEventIds.add(eventIdentifier);
   
   // 4. Determine if this is for a Payout or a Collection by checking our internal records.
   // Payout `orderSeq` corresponds to our internal `Settlement` ID.
   const settlement = await getSettlementById(orderSeq);
   if (settlement) {
-    return handlePayoutWebhook(payload as SpeedyPayPayoutWebhookPayload);
+    return handlePayoutWebhook(payload as SpeedyPayPayoutWebhookPayload, eventIdentifier);
   }
 
   // Collection `orderSeq` corresponds to our internal `Payment` ID.
   const payment = await getPaymentById(orderSeq);
   if (payment) {
-    return handleCollectionWebhook(payload as SpeedyPayCollectionWebhookPayload);
+    return handleCollectionWebhook(payload as SpeedyPayCollectionWebhookPayload, eventIdentifier);
   }
 
   // 5. If neither is found, it's an unknown webhook.
@@ -86,17 +101,19 @@ export async function POST(req: Request) {
     details: `Webhook received for an unknown orderSeq that is not a settlement or payment: ${orderSeq}`,
     entityId: orderSeq,
     entityType: null,
+    eventIdentifier,
   });
   return new NextResponse('failed', { status: 404 });
 }
 
-async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload) {
+async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload, eventIdentifier: string) {
   await addAuditLog({
     eventType: 'webhook.received',
     user: 'SpeedyPay Webhook',
     details: `Received PAYOUT webhook for OrderSeq ${payload.orderSeq} with state ${payload.transState}`,
     entityId: payload.orderSeq,
     entityType: 'settlement',
+    eventIdentifier,
   });
 
   try {
@@ -107,6 +124,7 @@ async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload) {
       details: `Successfully processed PAYOUT webhook for OrderSeq: ${payload.orderSeq}`,
       entityId: payload.orderSeq,
       entityType: 'settlement',
+      eventIdentifier,
     });
     return new NextResponse('success');
   } catch (error) {
@@ -118,18 +136,20 @@ async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload) {
       details: `Failed to process PAYOUT webhook. Error: ${errorMessage}`,
       entityId: payload.orderSeq,
       entityType: 'settlement',
+      eventIdentifier,
     });
     return new NextResponse('failed', { status: 500 });
   }
 }
 
-async function handleCollectionWebhook(payload: SpeedyPayCollectionWebhookPayload) {
+async function handleCollectionWebhook(payload: SpeedyPayCollectionWebhookPayload, eventIdentifier: string) {
    await addAuditLog({
     eventType: 'webhook.received',
     user: 'SpeedyPay Webhook',
     details: `Received COLLECTION webhook for OrderSeq ${payload.orderSeq} with state ${payload.transState}`,
     entityId: payload.orderSeq,
     entityType: 'payment',
+    eventIdentifier,
   });
 
   try {
@@ -140,6 +160,7 @@ async function handleCollectionWebhook(payload: SpeedyPayCollectionWebhookPayloa
       details: `Successfully processed COLLECTION webhook for OrderSeq: ${payload.orderSeq}`,
       entityId: payload.orderSeq,
       entityType: 'payment',
+      eventIdentifier,
     });
     return new NextResponse('success');
   } catch (error) {
@@ -151,6 +172,7 @@ async function handleCollectionWebhook(payload: SpeedyPayCollectionWebhookPayloa
       details: `Failed to process COLLECTION webhook. Error: ${errorMessage}`,
       entityId: payload.orderSeq,
       entityType: 'payment',
+      eventIdentifier,
     });
     return new NextResponse('failed', { status: 500 });
   }

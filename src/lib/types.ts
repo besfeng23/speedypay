@@ -110,6 +110,7 @@ export type AuditLog = {
   details: string;
   entityType: 'merchant' | 'payment' | 'settlement' | 'user' | null;
   entityId: string | null;
+  eventIdentifier?: string;
 };
 
 export type FeeConfig = {

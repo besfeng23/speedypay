@@ -425,6 +425,11 @@ export const getAuditLogsByEventTypePrefix = async (prefix: string, limit = 5): 
   return new Promise(resolve => setTimeout(() => resolve(result), 200));
 }
 
+export async function findAuditLogByEventIdentifier(eventIdentifier: string): Promise<AuditLog | undefined> {
+    const log = auditLogs.find(l => l.eventIdentifier === eventIdentifier);
+    return new Promise(resolve => setTimeout(() => resolve(log), 50));
+}
+
 export const getUATTestCases = async (): Promise<UATTestCase[]> => {
     return new Promise(resolve => setTimeout(() => resolve(uatTestCases), 100));
 }
