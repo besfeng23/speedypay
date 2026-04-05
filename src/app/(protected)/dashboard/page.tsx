@@ -1,7 +1,7 @@
 'use client';
 
-import { DollarSign, Users, Activity, Banknote, RefreshCw, AlertCircle, Building, HandCoins } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { DollarSign, Users, Activity, Banknote, RefreshCw, AlertCircle, Building } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/stat-card";
 import { getDashboardStats } from "@/lib/data";
