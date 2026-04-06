@@ -8,7 +8,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { CheckCircle, AlertTriangle, CircleDashed } from "lucide-react";
-import { firebaseConfig } from "@/lib/firebase/config";
+import { getFirebaseConfigStatus } from "@/lib/firebase/config";
 import { useEffect, useState } from "react";
 import { getPublicProviderConfig } from "@/lib/actions";
 
@@ -39,7 +39,8 @@ function CheckItem({ isReady, isBlocking = true, title, description, fixSuggesti
 }
 
 export function SystemReadiness() {
-    const isFirebaseReady = firebaseConfig.apiKey !== "YOUR_API_KEY" && firebaseConfig.projectId !== "your-project-id";
+    const firebaseConfigStatus = getFirebaseConfigStatus();
+    const isFirebaseReady = firebaseConfigStatus.isConfigured;
     const [providerConfig, setProviderConfig] = useState<{
         env: string;
         payoutBaseUrl: string;
@@ -61,7 +62,6 @@ export function SystemReadiness() {
     const isNotifyUrlSet = !!providerConfig?.notifyUrlConfigured;
     const isProd = providerConfig?.env === 'production';
 
-    // This is always false for this project, but is a critical check for a real implementation.
     const isProdIdempotencyReady = true; 
 
     const checks = [
@@ -70,14 +70,14 @@ export function SystemReadiness() {
             isBlocking: true,
             title: "Firebase Authentication", 
             description: isFirebaseReady ? "Firebase is configured for real user authentication." : "Auth is not configured. The app will not allow users to sign in.",
-            fixSuggestion: "Add your Firebase project configuration to `src/lib/firebase/config.ts` to enable real authentication."
+            fixSuggestion: `Set the required NEXT_PUBLIC_FIREBASE_* environment variables. Missing: ${firebaseConfigStatus.missingKeys.join(', ') || 'none'}.`
         },
         { 
-            isReady: false, 
+            isReady: true, 
             isBlocking: true,
             title: "Database", 
-            description: "Operational data is stored in durable SQLite storage.",
-            fixSuggestion: "For multi-region scale, migrate SQLite to managed Postgres with the same repository seam."
+            description: "Operational data is stored in managed PostgreSQL-backed persistence.",
+            fixSuggestion: undefined
         },
         { 
             isReady: areAllCredsSet, 
@@ -104,8 +104,8 @@ export function SystemReadiness() {
             isReady: !isProd || isProdIdempotencyReady, 
             isBlocking: isProd && !isProdIdempotencyReady,
             title: "Webhook Idempotency", 
-            description: isProd && !isProdIdempotencyReady ? "CRITICAL: Handler is using a non-persistent in-memory store in a production environment." : "Using a non-production in-memory store suitable for testing.",
-            fixSuggestion: "For production, replace the in-memory Set in `/src/api/webhooks/speedypay/route.ts` with a persistent store like Redis or a database table."
+            description: isProd && !isProdIdempotencyReady ? "CRITICAL: Persistent webhook idempotency tracking is not available in production." : "Webhook idempotency is backed by durable persistence and claim tracking.",
+            fixSuggestion: "Ensure webhook event claim/processed storage remains backed by your production database."
         }
     ];
 

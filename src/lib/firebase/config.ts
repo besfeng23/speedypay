@@ -1,19 +1,57 @@
-const isProd = process.env.NODE_ENV === 'production';
+const isProdRuntime = process.env.NODE_ENV === 'production' && process.env.NEXT_PHASE !== 'phase-production-build';
 
-function readPublicEnv(name: string, fallback = ''): string {
-  const value = process.env[name] ?? fallback;
-  if (isProd && !value) {
-    throw new Error(`${name} is required in production.`);
-  }
-  return value;
+const requiredFirebaseEnvKeys = [
+  'NEXT_PUBLIC_FIREBASE_API_KEY',
+  'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+  'NEXT_PUBLIC_FIREBASE_PROJECT_ID',
+  'NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET',
+  'NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+  'NEXT_PUBLIC_FIREBASE_APP_ID',
+] as const;
+
+type RequiredFirebaseEnvKey = (typeof requiredFirebaseEnvKeys)[number];
+
+type FirebaseConfigStatus = {
+  isConfigured: boolean;
+  missingKeys: RequiredFirebaseEnvKey[];
+};
+
+function readPublicEnv(name: RequiredFirebaseEnvKey): string {
+  return process.env[name]?.trim() ?? '';
 }
 
-export const firebaseConfig = {
-  apiKey: readPublicEnv('NEXT_PUBLIC_FIREBASE_API_KEY', 'YOUR_API_KEY'),
-  authDomain: readPublicEnv('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN', 'your-project-id.firebaseapp.com'),
-  projectId: readPublicEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID', 'your-project-id'),
-  storageBucket: readPublicEnv('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET', 'your-project-id.appspot.com'),
-  messagingSenderId: readPublicEnv('NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID', '000000000000'),
-  appId: readPublicEnv('NEXT_PUBLIC_FIREBASE_APP_ID', '1:000000000000:web:0000000000000000000000'),
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+const requiredFirebaseEnvValues: Record<RequiredFirebaseEnvKey, string> = {
+  NEXT_PUBLIC_FIREBASE_API_KEY: readPublicEnv('NEXT_PUBLIC_FIREBASE_API_KEY'),
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: readPublicEnv('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN'),
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: readPublicEnv('NEXT_PUBLIC_FIREBASE_PROJECT_ID'),
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: readPublicEnv('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET'),
+  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: readPublicEnv('NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID'),
+  NEXT_PUBLIC_FIREBASE_APP_ID: readPublicEnv('NEXT_PUBLIC_FIREBASE_APP_ID'),
 };
+
+const missingFirebaseEnvKeys = requiredFirebaseEnvKeys.filter((key) => !requiredFirebaseEnvValues[key]);
+
+if (isProdRuntime && missingFirebaseEnvKeys.length > 0) {
+  throw new Error(
+    `Missing required public Firebase env vars: ${missingFirebaseEnvKeys.join(', ')}`
+  );
+}
+
+export const firebaseConfig = missingFirebaseEnvKeys.length === 0
+  ? {
+      apiKey: requiredFirebaseEnvValues.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: requiredFirebaseEnvValues.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: requiredFirebaseEnvValues.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: requiredFirebaseEnvValues.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: requiredFirebaseEnvValues.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: requiredFirebaseEnvValues.NEXT_PUBLIC_FIREBASE_APP_ID,
+      measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID?.trim() || undefined,
+    }
+  : null;
+
+export function getFirebaseConfigStatus(): FirebaseConfigStatus {
+  return {
+    isConfigured: missingFirebaseEnvKeys.length === 0,
+    missingKeys: missingFirebaseEnvKeys,
+  };
+}
