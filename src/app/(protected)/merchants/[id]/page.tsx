@@ -99,9 +99,10 @@ function RecentSettlements({ settlements }: { settlements: Settlement[] }) {
 export default async function MerchantDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const merchant = await getMerchantById(params.id);
+  const { id } = await params;
+  const merchant = await getMerchantById(id);
 
   if (!merchant) {
     notFound();
