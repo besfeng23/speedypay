@@ -3,7 +3,7 @@ import 'server-only';
 import { Pool, PoolClient, QueryResultRow } from 'pg';
 import { getDatabaseUrlOrThrow, validateDatabaseConfig } from './config';
 import { dbMigrations } from './migrations';
-import { seedAuditLogs, seedMerchants, seedPayments, seedSettlements, seedTenants } from './seed-data';
+import { seedAuditLogs, seedEntities, seedMerchantAccounts, seedPayments, seedSettlementDestinations, seedSettlements, seedTenants, seedAllocationRules } from './seed-data';
 
 type MigrationRow = { version: number };
 
@@ -108,35 +108,56 @@ async function bootstrapDatabase(): Promise<void> {
 }
 
 async function seedCoreData(client: PoolClient): Promise<void> {
-  const tenantCountResult = await client.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM tenants');
-  const tenantCount = Number(tenantCountResult.rows[0]?.count ?? '0');
+  const entityCountResult = await client.query<{ count: string }>('SELECT COUNT(*)::text AS count FROM entities');
+  const entityCount = Number(entityCountResult.rows[0]?.count ?? '0');
 
-  if (tenantCount > 0) return;
+  if (entityCount > 0) return;
 
+  for (const entity of seedEntities) {
+    await client.query(
+      'INSERT INTO entities (id, legal_name, display_name, entity_type, parent_entity_id, status, metadata, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING',
+      [entity.id, entity.legalName, entity.displayName, entity.entityType, entity.parentEntityId, entity.status, entity.metadata, entity.createdAt, entity.updatedAt]
+    );
+  }
+  
   for (const tenant of seedTenants) {
     await client.query(
-      'INSERT INTO tenants(id, created_at, payload) VALUES ($1, $2::timestamptz, $3::jsonb) ON CONFLICT (id) DO NOTHING',
-      [tenant.id, tenant.createdAt, JSON.stringify(tenant)]
+      'INSERT INTO tenants (id, entity_id, tenant_code, status, settings, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO NOTHING',
+      [tenant.id, tenant.entityId, tenant.tenantCode, tenant.status, tenant.settings, tenant.createdAt, tenant.updatedAt]
     );
   }
 
-  for (const merchant of seedMerchants) {
+  for (const merchant of seedMerchantAccounts) {
     await client.query(
-      'INSERT INTO merchants(id, tenant_id, created_at, payload) VALUES ($1, $2, $3::timestamptz, $4::jsonb) ON CONFLICT (id) DO NOTHING',
-      [merchant.id, merchant.tenantId, merchant.createdAt, JSON.stringify(merchant)]
+      'INSERT INTO merchant_accounts (id, entity_id, tenant_id, onboarding_status, kyc_status, settlement_status, default_settlement_destination_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON CONFLICT (id) DO NOTHING',
+      [merchant.id, merchant.entityId, merchant.tenantId, merchant.onboardingStatus, merchant.kycStatus, merchant.settlementStatus, merchant.defaultSettlementDestinationId, merchant.createdAt, merchant.updatedAt]
     );
+  }
+
+  for (const destination of seedSettlementDestinations) {
+    await client.query(
+      'INSERT INTO settlement_destinations (id, merchant_account_id, destination_type, account_name, account_number_masked, bank_code, provider_reference, verification_status, is_default, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT (id) DO NOTHING',
+      [destination.id, destination.merchantAccountId, destination.destinationType, destination.accountName, destination.accountNumberMasked, destination.bankCode, destination.providerReference, destination.verificationStatus, destination.isDefault, destination.createdAt, destination.updatedAt]
+    );
+  }
+  
+  for (const rule of seedAllocationRules) {
+      await client.query(
+          'INSERT INTO allocation_rules (id, tenant_id, merchant_account_id, payment_method, rule_type, percentage_value, flat_value, recipient_entity_id, priority, active, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) ON CONFLICT (id) DO NOTHING',
+          [rule.id, rule.tenantId, rule.merchantAccountId, rule.paymentMethod, rule.ruleType, rule.percentageValue, rule.flatValue, rule.recipientEntityId, rule.priority, rule.active, rule.createdAt, rule.updatedAt]
+      );
   }
 
   for (const payment of seedPayments) {
     await client.query(
-      'INSERT INTO payments(id, tenant_id, merchant_id, created_at, payload) VALUES ($1, $2, $3, $4::timestamptz, $5::jsonb) ON CONFLICT (id) DO NOTHING',
+      'INSERT INTO payments(id, tenant_id, merchant_id, created_at, payload, merchant_account_id) VALUES ($1, $2, $3, $4::timestamptz, $5::jsonb, $3) ON CONFLICT (id) DO NOTHING',
       [payment.id, payment.tenantId, payment.merchantId, payment.createdAt, JSON.stringify(payment)]
     );
   }
 
   for (const settlement of seedSettlements) {
     await client.query(
-      'INSERT INTO settlements(id, tenant_id, payment_id, merchant_id, created_at, payload) VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb) ON CONFLICT (id) DO NOTHING',
+      'INSERT INTO settlements(id, tenant_id, payment_id, merchant_id, created_at, payload, merchant_account_id) VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb, $4) ON CONFLICT (id) DO NOTHING',
       [settlement.id, settlement.tenantId, settlement.paymentId, settlement.merchantId, settlement.createdAt, JSON.stringify(settlement)]
     );
   }

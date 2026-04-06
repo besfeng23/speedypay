@@ -6,54 +6,126 @@
 
 import { formatISO } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
-import type { AuditLog, Merchant, Payment, Settlement, Tenant, UATLog, UATTestCase } from '@/lib/types';
-import { uatTestCases } from './seed-data';
+import type { AuditLog, Merchant, Payment, Settlement, Tenant, UATLog, UATTestCase, Entity, MerchantAccount, TenantRecord, SettlementDestination, AllocationRule, PaymentAllocation } from '@/lib/types';
+import { uatTestCases, seedEntities, seedMerchantAccounts, seedTenants, seedSettlementDestinations, seedPayments, seedSettlements, seedAuditLogs, seedAllocationRules } from './seed-data';
 import { queryOne, queryRows, withTransaction } from './postgres';
+import type { PoolClient } from 'pg';
 
 type WebhookEventState = 'received' | 'processing' | 'processed' | 'failed';
 
 const PROCESSING_LEASE_INTERVAL = '2 minutes';
 
-// Tenants
-export const getAllTenants = async (): Promise<Tenant[]> => {
-  const rows = await queryRows<{ payload: Tenant }>('SELECT payload FROM tenants ORDER BY created_at DESC');
+
+// =================================================================
+// NEW MULTI-ENTITY DATA ACCESS
+// =================================================================
+
+// --- Read operations ---
+
+export const getAllEntities = async (): Promise<Entity[]> => {
+  const rows = await queryRows<{ payload: Entity }>('SELECT payload FROM entities ORDER BY created_at DESC');
   return rows.map((row) => row.payload);
 };
 
-export const findTenantById = async (id: string): Promise<Tenant | undefined> => {
-  const row = await queryOne<{ payload: Tenant }>('SELECT payload FROM tenants WHERE id = $1', [id]);
+export const findEntityById = async (id: string): Promise<Entity | undefined> => {
+  const row = await queryOne<{ payload: Entity }>('SELECT payload FROM entities WHERE id = $1', [id]);
   return row?.payload;
 };
 
+export const getAllTenants = async (): Promise<Tenant[]> => {
+  const rows = await queryRows<TenantRecord>('SELECT * FROM tenants ORDER BY created_at DESC');
+  const entities = await getAllEntities();
+  const entityMap = new Map(entities.map(e => [e.id, e]));
+
+  return rows.map(tenantRecord => ({
+    ...tenantRecord,
+    entity: entityMap.get(tenantRecord.entityId)!,
+  }));
+};
+
+export const findTenantById = async (id: string): Promise<Tenant | undefined> => {
+    const tenantRecord = await queryOne<TenantRecord>('SELECT * FROM tenants WHERE id = $1', [id]);
+    if (!tenantRecord) return undefined;
+
+    const entity = await findEntityById(tenantRecord.entityId);
+    if (!entity) return undefined;
+
+    return { ...tenantRecord, entity };
+};
+
+export const getAllMerchants = async (): Promise<Merchant[]> => {
+    const merchantAccounts = await queryRows<MerchantAccount>('SELECT * FROM merchant_accounts ORDER BY created_at DESC');
+    const tenants = await getAllTenants();
+    const entities = await getAllEntities();
+    const settlementDests = await queryRows<SettlementDestination>('SELECT * FROM settlement_destinations');
+
+    const tenantMap = new Map(tenants.map(t => [t.id, t]));
+    const entityMap = new Map(entities.map(e => [e.id, e]));
+    const settlementDestMap = new Map(settlementDests.map(d => [d.id, d]));
+
+    return merchantAccounts.map(ma => ({
+        ...ma,
+        entity: entityMap.get(ma.entityId)!,
+        tenant: tenantMap.get(ma.tenantId)!,
+        defaultSettlementDestination: ma.defaultSettlementDestinationId ? settlementDestMap.get(ma.defaultSettlementDestinationId) ?? null : null,
+    }));
+}
+
+export const findMerchantById = async (id: string): Promise<Merchant | undefined> => {
+    const merchantAccount = await queryOne<MerchantAccount>('SELECT * FROM merchant_accounts WHERE id = $1', [id]);
+    if (!merchantAccount) return undefined;
+
+    const [tenant, entity, settlementDests] = await Promise.all([
+        findTenantById(merchantAccount.tenantId),
+        findEntityById(merchantAccount.entityId),
+        queryRows<SettlementDestination>('SELECT * FROM settlement_destinations WHERE merchant_account_id = $1', [id])
+    ]);
+    
+    if (!tenant || !entity) return undefined;
+    
+    const settlementDestMap = new Map(settlementDests.map(d => [d.id, d]));
+
+    return {
+        ...merchantAccount,
+        entity,
+        tenant,
+        defaultSettlementDestination: merchantAccount.defaultSettlementDestinationId ? settlementDestMap.get(merchantAccount.defaultSettlementDestinationId) ?? null : null
+    };
+}
+
+export const getMerchantsByTenantId = async (tenantId: string): Promise<Merchant[]> => {
+    const allMerchants = await getAllMerchants();
+    return allMerchants.filter(m => m.tenantId === tenantId);
+}
+
+
+// Tenants
 export const addTenant = async (tenant: Tenant): Promise<Tenant> => {
-  await queryRows(
-    'INSERT INTO tenants (id, created_at, payload) VALUES ($1, $2::timestamptz, $3::jsonb)',
-    [tenant.id, tenant.createdAt, JSON.stringify(tenant)]
-  );
+  await withTransaction(async client => {
+    await client.query(
+      'INSERT INTO entities (id, legal_name, display_name, entity_type, parent_entity_id, status, metadata, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [tenant.entity.id, tenant.entity.legalName, tenant.entity.displayName, tenant.entity.entityType, tenant.entity.parentEntityId, tenant.entity.status, tenant.entity.metadata, tenant.entity.createdAt, tenant.entity.updatedAt]
+    );
+    await client.query(
+      'INSERT INTO tenants (id, entity_id, tenant_code, status, settings, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [tenant.id, tenant.entityId, tenant.tenantCode, tenant.status, tenant.settings, tenant.createdAt, tenant.updatedAt]
+    );
+  });
   return tenant;
 };
 
 // Merchants
-export const getAllMerchants = async (): Promise<Merchant[]> => {
-  const rows = await queryRows<{ payload: Merchant }>('SELECT payload FROM merchants ORDER BY created_at DESC');
-  return rows.map((row) => row.payload);
-};
-
-export const getMerchantsByTenantId = async (tenantId: string): Promise<Merchant[]> => {
-  const rows = await queryRows<{ payload: Merchant }>('SELECT payload FROM merchants WHERE tenant_id = $1 ORDER BY created_at DESC', [tenantId]);
-  return rows.map((row) => row.payload);
-};
-
-export const findMerchantById = async (id: string): Promise<Merchant | undefined> => {
-  const row = await queryOne<{ payload: Merchant }>('SELECT payload FROM merchants WHERE id = $1', [id]);
-  return row?.payload;
-};
-
 export const addMerchant = async (merchant: Merchant): Promise<Merchant> => {
-  await queryRows(
-    'INSERT INTO merchants (id, tenant_id, created_at, payload) VALUES ($1, $2, $3::timestamptz, $4::jsonb)',
-    [merchant.id, merchant.tenantId, merchant.createdAt, JSON.stringify(merchant)]
-  );
+  await withTransaction(async client => {
+     await client.query(
+      'INSERT INTO entities (id, legal_name, display_name, entity_type, parent_entity_id, status, metadata, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [merchant.entity.id, merchant.entity.legalName, merchant.entity.displayName, merchant.entity.entityType, merchant.entity.parentEntityId, merchant.entity.status, merchant.entity.metadata, merchant.entity.createdAt, merchant.entity.updatedAt]
+    );
+    await client.query(
+      'INSERT INTO merchant_accounts (id, entity_id, tenant_id, onboarding_status, kyc_status, settlement_status, default_settlement_destination_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
+      [merchant.id, merchant.entityId, merchant.tenantId, merchant.onboardingStatus, merchant.kycStatus, merchant.settlementStatus, merchant.defaultSettlementDestinationId, merchant.createdAt, merchant.updatedAt]
+    );
+  });
   return merchant;
 };
 
@@ -68,11 +140,15 @@ export const findPaymentById = async (id: string): Promise<Payment | undefined> 
   return row?.payload;
 };
 
-export const addPayment = async (payment: Payment): Promise<Payment> => {
-  await queryRows(
-    'INSERT INTO payments (id, tenant_id, merchant_id, created_at, payload) VALUES ($1, $2, $3, $4::timestamptz, $5::jsonb)',
-    [payment.id, payment.tenantId, payment.merchantId, payment.createdAt, JSON.stringify(payment)]
-  );
+export const addPayment = async (payment: Payment, client?: PoolClient): Promise<Payment> => {
+  const query = 'INSERT INTO payments (id, tenant_id, merchant_id, created_at, payload, merchant_account_id) VALUES ($1, $2, $3, $4::timestamptz, $5::jsonb, $3)';
+  const params = [payment.id, payment.tenantId, payment.merchantId, payment.createdAt, JSON.stringify(payment)];
+  
+  if (client) {
+      await client.query(query, params);
+  } else {
+      await queryRows(query, params);
+  }
   return payment;
 };
 
@@ -82,7 +158,7 @@ export const updatePayment = async (id: string, updatedData: Partial<Payment>): 
   const updated: Payment = { ...current, ...updatedData, updatedAt: formatISO(new Date()) };
 
   await queryRows(
-    'UPDATE payments SET tenant_id = $1, merchant_id = $2, created_at = $3::timestamptz, payload = $4::jsonb WHERE id = $5',
+    'UPDATE payments SET tenant_id = $1, merchant_id = $2, created_at = $3::timestamptz, payload = $4::jsonb, merchant_account_id = $2 WHERE id = $5',
     [updated.tenantId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id]
   );
 
@@ -107,7 +183,7 @@ export const findSettlementByPaymentId = async (paymentId: string): Promise<Sett
 
 export const addSettlement = async (settlement: Settlement): Promise<Settlement> => {
   await queryRows(
-    'INSERT INTO settlements (id, tenant_id, payment_id, merchant_id, created_at, payload) VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb)',
+    'INSERT INTO settlements (id, tenant_id, payment_id, merchant_id, created_at, payload, merchant_account_id) VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb, $4)',
     [settlement.id, settlement.tenantId, settlement.paymentId, settlement.merchantId, settlement.createdAt, JSON.stringify(settlement)]
   );
 
@@ -120,7 +196,7 @@ export const updateSettlement = async (id: string, updatedData: Partial<Settleme
   const updated: Settlement = { ...current, ...updatedData, updatedAt: formatISO(new Date()) };
 
   await queryRows(
-    'UPDATE settlements SET tenant_id = $1, payment_id = $2, merchant_id = $3, created_at = $4::timestamptz, payload = $5::jsonb WHERE id = $6',
+    'UPDATE settlements SET tenant_id = $1, payment_id = $2, merchant_id = $3, created_at = $4::timestamptz, payload = $5::jsonb, merchant_account_id = $3 WHERE id = $6',
     [updated.tenantId, updated.paymentId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id]
   );
 
@@ -153,6 +229,46 @@ export const addAuditLog = async (log: Omit<AuditLog, 'id' | 'timestamp'>): Prom
 
   return newLog;
 };
+
+// --- Allocation Engine ---
+export const getAllocationRules = async(): Promise<AllocationRule[]> => {
+    return queryRows<AllocationRule>('SELECT * FROM allocation_rules WHERE active = true ORDER BY priority ASC');
+}
+
+export const getPaymentAllocationsByPaymentId = async (paymentId: string): Promise<PaymentAllocation[]> => {
+    const rows = await queryRows<{payload: any}>('SELECT payload FROM payment_allocations WHERE payment_id = $1 ORDER BY created_at ASC', [paymentId]);
+    return rows.map(r => ({ ...r.payload, amount: r.payload.amount / 100 }));
+}
+
+export const addPaymentAllocations = async (allocations: Omit<PaymentAllocation, 'id'|'createdAt'>[], client?: PoolClient): Promise<void> => {
+    const now = new Date();
+    const query = 'INSERT INTO payment_allocations (id, payment_id, allocation_type, recipient_entity_id, basis_type, amount_cents, currency, rule_reference, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)';
+    
+    for (const alloc of allocations) {
+        const fullAlloc: PaymentAllocation = {
+            ...alloc,
+            id: `alloc-${uuidv4()}`,
+            createdAt: formatISO(now),
+        };
+        const params = [
+            fullAlloc.id,
+            fullAlloc.paymentId,
+            fullAlloc.allocationType,
+            fullAlloc.recipientEntityId,
+            fullAlloc.basisType,
+            Math.round(fullAlloc.amount * 100), // Store as cents
+            fullAlloc.currency,
+            fullAlloc.ruleReference,
+            fullAlloc.createdAt
+        ];
+        if (client) {
+            await client.query(query, params);
+        } else {
+            await queryRows(query, params);
+        }
+    }
+}
+
 
 // Webhook events (durable idempotency)
 export const claimWebhookEventForProcessing = async (

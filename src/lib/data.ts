@@ -3,7 +3,7 @@
  * Keeps a stable seam while delegating persistence to the current DB adapter.
  */
 
-import type { Merchant, Payment, Settlement, AuditLog, DashboardStats, UATTestCase, UATLog, Tenant } from '@/lib/types';
+import type { Merchant, Payment, Settlement, AuditLog, DashboardStats, UATTestCase, UATLog, Tenant, PaymentAllocation, AllocationRule } from '@/lib/types';
 import * as db from './db/in-memory';
 
 const SIMULATED_LATENCY_MS = 200;
@@ -130,6 +130,11 @@ export const getUATTestCases = async (): Promise<UATTestCase[]> => withLatency(a
 
 export const getUATLogs = async (): Promise<UATLog[]> => withLatency(() => db.getAllUATLogs(), 100);
 
+export const getAllocationRules = async (): Promise<AllocationRule[]> => withLatency(() => db.getAllocationRules());
+
+export const getPaymentAllocations = async (paymentId: string): Promise<PaymentAllocation[]> => withLatency(() => db.getPaymentAllocationsByPaymentId(paymentId));
+
+
 // --- Data Mutation Functions ---
 
 export async function addTenant(tenant: Tenant): Promise<Tenant> {
@@ -144,8 +149,12 @@ export async function addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>): Prom
   return db.addAuditLog(log);
 }
 
-export async function addPayment(payment: Payment): Promise<Payment> {
-  return db.addPayment(payment);
+export async function addPayment(payment: Payment, client?: any): Promise<Payment> {
+  return db.addPayment(payment, client);
+}
+
+export async function addPaymentAllocations(allocations: Omit<PaymentAllocation, 'id' | 'createdAt'>[], client?: any): Promise<void> {
+    return db.addPaymentAllocations(allocations, client);
 }
 
 export async function addSettlement(settlement: Settlement): Promise<Settlement> {

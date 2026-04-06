@@ -15,6 +15,7 @@ export const ENTITY_TYPES = ['speedypay', 'platform', 'tenant', 'merchant', 'ben
 export const DESTINATION_TYPES = ['bank', 'wallet', 'internal'] as const;
 export const FEE_TYPES = ['percentage', 'flat', 'blended'] as const;
 export const VERIFICATION_STATUSES = ['unverified', 'pending', 'verified', 'failed'] as const;
+export const ALLOCATION_TYPES = ['processing_fee', 'platform_fee', 'tenant_fee', 'merchant_net', 'reserve'] as const;
 
 
 // --- Core Domain Types ---
@@ -34,6 +35,8 @@ export type EntityType = (typeof ENTITY_TYPES)[number];
 export type DestinationType = (typeof DESTINATION_TYPES)[number];
 export type FeeType = (typeof FEE_TYPES)[number];
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
+export type AllocationType = (typeof ALLOCATION_TYPES)[number];
+
 
 // --- Base Models (reflecting DB tables) ---
 
@@ -67,7 +70,6 @@ export type MerchantAccount = {
   kycStatus: KYStatus;
   settlementStatus: MerchantSettlementStatus;
   defaultSettlementDestinationId: string | null;
-  feeProfileId: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -86,19 +88,31 @@ export type SettlementDestination = {
   updatedAt: string;
 };
 
-export type FeeProfile = {
-  id: string; // Internal UUID
-  ownerEntityId: string; // The entity that owns this fee configuration
-  tenantId: string | null; // Optional: if this fee profile is specific to a tenant
-  merchantAccountId: string | null; // Optional: if this fee profile is specific to a merchant
-  feeType: FeeType;
-  paymentMethod: string; // e.g., 'card', 'bank_transfer', 'all'
-  percentageValue: number | null;
-  flatValue: number | null;
-  priority: number; // For resolving which fee to apply if multiple match
-  active: boolean;
+export type AllocationRule = {
+    id: string; // Internal UUID
+    tenantId: string | null;
+    merchantAccountId: string | null;
+    paymentMethod: string; // e.g., 'card', 'bank_transfer', 'all'
+    ruleType: AllocationType;
+    percentageValue: number | null;
+    flatValue: number | null;
+    recipientEntityId: string; // The entity that receives this allocation
+    priority: number; // For resolving which rule to apply first
+    active: boolean;
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type PaymentAllocation = {
+  id: string;
+  paymentId: string;
+  allocationType: AllocationType;
+  recipientEntityId: string;
+  basisType: 'flat' | 'percentage' | 'rule';
+  amount: number;
+  currency: string;
+  ruleReference: string | null; // ID of the AllocationRule that generated this
   createdAt: string;
-  updatedAt: string;
 };
 
 
@@ -112,7 +126,6 @@ export type Merchant = MerchantAccount & {
   entity: Entity;
   tenant: Tenant;
   defaultSettlementDestination: SettlementDestination | null;
-  feeProfile: FeeProfile | null;
 };
 
 

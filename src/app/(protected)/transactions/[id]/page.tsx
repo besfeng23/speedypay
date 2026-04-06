@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import { getPaymentById, getMerchantById, getSettlementByPaymentId, getAuditLogsByEntity } from "@/lib/data";
+import { getPaymentById, getMerchantById, getSettlementByPaymentId, getAuditLogsByEntity, getPaymentAllocations, findEntityById } from "@/lib/data";
 import { PageHeader } from "@/components/page-header";
 import { notFound } from "next/navigation";
 import {
@@ -13,12 +13,12 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Wallet, Landmark, HandCoins, Minus, Equal, Link as LinkIcon, CheckCircle, AlertCircle, Clock } from "lucide-react";
+import { ArrowRight, Wallet, Landmark, HandCoins, Minus, Equal, Link as LinkIcon, CheckCircle, AlertCircle, Clock, Building, User } from "lucide-react";
 import Link from "next/link";
 import { StatCard } from "@/components/stat-card";
 import { Separator } from "@/components/ui/separator";
 import { CollectionActions } from "./collection-actions";
-import type { AuditLog } from "@/lib/types";
+import type { AuditLog, PaymentAllocation } from "@/lib/types";
 
 function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
     return (
@@ -55,6 +55,60 @@ function EventTimeline({ events }: { events: AuditLog[] }) {
     )
 }
 
+async function AllocationBreakdown({ allocations }: { allocations: PaymentAllocation[] }) {
+    const entityIds = [...new Set(allocations.map(a => a.recipientEntityId))];
+    const entities = await Promise.all(entityIds.map(id => findEntityById(id)));
+    const entityMap = new Map(entities.filter(Boolean).map(e => [e!.id, e]));
+
+    const formatCurrency = (amount: number, currency: string = "PHP") => {
+        return new Intl.NumberFormat("en-US", { style: "currency", currency: currency }).format(amount);
+    };
+    
+    const allocationIcons: Record<string, React.ReactNode> = {
+        'speedypay': <HandCoins className="text-muted-foreground"/>,
+        'platform': <Wallet className="text-muted-foreground"/>,
+        'tenant': <Building className="text-muted-foreground"/>,
+        'merchant': <User className="text-muted-foreground"/>,
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Financial Breakdown</CardTitle>
+                <CardDescription>The flow of funds from gross payment to all recipients.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ul className="space-y-4">
+                    {allocations.map(alloc => {
+                        const entity = entityMap.get(alloc.recipientEntityId);
+                        const icon = entity ? allocationIcons[entity.entityType] : <Wallet />;
+                        return (
+                             <li key={alloc.id} className="flex items-center gap-4">
+                                <div className="p-3 bg-muted rounded-full">
+                                    {icon}
+                                </div>
+                                <div className="flex-1">
+                                    <div className="font-medium capitalize">{alloc.allocationType.replace(/_/g, ' ')}</div>
+                                    <div className="text-xs text-muted-foreground">{entity?.displayName || 'Unknown Entity'}</div>
+                                </div>
+                                <div className="text-right font-mono text-sm">
+                                    {formatCurrency(alloc.amount, alloc.currency)}
+                                </div>
+                            </li>
+                        )
+                    })}
+                </ul>
+                <Separator className="my-4"/>
+                <div className="flex justify-between items-center font-bold">
+                    <span>Gross Payment Total</span>
+                    <span>{formatCurrency(allocations.reduce((sum, a) => sum + a.amount, 0), allocations[0]?.currency)}</span>
+                </div>
+            </CardContent>
+        </Card>
+    )
+}
+
+
 export default async function TransactionDetailPage({
   params,
 }: {
@@ -67,9 +121,12 @@ export default async function TransactionDetailPage({
     notFound();
   }
   
-  const merchant = await getMerchantById(payment.merchantId);
-  const settlement = await getSettlementByPaymentId(payment.id);
-  const events = await getAuditLogsByEntity('payment', payment.id);
+  const [merchant, settlement, events, allocations] = await Promise.all([
+      getMerchantById(payment.merchantId),
+      getSettlementByPaymentId(payment.id),
+      getAuditLogsByEntity('payment', payment.id),
+      getPaymentAllocations(payment.id),
+  ]);
 
   const formatCurrency = (amount: number, currency: string = "PHP") => {
     return new Intl.NumberFormat("en-US", {
@@ -90,20 +147,7 @@ export default async function TransactionDetailPage({
       
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 grid gap-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Financial Breakdown</CardTitle>
-                    <CardDescription>The flow of funds from gross payment to merchant net.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid md:grid-cols-3 gap-4 items-center">
-                    <StatCard title="Gross Payment" value={formatCurrency(payment.grossAmount, payment.currency)} icon={<Wallet />} className="shadow-none border-0" />
-                    <div className="text-muted-foreground flex justify-center"><Minus /></div>
-                    <StatCard title="Platform Fee" value={formatCurrency(payment.platformFeeAmount, payment.currency)} icon={<HandCoins />} className="shadow-none border-0" />
-                    <div className="col-span-full"><Separator /></div>
-                    <div className="text-muted-foreground flex justify-center md:col-start-2"><Equal /></div>
-                    <StatCard title="Net Amount to Settle" value={formatCurrency(payment.merchantNetAmount, payment.currency)} icon={<Landmark />} className="shadow-none border-0 md:col-start-3" />
-                </CardContent>
-            </Card>
+            <AllocationBreakdown allocations={allocations} />
 
             <Card>
                 <CardHeader>
@@ -114,7 +158,7 @@ export default async function TransactionDetailPage({
                     <dl className="divide-y">
                         <DetailItem label="Customer" value={payment.customerName} />
                         <DetailItem label="Customer Email" value={payment.customerEmail} />
-                        <DetailItem label="Merchant" value={<Link href={`/merchants/${payment.merchantId}`} className="text-primary hover:underline">{merchant?.displayName || 'Unknown'}</Link>} />
+                        <DetailItem label="Merchant" value={<Link href={`/merchants/${payment.merchantId}`} className="text-primary hover:underline">{merchant?.entity.displayName || 'Unknown'}</Link>} />
                         <DetailItem label="Description" value={payment.bookingReferenceOrInvoiceReference} />
                         <DetailItem label="Source Channel" value={<Badge variant="outline">{payment.sourceChannel}</Badge>} />
                         <DetailItem label="Created At" value={format(new Date(payment.createdAt), "PPP p")} />

@@ -4,7 +4,7 @@
  * THIS IS FOR DEMONSTRATION PURPOSES ONLY.
  */
 
-import type { Payment, Settlement, AuditLog, UATTestCase, Entity, TenantRecord, MerchantAccount, SettlementDestination, FeeProfile } from '@/lib/types';
+import type { Payment, Settlement, AuditLog, UATTestCase, Entity, TenantRecord, MerchantAccount, SettlementDestination, AllocationRule } from '@/lib/types';
 import { subDays, subHours, subMinutes, formatISO } from 'date-fns';
 
 const now = new Date();
@@ -12,6 +12,18 @@ const now = new Date();
 // --- V2 Seed Data (Multi-Entity) ---
 
 export const seedEntities: Entity[] = [
+    // Level 0: The Processor
+    {
+        id: 'ent-speedypay',
+        legalName: 'SpeedyPay Payments Inc.',
+        displayName: 'SpeedyPay',
+        entityType: 'speedypay',
+        parentEntityId: null,
+        status: 'active',
+        metadata: { version: '1.0' },
+        createdAt: formatISO(subDays(now, 200)),
+        updatedAt: formatISO(subDays(now, 200)),
+    },
     // Level 0: The Platform Itself
     {
         id: 'ent-platform',
@@ -84,49 +96,49 @@ export const seedTenants: TenantRecord[] = [
   },
 ];
 
-export const seedFeeProfiles: FeeProfile[] = [
+export const seedAllocationRules: AllocationRule[] = [
     {
-        id: 'fp-starlight',
-        ownerEntityId: 'ent-starlight',
-        tenantId: 'tnt-collo',
-        merchantAccountId: 'mer-1',
-        feeType: 'percentage',
+        id: 'ar-proc-1',
+        tenantId: null,
+        merchantAccountId: null,
         paymentMethod: 'all',
-        percentageValue: 3.2,
-        flatValue: null,
-        priority: 100,
-        active: true,
-        createdAt: formatISO(subDays(now, 45)),
-        updatedAt: formatISO(subDays(now, 2)),
-    },
-    {
-        id: 'fp-oceanview',
-        ownerEntityId: 'ent-oceanview',
-        tenantId: 'tnt-collo',
-        merchantAccountId: 'mer-2',
-        feeType: 'flat',
-        paymentMethod: 'all',
-        percentageValue: null,
-        flatValue: 0.50,
-        priority: 100,
-        active: true,
-        createdAt: formatISO(subDays(now, 120)),
-        updatedAt: formatISO(subDays(now, 15)),
-    },
-    {
-        id: 'fp-greenwood',
-        ownerEntityId: 'ent-greenwood',
-        tenantId: 'tnt-collo',
-        merchantAccountId: 'mer-3',
-        feeType: 'percentage',
-        paymentMethod: 'all',
-        percentageValue: 2.5,
-        flatValue: null,
-        priority: 100,
+        ruleType: 'processing_fee',
+        percentageValue: 0.5,
+        flatValue: 5.00,
+        recipientEntityId: 'ent-speedypay',
+        priority: 10,
         active: true,
         createdAt: formatISO(subDays(now, 200)),
+        updatedAt: formatISO(subDays(now, 200)),
+    },
+    {
+        id: 'ar-plat-1',
+        tenantId: null,
+        merchantAccountId: null,
+        paymentMethod: 'all',
+        ruleType: 'platform_fee',
+        percentageValue: 0.2,
+        flatValue: null,
+        recipientEntityId: 'ent-platform',
+        priority: 20,
+        active: true,
+        createdAt: formatISO(subDays(now, 200)),
+        updatedAt: formatISO(subDays(now, 200)),
+    },
+    {
+        id: 'ar-tenant-collo',
+        tenantId: 'tnt-collo',
+        merchantAccountId: null,
+        paymentMethod: 'all',
+        ruleType: 'tenant_fee',
+        percentageValue: 0.1,
+        flatValue: null,
+        recipientEntityId: 'ent-collo',
+        priority: 30,
+        active: true,
+        createdAt: formatISO(subDays(now, 50)),
         updatedAt: formatISO(subDays(now, 1)),
-    }
+    },
 ];
 
 export const seedMerchantAccounts: MerchantAccount[] = [
@@ -138,7 +150,6 @@ export const seedMerchantAccounts: MerchantAccount[] = [
     kycStatus: 'approved',
     settlementStatus: 'active',
     defaultSettlementDestinationId: 'sd-1',
-    feeProfileId: 'fp-starlight',
     createdAt: formatISO(subDays(now, 45)),
     updatedAt: formatISO(subDays(now, 2)),
   },
@@ -150,7 +161,6 @@ export const seedMerchantAccounts: MerchantAccount[] = [
     kycStatus: 'approved',
     settlementStatus: 'active',
     defaultSettlementDestinationId: 'sd-2',
-    feeProfileId: 'fp-oceanview',
     createdAt: formatISO(subDays(now, 120)),
     updatedAt: formatISO(subDays(now, 15)),
   },
@@ -162,7 +172,6 @@ export const seedMerchantAccounts: MerchantAccount[] = [
     kycStatus: 'in_review',
     settlementStatus: 'active',
     defaultSettlementDestinationId: 'sd-3',
-    feeProfileId: 'fp-greenwood',
     createdAt: formatISO(subDays(now, 200)),
     updatedAt: formatISO(subDays(now, 1)),
   },

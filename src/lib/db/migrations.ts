@@ -164,5 +164,44 @@ export const dbMigrations: DbMigration[] = [
       ALTER TABLE payments ADD COLUMN IF NOT EXISTS merchant_account_id TEXT;
       ALTER TABLE settlements ADD COLUMN IF NOT EXISTS merchant_account_id TEXT;
     `
+  },
+  {
+    version: 4,
+    name: 'add_allocation_engine',
+    sql: `
+      DROP TABLE IF EXISTS fee_profiles;
+      
+      ALTER TABLE merchant_accounts DROP COLUMN IF EXISTS fee_profile_id;
+      
+      CREATE TABLE IF NOT EXISTS allocation_rules (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT,
+        merchant_account_id TEXT,
+        payment_method TEXT NOT NULL,
+        rule_type TEXT NOT NULL,
+        percentage_value NUMERIC,
+        flat_value NUMERIC,
+        recipient_entity_id TEXT NOT NULL,
+        priority INTEGER NOT NULL,
+        active BOOLEAN NOT NULL DEFAULT true,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_allocation_rules_active ON allocation_rules(active);
+      CREATE INDEX IF NOT EXISTS idx_allocation_rules_priority ON allocation_rules(priority);
+
+      CREATE TABLE IF NOT EXISTS payment_allocations (
+        id TEXT PRIMARY KEY,
+        payment_id TEXT NOT NULL REFERENCES payments(id),
+        allocation_type TEXT NOT NULL,
+        recipient_entity_id TEXT NOT NULL,
+        basis_type TEXT NOT NULL,
+        amount_cents BIGINT NOT NULL,
+        currency TEXT NOT NULL,
+        rule_reference TEXT,
+        created_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_payment_allocations_payment_id ON payment_allocations(payment_id);
+    `
   }
 ];

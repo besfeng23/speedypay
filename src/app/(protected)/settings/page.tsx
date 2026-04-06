@@ -23,9 +23,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { payoutChannels } from "@/lib/speedypay/payout-channels";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import { getProviderBalance, getCollectionProviderBalance, getPublicProviderConfig } from "@/lib/actions";
+import { getProviderBalance, getCollectionProviderBalance, getPublicProviderConfig, getAllocationRules, findEntityById } from "@/lib/actions";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
+import type { AllocationRule, Entity } from "@/lib/types";
 
 type PublicProviderConfig = {
   env: string;
@@ -222,6 +223,59 @@ function CollectionBalanceQuery() {
     )
 }
 
+function AllocationRulesTable() {
+    const [rules, setRules] = useState<AllocationRule[]>([]);
+    const [entities, setEntities] = useState<Map<string, Entity>>(new Map());
+
+    useEffect(() => {
+        getAllocationRules().then(async (fetchedRules) => {
+            setRules(fetchedRules);
+            const entityIds = [...new Set(fetchedRules.map(r => r.recipientEntityId))];
+            const fetchedEntities = await Promise.all(entityIds.map(id => findEntityById(id)));
+            setEntities(new Map(fetchedEntities.filter(Boolean).map(e => [e!.id, e!])));
+        });
+    }, []);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Allocation Rules</CardTitle>
+                <CardDescription>
+                    These rules deterministically allocate funds from each payment. They are applied in order of priority.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                 <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Priority</TableHead>
+                            <TableHead>Rule Type</TableHead>
+                            <TableHead>Recipient</TableHead>
+                             <TableHead>Scope</TableHead>
+                            <TableHead>Value</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {rules.map((rule) => (
+                            <TableRow key={rule.id}>
+                                <TableCell>{rule.priority}</TableCell>
+                                <TableCell><Badge variant="secondary">{rule.ruleType.replace(/_/g, ' ')}</Badge></TableCell>
+                                <TableCell>{entities.get(rule.recipientEntityId)?.displayName || 'Unknown'}</TableCell>
+                                <TableCell>{rule.merchantAccountId ? 'Merchant' : rule.tenantId ? 'Tenant' : 'Global'}</TableCell>
+                                <TableCell>
+                                    {rule.percentageValue !== null ? `${rule.percentageValue}%` : ''}
+                                    {rule.percentageValue !== null && rule.flatValue !== null ? ' + ' : ''}
+                                    {rule.flatValue !== null ? `PHP ${rule.flatValue.toFixed(2)}` : ''}
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+}
+
 
 export default function SettingsPage() {
   const [providerConfig, setProviderConfig] = useState<PublicProviderConfig | null>(null);
@@ -286,28 +340,7 @@ export default function SettingsPage() {
                     </div>
                 </TabsContent>
                 <TabsContent value="fees" className="space-y-4 m-0">
-                <Card>
-                    <CardHeader>
-                    <CardTitle>Fee Configurations</CardTitle>
-                    <CardDescription>
-                        How transaction fees are calculated and applied.
-                    </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <p className="text-sm text-muted-foreground">
-                            Currently, fee configurations are managed on a per-merchant basis. Each merchant has a `defaultFeeType` (`percentage` or `fixed`) and a `defaultFeeValue` which are set when the merchant is created or edited.
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                            This provides flexibility to offer different rates to different merchants. All fee calculations are performed by trusted server-side logic to ensure integrity. A validation check prevents payments where the fee exceeds the gross amount.
-                        </p>
-                        <Link href="/merchants">
-                            <Button variant="outline">
-                                <Settings className="mr-2 h-4 w-4" />
-                                Manage Merchant Fees
-                            </Button>
-                        </Link>
-                    </CardContent>
-                </Card>
+                    <AllocationRulesTable />
                 </TabsContent>
                 
                 <TabsContent value="release" className="space-y-4 m-0">
