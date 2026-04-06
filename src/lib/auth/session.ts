@@ -69,7 +69,7 @@ export async function createSessionCookie(session: AdminSession): Promise<string
 }
 
 export async function readServerSession(): Promise<AdminSession | null> {
-  const token = cookies().get(SESSION_COOKIE_NAME)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
 
   try {

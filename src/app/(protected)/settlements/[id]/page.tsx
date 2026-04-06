@@ -58,9 +58,10 @@ function EventTimeline({ events }: { events: AuditLog[] }) {
 export default async function SettlementDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const settlement = await getSettlementById(params.id);
+  const { id } = await params;
+  const settlement = await getSettlementById(id);
 
   if (!settlement) {
     notFound();
