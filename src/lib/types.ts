@@ -2,65 +2,130 @@
 
 export const MERCHANT_STATUSES = ['active', 'inactive', 'suspended'] as const;
 export const ONBOARDING_STATUSES = ['completed', 'pending', 'in-review', 'rejected'] as const;
+export const KYC_STATUSES = ['not_started', 'pending', 'in_review', 'approved', 'rejected'] as const;
+export const MERCHANT_SETTLEMENT_STATUSES = ['active', 'paused', 'banned'] as const;
+
 export const PAYMENT_STATUSES = ['pending', 'succeeded', 'failed', 'expired', 'processing'] as const;
 export const SETTLEMENT_STATUSES = ['pending', 'completed', 'N/A'] as const;
 export const REMITTANCE_STATUSES = ['pending', 'processing', 'sent', 'failed', 'N/A'] as const;
 export const PROVIDER_TRANS_STATES = ['00', '01', '03', '04', '05', '06', '07', '08', '09'] as const;
 export const TENANT_STATUSES = ['active', 'inactive'] as const;
 
+export const ENTITY_TYPES = ['speedypay', 'platform', 'tenant', 'merchant', 'beneficiary'] as const;
+export const DESTINATION_TYPES = ['bank', 'wallet', 'internal'] as const;
+export const FEE_TYPES = ['percentage', 'flat', 'blended'] as const;
+export const VERIFICATION_STATUSES = ['unverified', 'pending', 'verified', 'failed'] as const;
+
 
 // --- Core Domain Types ---
 
 export type MerchantStatus = (typeof MERCHANT_STATUSES)[number];
 export type OnboardingStatus = (typeof ONBOARDING_STATUSES)[number];
+export type KYStatus = (typeof KYC_STATUSES)[number];
+export type MerchantSettlementStatus = (typeof MERCHANT_SETTLEMENT_STATUSES)[number];
+
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type SettlementStatus = (typeof SETTLEMENT_STATUSES)[number];
 export type RemittanceStatus = (typeof REMITTANCE_STATUSES)[number];
 export type ProviderTransState = (typeof PROVIDER_TRANS_STATES)[number];
 export type TenantStatus = (typeof TENANT_STATUSES)[number];
 
+export type EntityType = (typeof ENTITY_TYPES)[number];
+export type DestinationType = (typeof DESTINATION_TYPES)[number];
+export type FeeType = (typeof FEE_TYPES)[number];
+export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
 
-export type Tenant = {
-  id: string;
-  name: string;
-  status: TenantStatus;
-  platformFeeType: 'percentage' | 'fixed';
-  platformFeeValue: number;
-  notes: string;
-  createdAt: string;
-  updatedAt: string;
-};
+// --- Base Models (reflecting DB tables) ---
 
-export type Merchant = {
+export type Entity = {
   id: string;
-  tenantId: string;
-  businessName: string;
+  legalName: string;
   displayName: string;
-  contactName: string;
-  email: string;
-  mobile: string;
-  settlementAccountName: string;
-  settlementAccountNumberOrWalletId: string;
-  defaultPayoutChannel: string; // procId from payout channels
-  status: MerchantStatus;
-  onboardingStatus: OnboardingStatus;
-  propertyAssociations: string[];
-  defaultFeeType: 'percentage' | 'fixed';
-  defaultFeeValue: number;
-  notes: string;
+  entityType: EntityType;
+  parentEntityId: string | null;
+  status: 'active' | 'inactive' | 'restricted';
+  metadata: Record<string, any>;
   createdAt: string;
   updatedAt: string;
 };
 
+export type TenantRecord = {
+  id: string; // Internal UUID
+  entityId: string; // Foreign key to Entity table
+  tenantCode: string; // Short, unique code e.g., "COLLO"
+  status: TenantStatus;
+  settings: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MerchantAccount = {
+  id: string; // Internal UUID
+  entityId: string; // Foreign key to Entity table
+  tenantId: string; // Foreign key to Tenant table
+  onboardingStatus: OnboardingStatus;
+  kycStatus: KYStatus;
+  settlementStatus: MerchantSettlementStatus;
+  defaultSettlementDestinationId: string | null;
+  feeProfileId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SettlementDestination = {
+  id: string; // Internal UUID
+  merchantAccountId: string; // The merchant account this destination belongs to
+  destinationType: DestinationType;
+  accountName: string;
+  accountNumberMasked: string;
+  bankCode: string; // Corresponds to provider's procId
+  providerReference: string | null;
+  verificationStatus: VerificationStatus;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FeeProfile = {
+  id: string; // Internal UUID
+  ownerEntityId: string; // The entity that owns this fee configuration
+  tenantId: string | null; // Optional: if this fee profile is specific to a tenant
+  merchantAccountId: string | null; // Optional: if this fee profile is specific to a merchant
+  feeType: FeeType;
+  paymentMethod: string; // e.g., 'card', 'bank_transfer', 'all'
+  percentageValue: number | null;
+  flatValue: number | null;
+  priority: number; // For resolving which fee to apply if multiple match
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+
+// --- Composite Types (for UI and business logic) ---
+
+export type Tenant = TenantRecord & {
+  entity: Entity;
+};
+
+export type Merchant = MerchantAccount & {
+  entity: Entity;
+  tenant: Tenant;
+  defaultSettlementDestination: SettlementDestination | null;
+  feeProfile: FeeProfile | null;
+};
+
+
+// --- Transactional Types ---
 
 export type Payment = {
   id: string; // Our internal ID, used as provider's orderSeq
   tenantId: string;
+  merchantId: string; // This now refers to the MerchantAccount ID
   externalReference: string;
   bookingReferenceOrInvoiceReference: string;
   customerName: string;
   customerEmail: string;
-  merchantId: string;
   grossAmount: number;
   currency: string;
   feeType: 'percentage' | 'fixed';
@@ -92,7 +157,7 @@ export type Settlement = {
   id: string;
   tenantId: string;
   paymentId: string;
-  merchantId: string;
+  merchantId: string; // This now refers to the MerchantAccount ID
   grossAmount: number;
   currency: string;
   platformFeeAmount: number;
@@ -120,13 +185,16 @@ export type Settlement = {
   updatedAt: string;
 };
 
+
+// --- Utility & System Types ---
+
 export type AuditLog = {
   id: string;
   timestamp: string;
   eventType: string;
   user: string;
   details: string;
-  entityType: 'merchant' | 'payment' | 'settlement' | 'user' | 'tenant' | null;
+  entityType: 'merchant' | 'payment' | 'settlement' | 'user' | 'tenant' | 'entity' | null;
   entityId: string | null;
   eventIdentifier?: string;
   source?: 'admin' | 'system' | 'webhook' | 'provider' | 'auth';
@@ -136,14 +204,6 @@ export type AuditLog = {
   outcome?: 'success' | 'failed' | 'duplicate' | 'denied' | 'in-progress';
   correlationId?: string | null;
 };
-
-export type FeeConfig = {
-    id: string;
-    name: string;
-    type: 'percentage' | 'fixed';
-    value: number;
-    description: string;
-}
 
 export type NavItem = {
   title: string;
