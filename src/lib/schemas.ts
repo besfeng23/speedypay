@@ -6,7 +6,16 @@ const validProcIds = payoutChannels.map(c => c.procId);
 
 export const FeeTypeSchema = z.enum(['percentage', 'fixed']);
 
+export const TenantSchema = z.object({
+  name: z.string().min(2, "Tenant name must be at least 2 characters"),
+  platformFeeType: FeeTypeSchema,
+  platformFeeValue: z.coerce.number().min(0, "Fee value cannot be negative"),
+  notes: z.string().optional(),
+});
+export type TenantFormValues = z.infer<typeof TenantSchema>;
+
 export const MerchantSchema = z.object({
+  tenantId: z.string().min(1, "A tenant must be selected."),
   businessName: z.string().min(2, "Business name must be at least 2 characters"),
   displayName: z.string().min(2, "Display name must be at least 2 characters"),
   contactName: z.string().min(2, "Contact name must be at least 2 characters"),

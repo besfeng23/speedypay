@@ -25,7 +25,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -35,7 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "./ui/scroll-area";
 import { useRouter } from "next/navigation";
 import { addSimulatedData } from "@/lib/actions";
-import type { Merchant } from "@/lib/types";
+import type { Merchant, Tenant } from "@/lib/types";
 
 const formSchema = z.object({
   scenarioType: z.enum([
@@ -45,17 +47,22 @@ const formSchema = z.object({
     "remittance_failed",
   ]),
   grossAmount: z.coerce.number().positive(),
-  merchantId: z.string(),
+  merchantId: z.string().min(1, 'Please select a merchant.'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function DemoPaymentSimulator({ merchants }: { merchants: Merchant[] }) {
+export function DemoPaymentSimulator({ merchants, tenants }: { merchants: Merchant[], tenants: Tenant[] }) {
   const [open, setOpen] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationResult, setSimulationResult] = useState<SimulatePaymentOutput | null>(null);
   const { toast } = useToast();
   const router = useRouter();
+
+  const merchantsByTenant = tenants.map(tenant => ({
+    ...tenant,
+    merchants: merchants.filter(m => m.tenantId === tenant.id)
+  })).filter(tenant => tenant.merchants.length > 0);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -159,8 +166,15 @@ export function DemoPaymentSimulator({ merchants }: { merchants: Merchant[] }) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {merchants.map(m => (
-                            <SelectItem key={m.id} value={m.id}>{m.displayName}</SelectItem>
+                          {merchantsByTenant.map(tenant => (
+                            <SelectGroup key={tenant.id}>
+                                <Label className="px-2 text-xs font-bold">{tenant.name}</Label>
+                                {tenant.merchants.map((merchant) => (
+                                    <SelectItem key={merchant.id} value={merchant.id}>
+                                        {merchant.displayName}
+                                    </SelectItem>
+                                ))}
+                            </SelectGroup>
                           ))}
                         </SelectContent>
                       </Select>

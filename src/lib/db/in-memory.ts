@@ -6,7 +6,7 @@
 
 import { formatISO } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
-import type { AuditLog, Merchant, Payment, Settlement, UATLog, UATTestCase } from '@/lib/types';
+import type { AuditLog, Merchant, Payment, Settlement, Tenant, UATLog, UATTestCase } from '@/lib/types';
 import { uatTestCases } from './seed-data';
 import { queryOne, queryRows, withTransaction } from './postgres';
 
@@ -14,9 +14,33 @@ type WebhookEventState = 'received' | 'processing' | 'processed' | 'failed';
 
 const PROCESSING_LEASE_INTERVAL = '2 minutes';
 
+// Tenants
+export const getAllTenants = async (): Promise<Tenant[]> => {
+  const rows = await queryRows<{ payload: Tenant }>('SELECT payload FROM tenants ORDER BY created_at DESC');
+  return rows.map((row) => row.payload);
+};
+
+export const findTenantById = async (id: string): Promise<Tenant | undefined> => {
+  const row = await queryOne<{ payload: Tenant }>('SELECT payload FROM tenants WHERE id = $1', [id]);
+  return row?.payload;
+};
+
+export const addTenant = async (tenant: Tenant): Promise<Tenant> => {
+  await queryRows(
+    'INSERT INTO tenants (id, created_at, payload) VALUES ($1, $2::timestamptz, $3::jsonb)',
+    [tenant.id, tenant.createdAt, JSON.stringify(tenant)]
+  );
+  return tenant;
+};
+
 // Merchants
 export const getAllMerchants = async (): Promise<Merchant[]> => {
   const rows = await queryRows<{ payload: Merchant }>('SELECT payload FROM merchants ORDER BY created_at DESC');
+  return rows.map((row) => row.payload);
+};
+
+export const getMerchantsByTenantId = async (tenantId: string): Promise<Merchant[]> => {
+  const rows = await queryRows<{ payload: Merchant }>('SELECT payload FROM merchants WHERE tenant_id = $1 ORDER BY created_at DESC', [tenantId]);
   return rows.map((row) => row.payload);
 };
 
@@ -27,8 +51,8 @@ export const findMerchantById = async (id: string): Promise<Merchant | undefined
 
 export const addMerchant = async (merchant: Merchant): Promise<Merchant> => {
   await queryRows(
-    'INSERT INTO merchants (id, created_at, payload) VALUES ($1, $2::timestamptz, $3::jsonb)',
-    [merchant.id, merchant.createdAt, JSON.stringify(merchant)]
+    'INSERT INTO merchants (id, tenant_id, created_at, payload) VALUES ($1, $2, $3::timestamptz, $4::jsonb)',
+    [merchant.id, merchant.tenantId, merchant.createdAt, JSON.stringify(merchant)]
   );
   return merchant;
 };
@@ -46,8 +70,8 @@ export const findPaymentById = async (id: string): Promise<Payment | undefined> 
 
 export const addPayment = async (payment: Payment): Promise<Payment> => {
   await queryRows(
-    'INSERT INTO payments (id, merchant_id, created_at, payload) VALUES ($1, $2, $3::timestamptz, $4::jsonb)',
-    [payment.id, payment.merchantId, payment.createdAt, JSON.stringify(payment)]
+    'INSERT INTO payments (id, tenant_id, merchant_id, created_at, payload) VALUES ($1, $2, $3, $4::timestamptz, $5::jsonb)',
+    [payment.id, payment.tenantId, payment.merchantId, payment.createdAt, JSON.stringify(payment)]
   );
   return payment;
 };
@@ -58,8 +82,8 @@ export const updatePayment = async (id: string, updatedData: Partial<Payment>): 
   const updated: Payment = { ...current, ...updatedData, updatedAt: formatISO(new Date()) };
 
   await queryRows(
-    'UPDATE payments SET merchant_id = $1, created_at = $2::timestamptz, payload = $3::jsonb WHERE id = $4',
-    [updated.merchantId, updated.createdAt, JSON.stringify(updated), id]
+    'UPDATE payments SET tenant_id = $1, merchant_id = $2, created_at = $3::timestamptz, payload = $4::jsonb WHERE id = $5',
+    [updated.tenantId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id]
   );
 
   return updated;
@@ -83,8 +107,8 @@ export const findSettlementByPaymentId = async (paymentId: string): Promise<Sett
 
 export const addSettlement = async (settlement: Settlement): Promise<Settlement> => {
   await queryRows(
-    'INSERT INTO settlements (id, payment_id, merchant_id, created_at, payload) VALUES ($1, $2, $3, $4::timestamptz, $5::jsonb)',
-    [settlement.id, settlement.paymentId, settlement.merchantId, settlement.createdAt, JSON.stringify(settlement)]
+    'INSERT INTO settlements (id, tenant_id, payment_id, merchant_id, created_at, payload) VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb)',
+    [settlement.id, settlement.tenantId, settlement.paymentId, settlement.merchantId, settlement.createdAt, JSON.stringify(settlement)]
   );
 
   return settlement;
@@ -96,8 +120,8 @@ export const updateSettlement = async (id: string, updatedData: Partial<Settleme
   const updated: Settlement = { ...current, ...updatedData, updatedAt: formatISO(new Date()) };
 
   await queryRows(
-    'UPDATE settlements SET payment_id = $1, merchant_id = $2, created_at = $3::timestamptz, payload = $4::jsonb WHERE id = $5',
-    [updated.paymentId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id]
+    'UPDATE settlements SET tenant_id = $1, payment_id = $2, merchant_id = $3, created_at = $4::timestamptz, payload = $5::jsonb WHERE id = $6',
+    [updated.tenantId, updated.paymentId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id]
   );
 
   return updated;

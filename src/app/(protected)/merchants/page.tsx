@@ -5,7 +5,7 @@ import { PlusCircle, Users } from "lucide-react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
-import { getMerchants } from "@/lib/data";
+import { getMerchants, getTenants } from "@/lib/data";
 import {
   Table,
   TableBody,
@@ -20,13 +20,14 @@ import type { Merchant } from "@/lib/types";
 import { EmptyState } from "@/components/empty-state";
 
 export default async function MerchantsPage() {
-  const merchants: Merchant[] = await getMerchants();
+  const [merchants, tenants] = await Promise.all([getMerchants(), getTenants()]);
+  const tenantMap = new Map(tenants.map(t => [t.id, t.name]));
 
   return (
     <>
       <PageHeader
-        title="Merchants"
-        description="Manage your client merchants and their configurations."
+        title="All Merchants"
+        description="A complete list of all merchants across all tenants."
       >
         <Link href="/merchants/new">
           <Button>
@@ -42,6 +43,7 @@ export default async function MerchantsPage() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Business Name</TableHead>
+                            <TableHead className="hidden lg:table-cell">Tenant</TableHead>
                             <TableHead className="hidden sm:table-cell">Status</TableHead>
                             <TableHead className="hidden md:table-cell">Onboarding</TableHead>
                             <TableHead className="hidden lg:table-cell">Contact</TableHead>
@@ -56,7 +58,12 @@ export default async function MerchantsPage() {
                                     <Link href={`/merchants/${merchant.id}`} className="hover:underline">
                                         {merchant.displayName}
                                     </Link>
-                                    <div className="text-sm text-muted-foreground md:hidden">{merchant.email}</div>
+                                    <div className="text-sm text-muted-foreground lg:hidden">{tenantMap.get(merchant.tenantId) || 'Unknown Tenant'}</div>
+                                </TableCell>
+                                <TableCell className="hidden lg:table-cell">
+                                    <Link href={`/tenants/${merchant.tenantId}`} className="hover:underline">
+                                        {tenantMap.get(merchant.tenantId) || 'Unknown'}
+                                    </Link>
                                 </TableCell>
                                 <TableCell className="hidden sm:table-cell"><StatusBadge status={merchant.status} /></TableCell>
                                 <TableCell className="hidden md:table-cell"><StatusBadge status={merchant.onboardingStatus} /></TableCell>

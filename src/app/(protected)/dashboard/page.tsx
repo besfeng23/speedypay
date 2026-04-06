@@ -10,7 +10,7 @@ import { DashboardChart } from "@/components/dashboard-chart";
 import { RecentActivity } from "@/components/recent-activity";
 import { DemoPaymentSimulator } from "@/components/demo-payment-simulator";
 import { DashboardInsights } from "@/components/dashboard-insights";
-import { getMerchants } from "@/lib/data";
+import { getMerchants, getTenants } from "@/lib/data";
 
 
 const chartData = [
@@ -42,7 +42,7 @@ const formatCurrency = (amount: number, currency: string = "PHP") => {
   };
 
 export default async function Dashboard() {
-  const [stats, merchants] = await Promise.all([getDashboardStats(), getMerchants()]);
+  const [stats, merchants, tenants] = await Promise.all([getDashboardStats(), getMerchants(), getTenants()]);
   
   const kpiDataForAI = {
       totalGrossVolume: stats.totalGrossVolume,
@@ -62,7 +62,7 @@ export default async function Dashboard() {
         title="Dashboard"
         description="An executive overview of your marketplace's performance."
       >
-        <DemoPaymentSimulator merchants={merchants} />
+        <DemoPaymentSimulator merchants={merchants} tenants={tenants} />
       </PageHeader>
       <div className="grid gap-6">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">

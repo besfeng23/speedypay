@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import Link from "next/link";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/page-header";
-import { getPayments, getMerchants } from "@/lib/data";
+import { getPayments, getMerchants, getTenants } from "@/lib/data";
 import {
   Table,
   TableBody,
@@ -14,16 +14,17 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
-import type { Payment, Merchant } from "@/lib/types";
+import type { Payment, Merchant, Tenant } from "@/lib/types";
 import { EmptyState } from "@/components/empty-state";
 import { ArrowRightLeft } from "lucide-react";
 import { CreatePaymentDialog } from "@/components/create-payment-dialog";
 import { Button } from "@/components/ui/button";
 
 export default async function TransactionsPage() {
-  const payments: Payment[] = await getPayments();
-  const merchants: Merchant[] = await getMerchants();
+  const [payments, merchants, tenants] = await Promise.all([getPayments(), getMerchants(), getTenants()]);
+  
   const merchantMap = new Map(merchants.map(m => [m.id, m.displayName]));
+  const tenantMap = new Map(tenants.map(t => [t.id, t.name]));
 
   const formatCurrency = (amount: number, currency: string = "PHP") => {
     return new Intl.NumberFormat("en-US", {
@@ -38,7 +39,7 @@ export default async function TransactionsPage() {
         title="Transactions"
         description="View and manage all payment transactions."
       >
-        <CreatePaymentDialog merchants={merchants} />
+        <CreatePaymentDialog merchants={merchants} tenants={tenants} />
       </PageHeader>
       <Card>
         <CardHeader>
@@ -51,6 +52,7 @@ export default async function TransactionsPage() {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Customer / Desc</TableHead>
+                            <TableHead className="hidden lg:table-cell">Tenant</TableHead>
                             <TableHead className="hidden md:table-cell">Merchant</TableHead>
                             <TableHead className="text-right">Amount</TableHead>
                             <TableHead className="hidden sm:table-cell">Payment Status</TableHead>
@@ -67,6 +69,11 @@ export default async function TransactionsPage() {
                                         {payment.customerName !== 'N/A (Generated Link)' ? payment.customerName : payment.id}
                                     </Link>
                                     <div className="text-sm text-muted-foreground">{payment.bookingReferenceOrInvoiceReference}</div>
+                                </TableCell>
+                                 <TableCell className="hidden lg:table-cell">
+                                    <Link href={`/tenants/${payment.tenantId}`} className="hover:underline">
+                                        {tenantMap.get(payment.tenantId) || 'Unknown'}
+                                    </Link>
                                 </TableCell>
                                 <TableCell className="hidden md:table-cell">{merchantMap.get(payment.merchantId) || 'Unknown'}</TableCell>
                                 <TableCell className="text-right font-mono text-sm">{formatCurrency(payment.grossAmount)}</TableCell>

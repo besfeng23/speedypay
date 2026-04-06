@@ -17,20 +17,25 @@ import { PlusCircle, Loader2, Copy, Check } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { createCollectionPayment } from "@/lib/actions";
 import { CreatePaymentSchema, type CreatePaymentFormValues } from "@/lib/schemas";
-import type { Merchant } from "@/lib/types";
+import type { Merchant, Tenant } from "@/lib/types";
 
-export function CreatePaymentDialog({ merchants }: { merchants: Merchant[] }) {
+export function CreatePaymentDialog({ merchants, tenants }: { merchants: Merchant[], tenants: Tenant[] }) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
+
+  const merchantsByTenant = tenants.map(tenant => ({
+    ...tenant,
+    merchants: merchants.filter(m => m.tenantId === tenant.id)
+  })).filter(tenant => tenant.merchants.length > 0);
 
   const form = useForm<CreatePaymentFormValues>({
     resolver: zodResolver(CreatePaymentSchema),
@@ -120,10 +125,15 @@ export function CreatePaymentDialog({ merchants }: { merchants: Merchant[] }) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {merchants.map((merchant) => (
-                          <SelectItem key={merchant.id} value={merchant.id}>
-                            {merchant.displayName}
-                          </SelectItem>
+                        {merchantsByTenant.map(tenant => (
+                            <SelectGroup key={tenant.id}>
+                                <Label className="px-2 text-xs font-bold">{tenant.name}</Label>
+                                {tenant.merchants.map((merchant) => (
+                                    <SelectItem key={merchant.id} value={merchant.id}>
+                                        {merchant.displayName}
+                                    </SelectItem>
+                                ))}
+                            </SelectGroup>
                         ))}
                       </SelectContent>
                     </Select>

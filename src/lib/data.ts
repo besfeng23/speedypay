@@ -3,7 +3,7 @@
  * Keeps a stable seam while delegating persistence to the current DB adapter.
  */
 
-import type { Merchant, Payment, Settlement, AuditLog, DashboardStats, UATTestCase, UATLog } from '@/lib/types';
+import type { Merchant, Payment, Settlement, AuditLog, DashboardStats, UATTestCase, UATLog, Tenant } from '@/lib/types';
 import * as db from './db/in-memory';
 
 const SIMULATED_LATENCY_MS = 200;
@@ -39,7 +39,10 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
   }));
 };
 
+export const getTenants = async (): Promise<Tenant[]> => withLatency(() => db.getAllTenants());
+export const getTenantById = async (id: string): Promise<Tenant | undefined> => withLatency(() => db.findTenantById(id));
 export const getMerchants = async (): Promise<Merchant[]> => withLatency(() => db.getAllMerchants());
+export const getMerchantsByTenantId = async (tenantId: string): Promise<Merchant[]> => withLatency(() => db.getMerchantsByTenantId(tenantId));
 
 export const getMerchantById = async (id: string): Promise<Merchant | undefined> => withLatency(() => db.findMerchantById(id));
 
@@ -78,7 +81,7 @@ export const getSettlementsByMerchantId = async (merchantId: string, limit?: num
 
 export const getAuditLogs = async (): Promise<AuditLog[]> => withLatency(() => db.getAllAuditLogs());
 
-export const getAuditLogsByEntity = async (entityType: 'payment' | 'settlement', entityId: string): Promise<AuditLog[]> => {
+export const getAuditLogsByEntity = async (entityType: 'payment' | 'settlement' | 'tenant' | 'merchant', entityId: string): Promise<AuditLog[]> => {
   const relatedIds: string[] = [entityId];
   if (entityType === 'settlement') {
     const settlement = await getSettlementById(entityId);
@@ -128,6 +131,10 @@ export const getUATTestCases = async (): Promise<UATTestCase[]> => withLatency(a
 export const getUATLogs = async (): Promise<UATLog[]> => withLatency(() => db.getAllUATLogs(), 100);
 
 // --- Data Mutation Functions ---
+
+export async function addTenant(tenant: Tenant): Promise<Tenant> {
+    return db.addTenant(tenant);
+}
 
 export async function addMerchant(merchant: Merchant): Promise<Merchant> {
   return db.addMerchant(merchant);

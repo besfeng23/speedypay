@@ -102,6 +102,7 @@ export async function processCollectionWebhookEvent(payload: SpeedyPayCollection
       if (!existingSettlement) {
           const newSettlement: Settlement = {
               id: `set-${uuidv4().slice(0, 8)}`,
+              tenantId: payment.tenantId,
               paymentId: payment.id,
               merchantId: payment.merchantId,
               grossAmount: payment.grossAmount,

@@ -10,6 +10,7 @@ import {
   FileClock,
   Settings,
   Beaker,
+  Building,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -24,6 +25,7 @@ import {
 
 const navItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Tenants", href: "/tenants", icon: Building },
   { title: "Merchants", href: "/merchants", icon: Users },
   { title: "Transactions", href: "/transactions", icon: ArrowRightLeft },
   { title: "Settlements", href: "/settlements", icon: Banknote },

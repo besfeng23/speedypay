@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   Beaker,
   Server,
+  Building,
 } from "lucide-react";
 import { Icons } from "@/components/icons";
 import Link from "next/link";
@@ -130,6 +131,13 @@ export default function ProtectedLayout({
                 >
                   <Home className="h-5 w-5" />
                   Dashboard
+                </Link>
+                <Link
+                  href="/tenants"
+                  className="flex items-center gap-4 rounded-lg px-3 py-2 text-muted-foreground hover:text-foreground"
+                >
+                  <Building className="h-5 w-5" />
+                  Tenants
                 </Link>
                 <Link
                   href="/merchants"

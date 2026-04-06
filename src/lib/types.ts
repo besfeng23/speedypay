@@ -6,6 +6,8 @@ export const PAYMENT_STATUSES = ['pending', 'succeeded', 'failed', 'expired', 'p
 export const SETTLEMENT_STATUSES = ['pending', 'completed', 'N/A'] as const;
 export const REMITTANCE_STATUSES = ['pending', 'processing', 'sent', 'failed', 'N/A'] as const;
 export const PROVIDER_TRANS_STATES = ['00', '01', '03', '04', '05', '06', '07', '08', '09'] as const;
+export const TENANT_STATUSES = ['active', 'inactive'] as const;
+
 
 // --- Core Domain Types ---
 
@@ -15,10 +17,23 @@ export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 export type SettlementStatus = (typeof SETTLEMENT_STATUSES)[number];
 export type RemittanceStatus = (typeof REMITTANCE_STATUSES)[number];
 export type ProviderTransState = (typeof PROVIDER_TRANS_STATES)[number];
+export type TenantStatus = (typeof TENANT_STATUSES)[number];
 
+
+export type Tenant = {
+  id: string;
+  name: string;
+  status: TenantStatus;
+  platformFeeType: 'percentage' | 'fixed';
+  platformFeeValue: number;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type Merchant = {
   id: string;
+  tenantId: string;
   businessName: string;
   displayName: string;
   contactName: string;
@@ -40,6 +55,7 @@ export type Merchant = {
 
 export type Payment = {
   id: string; // Our internal ID, used as provider's orderSeq
+  tenantId: string;
   externalReference: string;
   bookingReferenceOrInvoiceReference: string;
   customerName: string;
@@ -74,6 +90,7 @@ export type Payment = {
 
 export type Settlement = {
   id: string;
+  tenantId: string;
   paymentId: string;
   merchantId: string;
   grossAmount: number;
@@ -109,7 +126,7 @@ export type AuditLog = {
   eventType: string;
   user: string;
   details: string;
-  entityType: 'merchant' | 'payment' | 'settlement' | 'user' | null;
+  entityType: 'merchant' | 'payment' | 'settlement' | 'user' | 'tenant' | null;
   entityId: string | null;
   eventIdentifier?: string;
   source?: 'admin' | 'system' | 'webhook' | 'provider' | 'auth';

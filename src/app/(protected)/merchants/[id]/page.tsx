@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import { getMerchantById, getPaymentsByMerchantId, getSettlementsByMerchantId } from "@/lib/data";
+import { getMerchantById, getPaymentsByMerchantId, getSettlementsByMerchantId, getTenantById } from "@/lib/data";
 import { PageHeader } from "@/components/page-header";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Payment, Settlement } from "@/lib/types";
 import Link from "next/link";
-import { Pencil } from "lucide-react";
+import { Pencil, Building } from "lucide-react";
 import { payoutChannelMap } from "@/lib/speedypay/payout-channels";
 
 function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
@@ -108,8 +108,12 @@ export default async function MerchantDetailPage({
     notFound();
   }
 
-  const recentTransactions = await getPaymentsByMerchantId(merchant.id, 5);
-  const recentSettlements = await getSettlementsByMerchantId(merchant.id, 5);
+  const [tenant, recentTransactions, recentSettlements] = await Promise.all([
+    getTenantById(merchant.tenantId),
+    getPaymentsByMerchantId(merchant.id, 5),
+    getSettlementsByMerchantId(merchant.id, 5),
+  ]);
+
   const payoutChannel = payoutChannelMap.get(merchant.defaultPayoutChannel);
 
   return (
@@ -133,6 +137,12 @@ export default async function MerchantDetailPage({
             </CardHeader>
             <CardContent>
               <dl className="divide-y">
+                <DetailItem label="Parent Tenant" value={
+                  <Link href={`/tenants/${tenant?.id}`} className="flex items-center gap-2 text-primary hover:underline">
+                    <Building className="h-4 w-4"/>
+                    {tenant?.name || 'Unknown'}
+                  </Link>
+                }/>
                 <DetailItem label="Business Name" value={merchant.businessName} />
                 <DetailItem label="Display Name" value={merchant.displayName} />
                 <DetailItem label="Contact Name" value={merchant.contactName} />

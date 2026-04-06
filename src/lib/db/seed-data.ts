@@ -4,14 +4,29 @@
  * THIS IS FOR DEMONSTRATION PURPOSES ONLY.
  */
 
-import type { Merchant, Payment, Settlement, AuditLog, UATTestCase } from '@/lib/types';
+import type { Merchant, Payment, Settlement, AuditLog, UATTestCase, Tenant } from '@/lib/types';
 import { subDays, subHours, subMinutes, formatISO } from 'date-fns';
 
 const now = new Date();
 
+export const seedTenants: Tenant[] = [
+  {
+    id: 'tnt-collo',
+    name: 'Collo',
+    status: 'active',
+    platformFeeType: 'percentage',
+    platformFeeValue: 0.2,
+    notes: 'Primary tenant for the platform.',
+    createdAt: formatISO(subDays(now, 50)),
+    updatedAt: formatISO(subDays(now, 1)),
+  },
+];
+
+
 export const seedMerchants: Merchant[] = [
   {
     id: 'mer-1',
+    tenantId: 'tnt-collo',
     businessName: 'Starlight Apartments',
     displayName: 'Starlight Apts',
     contactName: 'Alice Johnson',
@@ -31,6 +46,7 @@ export const seedMerchants: Merchant[] = [
   },
   {
     id: 'mer-2',
+    tenantId: 'tnt-collo',
     businessName: 'Oceanview Properties',
     displayName: 'Oceanview',
     contactName: 'Bob Williams',
@@ -50,6 +66,7 @@ export const seedMerchants: Merchant[] = [
   },
    {
     id: 'mer-3',
+    tenantId: 'tnt-collo',
     businessName: 'Greenwood Heights HOA',
     displayName: 'Greenwood HOA',
     contactName: 'Carol White',
@@ -72,6 +89,7 @@ export const seedMerchants: Merchant[] = [
 export const seedPayments: Payment[] = [
   {
     id: 'pay-1',
+    tenantId: 'tnt-collo',
     externalReference: 'ch_3Pq...V54',
     bookingReferenceOrInvoiceReference: 'inv-2024-07-001',
     customerName: 'David Miller',
@@ -101,6 +119,7 @@ export const seedPayments: Payment[] = [
   },
   {
     id: 'pay-2',
+    tenantId: 'tnt-collo',
     externalReference: 'ch_3Pq...X67',
     bookingReferenceOrInvoiceReference: 'inv-2024-07-002',
     customerName: 'Emily Clark',
@@ -127,6 +146,7 @@ export const seedPayments: Payment[] = [
   },
    {
     id: 'pay-3',
+    tenantId: 'tnt-collo',
     externalReference: 'ch_3Pq...Y89',
     bookingReferenceOrInvoiceReference: 'inv-2024-07-003',
     customerName: 'Frank Harris',
@@ -147,6 +167,7 @@ export const seedPayments: Payment[] = [
   },
    {
     id: 'pay-4',
+    tenantId: 'tnt-collo',
     externalReference: 'ch_3Pq...Z12',
     bookingReferenceOrInvoiceReference: 'inv-2024-06-105',
     customerName: 'Grace Lee',
@@ -167,6 +188,7 @@ export const seedPayments: Payment[] = [
   },
   {
     id: 'pay-5',
+    tenantId: 'tnt-collo',
     externalReference: 'N/A',
     bookingReferenceOrInvoiceReference: 'inv-2024-07-005',
     customerName: 'Demo Customer',
@@ -190,12 +212,13 @@ export const seedPayments: Payment[] = [
 export const seedSettlements: Settlement[] = [
   {
     id: 'set-a1b2c3d4',
+    tenantId: 'tnt-collo',
     paymentId: 'pay-1',
     merchantId: 'mer-1',
     grossAmount: 1250.00,
+    currency: 'PHP',
     platformFeeAmount: 40.00,
     merchantNetAmount: 1210.00,
-    currency: 'PHP',
     settlementStatus: 'completed',
     remittanceStatus: 'sent',
     payoutReference: `payout-set-a1b2c3d4`,
@@ -217,12 +240,13 @@ export const seedSettlements: Settlement[] = [
   },
   {
     id: 'set-c3d4e5f6',
+    tenantId: 'tnt-collo',
     paymentId: 'pay-4',
     merchantId: 'mer-3',
     grossAmount: 2000.00,
+    currency: 'PHP',
     platformFeeAmount: 50.00,
     merchantNetAmount: 1950.00,
-    currency: 'PHP',
     settlementStatus: 'completed',
     remittanceStatus: 'pending',
     payoutReference: null,
@@ -232,12 +256,13 @@ export const seedSettlements: Settlement[] = [
   },
   {
     id: 'set-d4e5f6g7',
+    tenantId: 'tnt-collo',
     paymentId: 'pay-5',
     merchantId: 'mer-2',
     grossAmount: 150.00,
+    currency: 'PHP',
     platformFeeAmount: 0.50,
     merchantNetAmount: 149.50,
-    currency: 'PHP',
     settlementStatus: 'completed',
     remittanceStatus: 'failed',
     payoutReference: 'payout-set-d4e5f6g7',

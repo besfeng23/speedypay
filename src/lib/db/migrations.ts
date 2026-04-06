@@ -66,4 +66,25 @@ export const dbMigrations: DbMigration[] = [
       CREATE INDEX IF NOT EXISTS idx_webhook_events_state ON webhook_events(state);
     `,
   },
+  {
+    version: 2,
+    name: 'add_tenants',
+    sql: `
+      CREATE TABLE IF NOT EXISTS tenants (
+        id TEXT PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL,
+        payload JSONB NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_tenants_created_at ON tenants(created_at DESC);
+
+      ALTER TABLE merchants ADD COLUMN IF NOT EXISTS tenant_id TEXT;
+      CREATE INDEX IF NOT EXISTS idx_merchants_tenant_id ON merchants(tenant_id);
+
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS tenant_id TEXT;
+      CREATE INDEX IF NOT EXISTS idx_payments_tenant_id ON payments(tenant_id);
+
+      ALTER TABLE settlements ADD COLUMN IF NOT EXISTS tenant_id TEXT;
+      CREATE INDEX IF NOT EXISTS idx_settlements_tenant_id ON settlements(tenant_id);
+    `
+  },
 ];

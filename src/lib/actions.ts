@@ -5,20 +5,22 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
 import { format, formatISO, parseISO } from 'date-fns';
-import { MerchantSchema, CreatePaymentSchema, type MerchantFormValues, type CreatePaymentFormValues } from './schemas';
+import { MerchantSchema, TenantSchema, CreatePaymentSchema, type MerchantFormValues, type TenantFormValues, type CreatePaymentFormValues } from './schemas';
 import {
   addAuditLog,
   updatePayment,
   addUATLog,
   addPayment,
   addMerchant,
+  addTenant,
   addSettlement,
   updateSettlement as dbUpdateSettlement,
   getSettlementById,
   getMerchantById,
-  getPaymentById
+  getPaymentById,
+  getTenantById,
 } from './data';
-import type { Merchant, Settlement, Payment, UATTestPayload } from './types';
+import type { Merchant, Settlement, Payment, Tenant, UATTestPayload } from './types';
 import { cashOut, qryOrder, qryBalance, createCollectionPayment as apiCreateCollectionPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
 import type { QrPayResponse, QryBalanceResponse, QryCollectionBalanceResponse } from './speedypay/types';
 import { mapProviderStateToInternal, providerStateLabels, mapCollectionStateToPaymentStatus } from './speedypay/mappers';
@@ -46,10 +48,57 @@ function getSpeedyPaySecretOrThrow(): string {
   return speedypayConfig.secretKey;
 }
 
+export async function createTenant(values: TenantFormValues): Promise<ActionResult> {
+  try {
+    const actorEmail = await getAdminActorEmail();
+    const validatedData = TenantSchema.parse(values);
+
+    const now = formatISO(new Date());
+    const newTenant: Tenant = {
+      id: `tnt-${uuidv4().slice(0, 8)}`,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+      ...validatedData,
+      notes: validatedData.notes ?? '',
+    };
+    
+    await addTenant(newTenant);
+
+    await addAuditLog({
+      eventType: 'tenant.created',
+      user: actorEmail,
+      details: `Created new tenant: ${newTenant.name} (ID: ${newTenant.id})`,
+      entityId: newTenant.id,
+      entityType: 'tenant'
+    });
+
+    revalidatePath('/tenants');
+    revalidatePath('/dashboard');
+
+    return { success: true };
+
+  } catch (error) {
+    console.error('Failed to create tenant:', error);
+    let message = 'An unknown error occurred.';
+    if (error instanceof z.ZodError) {
+      message = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+    } else if (error instanceof Error) {
+        message = error.message;
+    }
+    return { success: false, message };
+  }
+}
+
 export async function createMerchant(values: MerchantFormValues): Promise<ActionResult> {
   try {
     const actorEmail = await getAdminActorEmail();
     const validatedData = MerchantSchema.parse(values);
+    
+    const tenant = await getTenantById(validatedData.tenantId);
+    if (!tenant) {
+      return { success: false, message: 'Invalid Tenant ID provided.' };
+    }
 
     const now = formatISO(new Date());
     const newMerchant: Merchant = {
@@ -67,13 +116,13 @@ export async function createMerchant(values: MerchantFormValues): Promise<Action
     await addAuditLog({
       eventType: 'merchant.created',
       user: actorEmail,
-      details: `Created new merchant: ${newMerchant.displayName} (ID: ${newMerchant.id})`,
+      details: `Created new merchant: ${newMerchant.displayName} for tenant ${tenant.name}`,
       entityId: newMerchant.id,
       entityType: 'merchant'
     });
 
-    // Revalidate paths to update the UI
     revalidatePath('/merchants');
+    revalidatePath(`/tenants/${tenant.id}`);
     revalidatePath('/dashboard');
 
     return { success: true };
@@ -138,6 +187,7 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
     const now = new Date();
     const newPayment: Payment = {
         id: orderSeq,
+        tenantId: merchant.tenantId,
         externalReference: 'N/A',
         bookingReferenceOrInvoiceReference: description,
         customerName: 'N/A (Generated Link)',
@@ -183,6 +233,17 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
 export async function addSimulatedData(data: { paymentRecord: Payment, settlementRecord?: Settlement }): Promise<ActionResult> {
     try {
         const actorEmail = await getAdminActorEmail();
+        
+        const merchant = await getMerchantById(data.paymentRecord.merchantId);
+        if (!merchant) {
+            throw new Error('Simulated data references a non-existent merchant.');
+        }
+
+        data.paymentRecord.tenantId = merchant.tenantId;
+        if (data.settlementRecord) {
+            data.settlementRecord.tenantId = merchant.tenantId;
+        }
+
         await addPayment(data.paymentRecord);
         if (data.settlementRecord) {
             await addSettlement(data.settlementRecord);
@@ -588,7 +649,3 @@ export async function runUATTestAction(testCaseId: string, payload?: UATTestPayl
         return { success: false, message: errorMessage, data: e };
     }
 }
-
-    
-
-    

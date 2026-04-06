@@ -4,7 +4,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
-import { getSettlements, getMerchants } from "@/lib/data";
+import { getSettlements, getMerchants, getTenants } from "@/lib/data";
 import {
   Table,
   TableBody,
@@ -15,14 +15,15 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
-import type { Settlement, Merchant } from "@/lib/types";
+import type { Settlement, Merchant, Tenant } from "@/lib/types";
 import { EmptyState } from "@/components/empty-state";
 import { Banknote } from "lucide-react";
 
 export default async function SettlementsPage() {
-  const settlements: Settlement[] = await getSettlements();
-  const merchants: Merchant[] = await getMerchants();
+  const [settlements, merchants, tenants] = await Promise.all([getSettlements(), getMerchants(), getTenants()]);
+  
   const merchantMap = new Map(merchants.map(m => [m.id, m.displayName]));
+  const tenantMap = new Map(tenants.map(t => [t.id, t.name]));
 
   const formatCurrency = (amount: number, currency: string = 'PHP') => {
     return new Intl.NumberFormat("en-US", {
@@ -48,6 +49,7 @@ export default async function SettlementsPage() {
                     <TableHeader>
                         <TableRow>
                             <TableHead className="w-[150px]">Settlement ID</TableHead>
+                            <TableHead>Tenant</TableHead>
                             <TableHead>Merchant</TableHead>
                             <TableHead className="text-right">Net Amount</TableHead>
                             <TableHead>Settlement Status</TableHead>
@@ -66,6 +68,11 @@ export default async function SettlementsPage() {
                                     <div className="text-xs text-muted-foreground font-sans">
                                         From: <Link href={`/transactions/${settlement.paymentId}`} className="hover:underline font-medium text-primary">{settlement.paymentId}</Link>
                                     </div>
+                                </TableCell>
+                                <TableCell>
+                                    <Link href={`/tenants/${settlement.tenantId}`} className="hover:underline">
+                                        {tenantMap.get(settlement.tenantId) || 'Unknown'}
+                                    </Link>
                                 </TableCell>
                                 <TableCell>{merchantMap.get(settlement.merchantId) || 'Unknown'}</TableCell>
                                 <TableCell className="text-right font-mono">{formatCurrency(settlement.merchantNetAmount, settlement.currency)}</TableCell>
