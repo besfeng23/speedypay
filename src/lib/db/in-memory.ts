@@ -97,6 +97,7 @@ export const getAllMerchants = async (): Promise<Merchant[]> => {
             entity,
             tenant: tenantMap.get(ma.tenantId)!,
             defaultSettlementDestination: defaultDest || null,
+            propertyAssociations: entity.metadata.propertyAssociations || [],
         }
     }));
 }
@@ -133,6 +134,7 @@ export const findMerchantById = async (id: string): Promise<Merchant | undefined
         entity,
         tenant,
         defaultSettlementDestination: defaultDest,
+        propertyAssociations: entity.metadata.propertyAssociations || [],
     });
 }
 
@@ -169,6 +171,18 @@ export const addMerchant = async (merchant: Merchant): Promise<Merchant> => {
       activationStatus: merchant.activationStatus,
       settlementStatus: merchant.settlementStatus,
       defaultSettlementDestinationId: merchant.defaultSettlementDestinationId,
+      
+      // New production-ready fields
+      merchantOfRecordType: merchant.merchantOfRecordType,
+      providerMerchantMode: merchant.providerMerchantMode,
+      settlementMode: merchant.settlementMode,
+      settlementSchedule: merchant.settlementSchedule,
+      providerMerchantId: merchant.providerMerchantId,
+      providerSubMerchantId: merchant.providerSubMerchantId,
+      isProviderOnboarded: merchant.isProviderOnboarded,
+      providerOnboardingStatus: merchant.providerOnboardingStatus,
+      providerCapabilityProfile: merchant.providerCapabilityProfile,
+
       createdAt: merchant.createdAt,
       updatedAt: merchant.updatedAt,
   });
