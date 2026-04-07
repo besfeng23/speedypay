@@ -6,8 +6,9 @@ export const KYC_STATUSES = ['not_started', 'pending', 'in_review', 'approved', 
 export const MERCHANT_SETTLEMENT_STATUSES = ['active', 'paused', 'banned'] as const;
 
 export const PAYMENT_STATUSES = ['pending', 'succeeded', 'failed', 'expired', 'processing'] as const;
-export const SETTLEMENT_STATUSES = ['pending', 'completed', 'N/A'] as const;
-export const REMITTANCE_STATUSES = ['pending', 'processing', 'sent', 'failed', 'N/A'] as const;
+export const INTERNAL_SETTLEMENT_STATUSES = ['unpaid', 'processing', 'paid', 'failed'] as const;
+export const PAYOUT_STATUSES = ['pending', 'processing', 'sent', 'failed'] as const;
+
 export const PROVIDER_TRANS_STATES = ['00', '01', '03', '04', '05', '06', '07', '08', '09'] as const;
 export const TENANT_STATUSES = ['active', 'inactive'] as const;
 
@@ -40,8 +41,8 @@ export type KYStatus = (typeof KYC_STATUSES)[number];
 export type MerchantSettlementStatus = (typeof MERCHANT_SETTLEMENT_STATUSES)[number];
 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
-export type SettlementStatus = (typeof SETTLEMENT_STATUSES)[number];
-export type RemittanceStatus = (typeof REMITTANCE_STATUSES)[number];
+export type InternalSettlementStatus = (typeof INTERNAL_SETTLEMENT_STATUSES)[number];
+export type PayoutStatus = (typeof PAYOUT_STATUSES)[number];
 export type ProviderTransState = (typeof PROVIDER_TRANS_STATES)[number];
 export type TenantStatus = (typeof TENANT_STATUSES)[number];
 
@@ -183,14 +184,10 @@ export type Payment = {
   customerEmail: string;
   grossAmount: number;
   currency: string;
-  feeType: 'percentage' | 'fixed';
-  feeValue: number;
-  platformFeeAmount: number;
-  merchantNetAmount: number;
+  platformFeeAmount: number; // Stored for quick reference
+  merchantNetAmount: number; // Stored for quick reference
   paymentStatus: PaymentStatus;
-  settlementStatus: SettlementStatus;
-  remittanceStatus: RemittanceStatus;
-  sourceChannel: 'Web' | 'Mobile' | 'API' | 'Manual';
+  settlementStatus: 'pending' | 'completed'; // Simplified status
   createdAt: string;
   updatedAt: string;
   
@@ -208,36 +205,52 @@ export type Payment = {
   lastQueryAt?: string;
 };
 
+export type Payout = {
+    id: string;
+    settlementId: string;
+    merchantAccountId: string;
+    settlementDestinationId: string;
+    amount: number;
+    currency: string;
+    status: PayoutStatus;
+
+    // Provider-specific fields
+    providerName?: 'SpeedyPay' | string;
+    providerTransSeq?: string;
+    providerRespCode?: string;
+    providerRespMessage?: string;
+    providerTransState?: ProviderTransState;
+    providerTransStateLabel?: string;
+    signatureVerified?: boolean;
+    payoutChannelProcId?: string;
+    payoutChannelDescription?: string;
+    providerTimestamp?: string;
+    lastQueryAt?: string;
+    failureReason?: string | null;
+
+    createdAt: string;
+    updatedAt: string;
+};
+
 export type Settlement = {
   id: string;
   tenantId: string;
   paymentId: string;
-  merchantId: string; // This now refers to the MerchantAccount ID
+  merchantId: string;
+  status: InternalSettlementStatus; // 'unpaid', 'processing', 'paid', 'failed'
+  
   grossAmount: number;
   currency: string;
   platformFeeAmount: number;
-  merchantNetAmount: number; // This is the payoutAmount for remittance
-  settlementStatus: 'pending' | 'completed';
-  remittanceStatus: RemittanceStatus;
+  merchantNetAmount: number; // The amount that is payable
   
-  // Provider-specific fields for remittance
-  providerName?: 'SpeedyPay' | string;
-  payoutReference: string | null;
-  failureReason: string | null;
-  providerOrderSeq?: string;
-  providerTransSeq?: string;
-  providerRespCode?: string;
-  providerRespMessage?: string;
-  providerTransState?: ProviderTransState;
-  providerTransStateLabel?: string;
-  signatureVerified?: boolean;
-  payoutChannelProcId?: string;
-  payoutChannelDescription?: string;
-  lastQueryAt?: string;
-  providerTimestamp?: string;
+  payoutId: string | null;
   
   createdAt: string;
   updatedAt: string;
+
+  // This is a hydrated property, not in DB
+  payout?: Payout | null;
 };
 
 
@@ -249,7 +262,7 @@ export type AuditLog = {
   eventType: string;
   user: string;
   details: string;
-  entityType: 'merchant' | 'payment' | 'settlement' | 'user' | 'tenant' | 'entity' | null;
+  entityType: 'merchant' | 'payment' | 'settlement' | 'payout' | 'user' | 'tenant' | 'entity' | null;
   entityId: string | null;
   eventIdentifier?: string;
   source?: 'admin' | 'system' | 'webhook' | 'provider' | 'auth';
@@ -291,7 +304,7 @@ export type UATLog = {
   status: 'passed' | 'failed';
   notes: string;
   entityId: string | null;
-  entityType: 'payment' | 'settlement' | 'merchant' | null;
+  entityType: 'payment' | 'settlement' | 'merchant' | 'payout' | null;
   providerResponse?: string;
 };
 

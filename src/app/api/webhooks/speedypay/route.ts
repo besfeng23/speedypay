@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { verifySignature } from '@/lib/speedypay/crypto';
-import { processPayoutWebhookEvent, processCollectionWebhookEvent } from '@/lib/speedypay/events';
+import { processPayoutWebhook, processCollectionWebhookEvent } from '@/lib/speedypay/events';
 import type { SpeedyPayPayoutWebhookPayload, SpeedyPayCollectionWebhookPayload } from '@/lib/speedypay/types';
-import { addAuditLog, getPaymentById, getSettlementById, findAuditLogByEventIdentifier, claimWebhookEventForProcessing, markWebhookEventProcessed, releaseWebhookEventClaim } from '@/lib/data';
+import { addAuditLog, getPaymentById, findPayoutByOrderSeq, findAuditLogByEventIdentifier, claimWebhookEventForProcessing, markWebhookEventProcessed, releaseWebhookEventClaim } from '@/lib/data';
 import { speedypayConfig } from '@/lib/speedypay/config';
 
 
@@ -121,9 +121,9 @@ export async function POST(req: Request) {
   }
   
   // 4. Determine if this is for a Payout or a Collection by checking our internal records.
-  // Payout `orderSeq` corresponds to our internal `Settlement` ID.
-  const settlement = await getSettlementById(orderSeq);
-  if (settlement) {
+  // Payout `orderSeq` corresponds to our internal `Payout` ID.
+  const payout = await findPayoutByOrderSeq(orderSeq);
+  if (payout) {
     return handlePayoutWebhook(payload as unknown as SpeedyPayPayoutWebhookPayload, eventIdentifier);
   }
 
@@ -137,7 +137,7 @@ export async function POST(req: Request) {
   await addAuditLog({
     eventType: 'webhook.unknown.received',
     user: 'SpeedyPay Webhook',
-    details: `Webhook received for an unknown orderSeq that is not a settlement or payment: ${orderSeq}`,
+    details: `Webhook received for an unknown orderSeq that is not a payout or payment: ${orderSeq}`,
     entityId: orderSeq,
     entityType: null,
     eventIdentifier,
@@ -157,7 +157,7 @@ async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload, event
     user: 'SpeedyPay Webhook',
     details: `Received PAYOUT webhook for OrderSeq ${payload.orderSeq} with state ${payload.transState}`,
     entityId: payload.orderSeq,
-    entityType: 'settlement',
+    entityType: 'payout',
     source: 'webhook',
     action: 'receive',
     outcome: 'success',
@@ -165,7 +165,7 @@ async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload, event
   });
 
   try {
-    await processPayoutWebhookEvent(payload);
+    await processPayoutWebhook(payload);
 
     // CRITICAL: The idempotency key is only logged AFTER successful processing.
     await addAuditLog({
@@ -173,7 +173,7 @@ async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload, event
       user: 'SpeedyPay Webhook',
       details: `Successfully processed PAYOUT webhook for OrderSeq: ${payload.orderSeq}`,
       entityId: payload.orderSeq,
-      entityType: 'settlement',
+      entityType: 'payout',
       eventIdentifier, // The idempotency key is now stored.
       source: 'webhook',
       action: 'process',
@@ -190,7 +190,7 @@ async function handlePayoutWebhook(payload: SpeedyPayPayoutWebhookPayload, event
       user: 'SpeedyPay Webhook',
       details: `Failed to process PAYOUT webhook. Error: ${errorMessage}`,
       entityId: payload.orderSeq,
-      entityType: 'settlement',
+      entityType: 'payout',
       source: 'webhook',
       action: 'process',
       outcome: 'failed',

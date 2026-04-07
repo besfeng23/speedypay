@@ -214,5 +214,60 @@ export const dbMigrations: DbMigration[] = [
       CREATE INDEX IF NOT EXISTS idx_ledger_entries_ledger_transaction_id ON ledger_entries(ledger_transaction_id);
       CREATE INDEX IF NOT EXISTS idx_ledger_entries_account_code ON ledger_entries(account_code);
     `
+  },
+  {
+    version: 6,
+    name: 'refactor_payout_architecture',
+    sql: `
+      CREATE TABLE IF NOT EXISTS payouts (
+        id TEXT PRIMARY KEY,
+        settlement_id TEXT NOT NULL,
+        merchant_account_id TEXT NOT NULL,
+        settlement_destination_id TEXT NOT NULL,
+        amount_cents BIGINT NOT NULL,
+        currency TEXT NOT NULL,
+        status TEXT NOT NULL,
+        provider_name TEXT,
+        provider_trans_seq TEXT,
+        provider_resp_code TEXT,
+        provider_resp_message TEXT,
+        provider_trans_state TEXT,
+        provider_trans_state_label TEXT,
+        signature_verified BOOLEAN,
+        payout_channel_proc_id TEXT,
+        payout_channel_description TEXT,
+        provider_timestamp TIMESTAMPTZ,
+        last_query_at TIMESTAMPTZ,
+        failure_reason TEXT,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_payouts_settlement_id ON payouts(settlement_id);
+      CREATE INDEX IF NOT EXISTS idx_payouts_merchant_account_id ON payouts(merchant_account_id);
+      CREATE INDEX IF NOT EXISTS idx_payouts_status ON payouts(status);
+
+      -- Modify settlements table to be purely internal
+      ALTER TABLE settlements RENAME COLUMN settlement_status TO status;
+      ALTER TABLE settlements ALTER COLUMN payload DROP NOT NULL;
+      ALTER TABLE settlements ADD COLUMN payout_id TEXT;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS remittance_status;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS provider_name;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS payout_reference;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS failure_reason;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS provider_order_seq;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS provider_trans_seq;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS provider_resp_code;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS provider_resp_message;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS provider_trans_state;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS provider_trans_state_label;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS signature_verified;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS payout_channel_proc_id;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS payout_channel_description;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS last_query_at;
+      ALTER TABLE settlements DROP COLUMN IF EXISTS provider_timestamp;
+
+      -- Modify payments table to simplify settlement status
+      ALTER TABLE payments ALTER COLUMN payload DROP NOT NULL;
+    `
   }
 ];

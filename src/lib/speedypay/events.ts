@@ -1,10 +1,19 @@
-
 import type { SpeedyPayPayoutWebhookPayload, SpeedyPayCollectionWebhookPayload } from './types';
-import { addAuditLog, getSettlementById, updateSettlement, getPaymentById, updatePayment, addSettlement, getSettlementByPaymentId } from '@/lib/data';
+import { 
+    addAuditLog, 
+    getSettlementById, 
+    updateSettlement, 
+    getPaymentById, 
+    updatePayment, 
+    addSettlement, 
+    getSettlementByPaymentId,
+    findPayoutById,
+    updatePayout,
+} from '@/lib/data';
 import { mapProviderStateToInternal, providerStateLabels, mapCollectionStateToPaymentStatus } from './mappers';
 import { formatISO } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
-import type { Settlement, Payment } from '@/lib/types';
+import type { Settlement, Payment, Payout, InternalSettlementStatus } from '@/lib/types';
 
 
 /**
@@ -12,31 +21,29 @@ import type { Settlement, Payment } from '@/lib/types';
  * This is triggered by a POST to `/api/webhooks/speedypay`.
  * @param payload - The verified SpeedyPayPayoutWebhookPayload object from the form-urlencoded body.
  */
-export async function processPayoutWebhookEvent(payload: SpeedyPayPayoutWebhookPayload): Promise<void> {
-  console.log(`[SpeedyPay Event Processor] Processing PAYOUT webhook for orderSeq: ${payload.orderSeq}`);
+export async function processPayoutWebhook(payload: SpeedyPayPayoutWebhookPayload): Promise<void> {
+  // The orderSeq from the provider maps to our internal Payout ID.
+  const payoutId = payload.orderSeq;
+  console.log(`[SpeedyPay Event Processor] Processing PAYOUT webhook for Payout ID: ${payoutId}`);
+  
+  const payout = await findPayoutById(payoutId);
 
-  // The orderSeq from the provider maps to our internal settlement ID.
-  const settlementId = payload.orderSeq;
-  const settlement = await getSettlementById(settlementId);
-
-  if (!settlement) {
-    // This could happen if the webhook arrives before our DB is updated,
-    // or if the orderSeq is not one of ours. Log it and throw an error.
-    const errorMsg = `Webhook received for unknown settlement ID (orderSeq): ${settlementId}`;
+  if (!payout) {
+    const errorMsg = `Webhook received for unknown Payout ID (orderSeq): ${payoutId}`;
     await addAuditLog({
         eventType: 'webhook.processing.failed',
         user: 'SpeedyPay Webhook',
         details: errorMsg,
-        entityId: settlementId,
-        entityType: 'settlement'
+        entityId: payoutId,
+        entityType: 'payout'
     });
     throw new Error(errorMsg);
   }
 
-  const internalRemittanceStatus = mapProviderStateToInternal(payload.transState);
+  const internalPayoutStatus = mapProviderStateToInternal(payload.transState);
 
-  const updatedSettlement: Partial<Settlement> = {
-      remittanceStatus: internalRemittanceStatus,
+  const updatedPayout: Partial<Payout> = {
+      status: internalPayoutStatus,
       providerTransSeq: payload.transSeq,
       providerRespCode: payload.respCode,
       providerRespMessage: payload.respMessage,
@@ -48,13 +55,24 @@ export async function processPayoutWebhookEvent(payload: SpeedyPayPayoutWebhookP
       updatedAt: formatISO(new Date()),
   };
   
-  await updateSettlement(settlementId, updatedSettlement);
+  await updatePayout(payoutId, updatedPayout);
+
+  // Update the parent settlement's status based on the payout outcome
+  const settlementStatus: InternalSettlementStatus = internalPayoutStatus === 'sent' ? 'paid' : internalPayoutStatus === 'failed' ? 'failed' : 'processing';
+  await updateSettlement(payout.settlementId, { status: settlementStatus });
 
   await addAuditLog({
     eventType: 'payout.status.updated',
     user: 'SpeedyPay Webhook',
-    details: `Payout status updated via webhook. New provider state: ${payload.transState} (${payload.respMessage})`,
-    entityId: settlement.id,
+    details: `Payout status updated to ${internalPayoutStatus} via webhook. Provider state: ${payload.transState} (${payload.respMessage})`,
+    entityId: payout.id,
+    entityType: 'payout'
+  });
+   await addAuditLog({
+    eventType: 'settlement.status.updated',
+    user: 'System',
+    details: `Settlement status updated to ${settlementStatus} based on payout outcome.`,
+    entityId: payout.settlementId,
     entityType: 'settlement'
   });
 }
@@ -100,19 +118,17 @@ export async function processCollectionWebhookEvent(payload: SpeedyPayCollection
   if (internalPaymentStatus === 'succeeded' && payment.settlementStatus === 'pending') {
       const existingSettlement = await getSettlementByPaymentId(paymentId);
       if (!existingSettlement) {
-          const newSettlement: Settlement = {
+          const newSettlement: Omit<Settlement, 'payout'> = {
               id: `set-${uuidv4().slice(0, 8)}`,
               tenantId: payment.tenantId,
               paymentId: payment.id,
               merchantId: payment.merchantId,
+              status: 'unpaid', // Ready to be paid out
               grossAmount: payment.grossAmount,
               currency: payment.currency,
               platformFeeAmount: payment.platformFeeAmount,
               merchantNetAmount: payment.merchantNetAmount,
-              settlementStatus: 'completed', // Settlement is now ready for payout
-              remittanceStatus: 'pending',
-              payoutReference: null,
-              failureReason: null,
+              payoutId: null,
               createdAt: formatISO(new Date()),
               updatedAt: formatISO(new Date()),
           };
@@ -121,7 +137,7 @@ export async function processCollectionWebhookEvent(payload: SpeedyPayCollection
           await addAuditLog({
               eventType: 'settlement.created',
               user: 'System',
-              details: `Internal settlement created from successful payment.`,
+              details: `Internal settlement created from successful payment. Status: unpaid.`,
               entityId: newSettlement.id,
               entityType: 'settlement'
           });
