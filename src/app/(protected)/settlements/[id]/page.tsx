@@ -122,7 +122,12 @@ export default async function SettlementDetailPage({
                         <DetailItem label="Merchant Net Amount" value={<span className="font-bold">{formatCurrency(settlement.merchantNetAmount, settlement.currency)}</span>} />
                          <Separator className="my-2"/>
                         <DetailItem label="Settlement Status" value={<StatusBadge status={settlement.status} />} />
+                        <DetailItem label="Settlement Mode" value={<Badge variant="outline" className="capitalize">{settlement.settlementMode.replace(/_/g, ' ')}</Badge>} />
+                        <DetailItem label="Settlement Schedule" value={<Badge variant="outline" className="capitalize">{settlement.settlementSchedule}</Badge>} />
+                         <Separator className="my-2"/>
                         <DetailItem label="Resulting Payout ID" value={settlement.payoutId ? <span className="font-mono text-xs">{settlement.payoutId}</span> : <span className="text-muted-foreground">Not created</span>} />
+                        <DetailItem label="Eligibility Date" value={settlement.eligibilityAt ? format(new Date(settlement.eligibilityAt), "PPpp") : 'N/A'} />
+                        <DetailItem label="Remitted At" value={settlement.remittedAt ? format(new Date(settlement.remittedAt), "PPpp") : 'N/A'} />
                     </dl>
                 </CardContent>
             </Card>
@@ -175,3 +180,5 @@ export default async function SettlementDetailPage({
     </>
   );
 }
+
+    

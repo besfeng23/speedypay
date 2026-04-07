@@ -1,5 +1,11 @@
 // --- Status Enums (Single Source of Truth) ---
 
+export const MERCHANT_OF_RECORD_TYPES = ['platform', 'client_merchant', 'submerchant'] as const;
+export const PROVIDER_MERCHANT_MODES = ['master_only', 'master_with_submerchants', 'direct_merchant'] as const;
+export const SETTLEMENT_MODES = ['internal_payout', 'provider_direct_settlement', 'split_settlement'] as const;
+export const SETTLEMENT_SCHEDULES = ['instant', 't1', 'manual', 'batched'] as const;
+export const PROVIDER_ONBOARDING_STATUSES = ['not_started', 'pending', 'approved', 'rejected'] as const;
+
 export const MERCHANT_STATUSES = ['active', 'inactive', 'suspended'] as const;
 export const ONBOARDING_STATUSES = ['completed', 'pending', 'in-review', 'rejected'] as const;
 export const KYC_STATUSES = ['not_started', 'pending', 'in_review', 'approved', 'rejected'] as const;
@@ -16,7 +22,7 @@ export const CHECK_TYPES = ['sanctions_screening', 'credit_check', 'business_ver
 export const MERCHANT_SETTLEMENT_STATUSES = ['active', 'paused', 'banned'] as const;
 
 export const PAYMENT_STATUSES = ['pending', 'succeeded', 'failed', 'expired', 'processing'] as const;
-export const SETTLEMENT_STATUSES = ['unpaid', 'processing', 'paid', 'failed'] as const;
+export const SETTLEMENT_STATUSES = ['pending', 'eligible', 'unpaid', 'processing', 'paid', 'failed', 'reversed'] as const;
 export const PAYOUT_STATUSES = ['pending', 'processing', 'sent', 'failed'] as const;
 
 
@@ -48,6 +54,11 @@ export type Role = (typeof ROLES)[number];
 
 
 // --- Core Domain Types ---
+export type MerchantOfRecordType = (typeof MERCHANT_OF_RECORD_TYPES)[number];
+export type ProviderMerchantMode = (typeof PROVIDER_MERCHANT_MODES)[number];
+export type SettlementMode = (typeof SETTLEMENT_MODES)[number];
+export type SettlementSchedule = (typeof SETTLEMENT_SCHEDULES)[number];
+export type ProviderOnboardingStatus = (typeof PROVIDER_ONBOARDING_STATUSES)[number];
 
 export type MerchantStatus = (typeof MERCHANT_STATUSES)[number];
 export type OnboardingStatus = (typeof ONBOARDING_STATUSES)[number];
@@ -116,6 +127,18 @@ export type MerchantAccount = {
   activationStatus: ActivationStatus;
   settlementStatus: MerchantSettlementStatus;
   defaultSettlementDestinationId: string | null;
+  
+  // New production-ready fields
+  merchantOfRecordType: MerchantOfRecordType;
+  providerMerchantMode: ProviderMerchantMode;
+  providerMerchantId: string | null;
+  providerSubMerchantId: string | null;
+  isProviderOnboarded: boolean;
+  providerOnboardingStatus: ProviderOnboardingStatus;
+  settlementMode: SettlementMode;
+  settlementSchedule: SettlementSchedule;
+  providerCapabilityProfile: Record<string, any>;
+
   createdAt: string;
   updatedAt: string;
 };
@@ -288,6 +311,16 @@ export type Settlement = {
   merchantNetAmount: number; // The amount that is payable
   
   payoutId: string | null;
+
+  // New settlement lifecycle fields
+  settlementMode: SettlementMode;
+  settlementSchedule: SettlementSchedule;
+  providerSettlementReference: string | null;
+  eligibilityAt: string | null;
+  remittedAt: string | null;
+  failedAt: string | null;
+  reversalReference: string | null;
+  failureReason: string | null;
   
   createdAt: string;
   updatedAt: string;
@@ -404,3 +437,5 @@ export type UATTestPayload = {
     description?: string;
     entityId?: string;
 };
+
+    

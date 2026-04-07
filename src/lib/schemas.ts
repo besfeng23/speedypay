@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { payoutChannels } from './speedypay/payout-channels';
-import { ONBOARDING_STATUSES, MERCHANT_STATUSES } from './types';
+import { ONBOARDING_STATUSES, MERCHANT_OF_RECORD_TYPES, PROVIDER_MERCHANT_MODES, SETTLEMENT_MODES, SETTLEMENT_SCHEDULES } from './types';
 
 const validProcIds = payoutChannels.map(c => c.procId);
 
@@ -36,6 +36,12 @@ export const MerchantSchema = z.object({
     .positive("Fee value must be positive")
     .min(0.01, "Fee value is too low"),
 
+  // New production-ready fields
+  merchantOfRecordType: z.enum(MERCHANT_OF_RECORD_TYPES),
+  providerMerchantMode: z.enum(PROVIDER_MERCHANT_MODES),
+  settlementMode: z.enum(SETTLEMENT_MODES),
+  settlementSchedule: z.enum(SETTLEMENT_SCHEDULES),
+
   notes: z.string().optional(),
 });
 
@@ -48,3 +54,5 @@ export const CreatePaymentSchema = z.object({
 });
 
 export type CreatePaymentFormValues = z.infer<typeof CreatePaymentSchema>;
+
+    

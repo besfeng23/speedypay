@@ -30,8 +30,9 @@ import { MerchantSchema, type MerchantFormValues } from '@/lib/schemas';
 import { createMerchant } from '@/lib/actions';
 import { Loader2 } from 'lucide-react';
 import { payoutChannels } from '@/lib/speedypay/payout-channels';
-import { ONBOARDING_STATUSES } from '@/lib/types';
+import { ONBOARDING_STATUSES, MERCHANT_OF_RECORD_TYPES, PROVIDER_MERCHANT_MODES, SETTLEMENT_MODES, SETTLEMENT_SCHEDULES } from '@/lib/types';
 import type { Tenant } from '@/lib/types';
+import { Separator } from '@/components/ui/separator';
 
 interface NewMerchantPageClientProps {
   tenants: Tenant[];
@@ -59,6 +60,13 @@ export default function NewMerchantPageClient({ tenants }: NewMerchantPageClient
       onboardingStatus: "pending",
       defaultFeeType: "percentage",
       defaultFeeValue: 2.9,
+      
+      // New fields with defaults
+      merchantOfRecordType: 'platform',
+      providerMerchantMode: 'master_only',
+      settlementMode: 'internal_payout',
+      settlementSchedule: 'manual',
+      
       notes: "",
     },
   });
@@ -136,8 +144,21 @@ export default function NewMerchantPageClient({ tenants }: NewMerchantPageClient
                     <FormField control={form.control} name="defaultPayoutChannel" render={({ field }) => ( <FormItem> <FormLabel>Default Payout Channel</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a channel"/> </SelectTrigger> </FormControl> <SelectContent> {payoutChannels.map(channel => ( <SelectItem key={channel.procId} value={channel.procId}>{channel.description}</SelectItem> ))} </SelectContent> </Select> <FormDescription>The default method for sending payouts.</FormDescription><FormMessage /> </FormItem> )}/>
                     <FormField control={form.control} name="settlementAccountName" render={({ field }) => ( <FormItem> <FormLabel>Recipient Account Name</FormLabel> <FormControl> <Input placeholder="e.g., Alice B. Johnson" {...field} /> </FormControl><FormDescription>Full legal name of the account holder.</FormDescription> <FormMessage /> </FormItem> )}/>
                     <FormField control={form.control} name="settlementAccountNumberOrWalletId" render={({ field }) => ( <FormItem className="md:col-span-2"> <FormLabel>Recipient Account / Wallet ID</FormLabel> <FormControl> <Input placeholder="Enter bank account # or mobile #" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+                    <Separator className="md:col-span-2"/>
                     <FormField control={form.control} name="defaultFeeType" render={({ field }) => ( <FormItem> <FormLabel>Default Fee Type</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a fee type"/> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="percentage">Percentage</SelectItem> <SelectItem value="fixed">Fixed</SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )}/>
                     <FormField control={form.control} name="defaultFeeValue" render={({ field }) => ( <FormItem> <FormLabel>Default Fee Value</FormLabel> <FormControl> <Input type="number" step="0.01" placeholder="e.g., 2.9" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                    <CardTitle>Platform Configuration</CardTitle>
+                    <CardDescription>Define how this merchant is treated by the platform and payment provider.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FormField control={form.control} name="merchantOfRecordType" render={({ field }) => ( <FormItem> <FormLabel>Merchant of Record</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select MoR type"/> </SelectTrigger> </FormControl> <SelectContent> {MERCHANT_OF_RECORD_TYPES.map(type => ( <SelectItem key={type} value={type} className="capitalize">{type.replace('_', ' ')}</SelectItem> ))} </SelectContent> </Select> <FormDescription>Who is legally responsible for the transaction?</FormDescription><FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="providerMerchantMode" render={({ field }) => ( <FormItem> <FormLabel>Provider Mode</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select provider mode"/> </SelectTrigger> </FormControl> <SelectContent> {PROVIDER_MERCHANT_MODES.map(type => ( <SelectItem key={type} value={type} className="capitalize">{type.replace('_', ' ')}</SelectItem> ))} </SelectContent> </Select> <FormDescription>How is this merchant represented on the provider?</FormDescription><FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="settlementMode" render={({ field }) => ( <FormItem> <FormLabel>Settlement Mode</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select settlement mode"/> </SelectTrigger> </FormControl> <SelectContent> {SETTLEMENT_MODES.map(type => ( <SelectItem key={type} value={type} className="capitalize">{type.replace('_', ' ')}</SelectItem> ))} </SelectContent> </Select> <FormDescription>How are funds paid out to this merchant?</FormDescription><FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="settlementSchedule" render={({ field }) => ( <FormItem> <FormLabel>Settlement Schedule</FormLabel> <Select onValueChange={field.onChange} defaultValue={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select schedule"/> </SelectTrigger> </FormControl> <SelectContent> {SETTLEMENT_SCHEDULES.map(type => ( <SelectItem key={type} value={type} className="capitalize">{type.replace('_', ' ')}</SelectItem> ))} </SelectContent> </Select> <FormDescription>When are payouts processed?</FormDescription><FormMessage /> </FormItem> )}/>
                 </CardContent>
               </Card>
             </div>
@@ -167,3 +188,5 @@ export default function NewMerchantPageClient({ tenants }: NewMerchantPageClient
     </>
   );
 }
+
+    

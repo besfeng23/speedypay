@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import { getMerchantById, getPaymentsByMerchantId, getSettlementsByMerchantId, getTenantById } from "@/lib/data";
+import { getMerchantById, getPaymentsByMerchantId, getSettlementsByMerchantId } from "@/lib/data";
 import { PageHeader } from "@/components/page-header";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,11 @@ import { StatusBadge } from "@/components/status-badge";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { Payment, Settlement } from "@/lib/types";
+import type { Merchant, Payment, Settlement } from "@/lib/types";
 import Link from "next/link";
-import { Pencil, Building } from "lucide-react";
+import { Pencil, Building, Info, AlertTriangle } from "lucide-react";
 import { payoutChannelMap } from "@/lib/speedypay/payout-channels";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -95,6 +96,48 @@ function RecentSettlements({ settlements }: { settlements: Settlement[] }) {
     );
 }
 
+function CapabilityWarnings({ merchant }: { merchant: Merchant }) {
+    const warnings = [];
+
+    if (merchant.merchantOfRecordType === 'client_merchant' && !merchant.isProviderOnboarded) {
+        warnings.push({
+            title: "Client is Merchant of Record, but Not Onboarded with Provider",
+            description: "This merchant is configured as the Merchant of Record, but their account has not been fully onboarded or approved by the payment provider. All transactions will be processed under the platform's master account until provider onboarding is complete."
+        });
+    }
+
+    if (merchant.settlementMode === 'provider_direct_settlement' && (merchant.providerMerchantMode !== 'direct_merchant' || !merchant.isProviderOnboarded)) {
+        warnings.push({
+            title: "Provider Direct Settlement is Not Available",
+            description: "Direct settlement is selected, but the merchant is not configured or approved as a direct merchant with the provider. The system will fall back to 'Internal Payout' mode."
+        });
+    }
+    
+    if (warnings.length === 0) {
+        return (
+            <Alert>
+                <Info className="h-4 w-4" />
+                <AlertTitle>Configuration Status: OK</AlertTitle>
+                <AlertDescription>
+                    The merchant's configuration is fully supported and operational. The current effective settlement mode is <strong>{merchant.settlementMode.replace(/_/g, ' ')}</strong>.
+                </AlertDescription>
+            </Alert>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {warnings.map((warning, i) => (
+                <Alert key={i} variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>{warning.title}</AlertTitle>
+                    <AlertDescription>{warning.description}</AlertDescription>
+                </Alert>
+            ))}
+        </div>
+    );
+}
+
 
 export default async function MerchantDetailPage({
   params,
@@ -127,6 +170,10 @@ export default async function MerchantDetailPage({
         </Button>
       </PageHeader>
 
+        <div className="mb-6">
+            <CapabilityWarnings merchant={merchant} />
+        </div>
+
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 grid gap-6">
           <Card>
@@ -151,11 +198,29 @@ export default async function MerchantDetailPage({
               </dl>
             </CardContent>
           </Card>
+          
+          <Card>
+            <CardHeader>
+                <CardTitle>Provider & Settlement Configuration</CardTitle>
+                <CardDescription>How this merchant is configured for payment processing and payouts.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <dl className="divide-y">
+                    <DetailItem label="Merchant of Record" value={<Badge variant="outline" className="capitalize">{merchant.merchantOfRecordType.replace(/_/g, ' ')}</Badge>} />
+                    <DetailItem label="Provider Mode" value={<Badge variant="outline" className="capitalize">{merchant.providerMerchantMode.replace(/_/g, ' ')}</Badge>} />
+                    <DetailItem label="Settlement Mode" value={<Badge variant="outline" className="capitalize">{merchant.settlementMode.replace(/_/g, ' ')}</Badge>} />
+                    <DetailItem label="Settlement Schedule" value={<Badge variant="outline" className="capitalize">{merchant.settlementSchedule}</Badge>} />
+                    <DetailItem label="Provider Merchant ID" value={<span className="font-mono text-xs">{merchant.providerMerchantId || 'N/A'}</span>} />
+                    <DetailItem label="Provider Sub-Merchant ID" value={<span className="font-mono text-xs">{merchant.providerSubMerchantId || 'N/A'}</span>} />
+                    <DetailItem label="Provider Onboarding" value={<StatusBadge status={merchant.providerOnboardingStatus} />} />
+                </dl>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Payout & Fee Configuration</CardTitle>
-              <CardDescription>Settings for how this merchant receives funds and how fees are applied.</CardDescription>
+              <CardTitle>Default Payout & Fee Configuration</CardTitle>
+              <CardDescription>Default settings for how this merchant receives funds and how fees are applied.</CardDescription>
             </CardHeader>
             <CardContent>
               <dl className="divide-y">
@@ -191,8 +256,8 @@ export default async function MerchantDetailPage({
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Status</CardTitle>
-              <CardDescription>Current operational status of the merchant.</CardDescription>
+              <CardTitle>Internal Status</CardTitle>
+              <CardDescription>Current operational status of the merchant on this platform.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
                 <div className="flex justify-between items-center py-2 border-b">
@@ -242,3 +307,5 @@ export default async function MerchantDetailPage({
     </>
   );
 }
+
+    

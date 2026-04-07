@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { StatusBadge } from "@/components/status-badge";
 import type { Merchant } from "@/lib/types";
 import { EmptyState } from "@/components/empty-state";
+import { Badge } from "@/components/ui/badge";
 
 export default async function MerchantsPage() {
   const [merchants, tenants] = await Promise.all([getMerchants(), getTenants()]);
@@ -44,9 +45,9 @@ export default async function MerchantsPage() {
                         <TableRow>
                             <TableHead>Business Name</TableHead>
                             <TableHead className="hidden lg:table-cell">Tenant</TableHead>
-                            <TableHead className="hidden sm:table-cell">Status</TableHead>
+                            <TableHead className="hidden sm:table-cell">Activation</TableHead>
                             <TableHead className="hidden md:table-cell">Onboarding</TableHead>
-                            <TableHead className="hidden lg:table-cell">Contact</TableHead>
+                            <TableHead className="hidden lg:table-cell">MoR / Settlement</TableHead>
                             <TableHead className="hidden sm:table-cell">Created At</TableHead>
                             <TableHead><span className="sr-only">Actions</span></TableHead>
                         </TableRow>
@@ -65,11 +66,13 @@ export default async function MerchantsPage() {
                                         {tenantMap.get(merchant.tenantId) || 'Unknown'}
                                     </Link>
                                 </TableCell>
-                                <TableCell className="hidden sm:table-cell"><StatusBadge status={merchant.status} /></TableCell>
+                                <TableCell className="hidden sm:table-cell"><StatusBadge status={merchant.activationStatus} /></TableCell>
                                 <TableCell className="hidden md:table-cell"><StatusBadge status={merchant.onboardingStatus} /></TableCell>
                                 <TableCell className="hidden lg:table-cell">
-                                    <div className="font-medium">{merchant.contactName}</div>
-                                    <div className="text-sm text-muted-foreground">{merchant.email}</div>
+                                    <div className="flex flex-col gap-1">
+                                      <Badge variant="outline" className="capitalize w-fit">{merchant.merchantOfRecordType.replace(/_/g, ' ')}</Badge>
+                                      <Badge variant="secondary" className="capitalize w-fit">{merchant.settlementMode.replace(/_/g, ' ')}</Badge>
+                                    </div>
                                 </TableCell>
                                 <TableCell className="hidden sm:table-cell">{format(new Date(merchant.createdAt), 'MMM d, yyyy')}</TableCell>
                                 <TableCell className="text-right">
@@ -100,3 +103,5 @@ export default async function MerchantsPage() {
     </>
   );
 }
+
+    

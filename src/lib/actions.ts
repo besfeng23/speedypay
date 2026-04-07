@@ -25,7 +25,7 @@ import {
   findEntityById,
   withTransaction,
 } from './data';
-import type { Merchant, Settlement, Payment, Tenant, UATTestPayload, Entity, TenantRecord, MerchantAccount, SettlementDestination, PaymentAllocation, LedgerTransaction, LedgerEntry, Payout, InternalSettlementStatus } from './types';
+import type { Merchant, Settlement, Payment, Tenant, UATTestPayload, Entity, TenantRecord, MerchantAccount, SettlementDestination, PaymentAllocation, LedgerTransaction, LedgerEntry, Payout, InternalSettlementStatus } from './lib/types';
 import { cashOut, qryOrder, qryBalance, createCollectionPayment as apiCreateCollectionPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
 import type { QrPayResponse, QryBalanceResponse, QryCollectionBalanceResponse } from './speedypay/types';
 import { mapProviderStateToInternal, providerStateLabels, mapCollectionStateToPaymentStatus } from './speedypay/mappers';
@@ -35,6 +35,7 @@ import { verifySignature } from './speedypay/crypto';
 import { requireAdminSession } from './auth/session';
 import { calculateAllocations } from './allocation';
 import { createLedgerEntriesForPaymentCapture } from './ledger';
+import { resolveCollectionRoute } from './payment-routing';
 
 
 interface ActionResult<TData = unknown> {
@@ -156,6 +157,18 @@ export async function createMerchant(values: MerchantFormValues): Promise<Action
       activationStatus: 'inactive',
       settlementStatus: 'active',
       defaultSettlementDestinationId: null, // This would be created in a separate step
+
+      // New production-ready fields
+      merchantOfRecordType: validatedData.merchantOfRecordType,
+      providerMerchantMode: validatedData.providerMerchantMode,
+      settlementMode: validatedData.settlementMode,
+      settlementSchedule: validatedData.settlementSchedule,
+      providerMerchantId: null,
+      providerSubMerchantId: null,
+      isProviderOnboarded: false,
+      providerOnboardingStatus: 'not_started',
+      providerCapabilityProfile: {},
+      
       createdAt: formatISO(now),
       updatedAt: formatISO(now),
     };
@@ -196,6 +209,14 @@ export async function createMerchant(values: MerchantFormValues): Promise<Action
       entityId: merchantAccount.id,
       entityType: 'merchant'
     });
+    
+    await addAuditLog({
+      eventType: 'merchant.config.updated',
+      user: actorEmail,
+      details: `Set initial settlement config: MoR Type: ${validatedData.merchantOfRecordType}, Settlement Mode: ${validatedData.settlementMode}`,
+      entityId: merchantAccount.id,
+      entityType: 'merchant',
+    });
 
     revalidatePath('/merchants');
     revalidatePath(`/tenants/${tenant.id}`);
@@ -225,10 +246,21 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
     if (!merchant) {
       return { success: false, message: 'Merchant not found.' };
     }
+    
+    const tenant = await getTenantById(merchant.tenantId);
+    if (!tenant) {
+      return { success: false, message: 'Tenant not found for merchant.' };
+    }
+
+    // --- 1. Payment Routing ---
+    const route = await resolveCollectionRoute({ merchant, tenant, amount });
+    await addAuditLog({ eventType: 'payment.routing.decision', user: 'System', details: `Routing decision for new payment: ${route.notes.join(' ')}`, entityId: merchantId, entityType: 'merchant' });
+
 
     const orderSeq = `pay-${uuidv4()}`;
     const now = new Date();
 
+    // --- 2. Create Payment Intent with Provider ---
     const response = await apiCreateCollectionPayment({
         orderSeq: orderSeq,
         amount: amount,
@@ -244,58 +276,33 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
     
     const isSignatureVerified = verifySignature(response, getSpeedyPaySecretOrThrow());
 
-    await withTransaction(async (client) => {
-        const allocations = await calculateAllocations({
-            grossAmount: amount,
-            currency: 'PHP',
-            merchantAccountId: merchant.id,
-            tenantId: merchant.tenantId,
-        });
-        
-        const merchantNet = allocations.find(a => a.allocationType === 'merchant_net');
-        const totalFees = allocations
-            .filter(a => a.allocationType !== 'merchant_net')
-            .reduce((sum, a) => sum + a.amount, 0);
-
-        const merchantNetAmount = merchantNet?.amount ?? 0;
-        
-        const newPayment: Payment = {
-            id: orderSeq,
-            tenantId: merchant.tenantId,
-            merchantId: merchantId,
-            externalReference: 'N/A',
-            bookingReferenceOrInvoiceReference: description,
-            customerName: 'N/A (Generated Link)',
-            customerEmail: 'N/A',
-            grossAmount: amount,
-            currency: 'PHP',
-            platformFeeAmount: totalFees,
-            merchantNetAmount,
-            paymentStatus: 'pending',
-            settlementStatus: 'pending',
-            createdAt: formatISO(now),
-            updatedAt: formatISO(now),
-            providerPaymentUrl: response.url,
-            providerCollectionRespCode: response.respCode,
-            providerCollectionRespMessage: response.respMessage,
-            providerCollectionSignatureVerified: isSignatureVerified,
-        };
-        
-        const ledgerEntries = await createLedgerEntriesForPaymentCapture(newPayment, allocations);
-        const ledgerTransaction: Omit<LedgerTransaction, 'id' | 'createdAt' | 'updatedAt'> = {
-            paymentId: newPayment.id,
-            payoutId: null,
-            transactionType: 'payment_capture',
-            status: 'completed',
-            reference: `Payment from ${newPayment.customerName}`,
-        };
-
-        await addPayment(newPayment, client);
-        await addPaymentAllocations(allocations.map(alloc => ({ ...alloc, paymentId: orderSeq })), client);
-        await addLedgerTransactionAndEntries(ledgerTransaction, ledgerEntries, client);
-    });
+    // --- 3. Create Pending Payment Record ---
+    // NO financial records (allocations, ledger entries) are created at this stage.
+    const newPayment: Payment = {
+        id: orderSeq,
+        tenantId: merchant.tenantId,
+        merchantId: merchantId,
+        externalReference: 'N/A',
+        bookingReferenceOrInvoiceReference: description,
+        customerName: 'N/A (Generated Link)',
+        customerEmail: 'N/A',
+        grossAmount: amount,
+        currency: 'PHP',
+        platformFeeAmount: 0, // Will be calculated on success
+        merchantNetAmount: 0, // Will be calculated on success
+        paymentStatus: 'pending',
+        settlementStatus: 'pending',
+        createdAt: formatISO(now),
+        updatedAt: formatISO(now),
+        providerPaymentUrl: response.url,
+        providerCollectionRespCode: response.respCode,
+        providerCollectionRespMessage: response.respMessage,
+        providerCollectionSignatureVerified: isSignatureVerified,
+    };
     
-    await addAuditLog({ eventType: 'payment.created', user: actorEmail, details: `Created manual payment link for ${merchant.entity.displayName}`, entityId: orderSeq, entityType: 'payment' });
+    await addPayment(newPayment);
+    
+    await addAuditLog({ eventType: 'payment.intent.created', user: actorEmail, details: `Created pending payment for ${merchant.entity.displayName}`, entityId: orderSeq, entityType: 'payment' });
     await addAuditLog({ eventType: 'payment.provider.sent', user: 'System', details: `Successfully created payment link at provider. URL: ${response.url}`, entityId: orderSeq, entityType: 'payment' });
 
     revalidatePath('/transactions');
@@ -323,6 +330,15 @@ export async function addSimulatedData(data: { paymentRecord: Payment, settlemen
         data.paymentRecord.tenantId = merchant.tenantId;
         if (data.settlementRecord) {
             data.settlementRecord.tenantId = merchant.tenantId;
+            // Add new settlement fields for simulation
+            data.settlementRecord.settlementMode = 'internal_payout';
+            data.settlementRecord.settlementSchedule = 'manual';
+            data.settlementRecord.providerSettlementReference = null;
+            data.settlementRecord.eligibilityAt = data.settlementRecord.createdAt;
+            data.settlementRecord.remittedAt = null;
+            data.settlementRecord.failedAt = null;
+            data.settlementRecord.reversalReference = null;
+            data.settlementRecord.failureReason = null;
         }
 
         await addPayment(data.paymentRecord);
@@ -722,3 +738,5 @@ export async function runUATTestAction(testCaseId: string, payload?: UATTestPayl
         return { success: false, message: errorMessage, data: e };
     }
 }
+
+    
