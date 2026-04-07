@@ -6,7 +6,7 @@
 
 import { formatISO } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
-import type { AuditLog, Merchant, Payment, Settlement, Tenant, UATLog, UATTestCase, Entity, MerchantAccount, TenantRecord, SettlementDestination, AllocationRule, PaymentAllocation, LedgerTransaction, LedgerEntry } from '@/lib/types';
+import type { AuditLog, Merchant, Payment, Settlement, Tenant, UATLog, UATTestCase, Entity, MerchantAccount, TenantRecord, SettlementDestination, AllocationRule, PaymentAllocation, LedgerTransaction, LedgerEntry, Payout } from '@/lib/types';
 import { uatTestCases, seedEntities, seedMerchantAccounts, seedTenants, seedSettlementDestinations, seedPayments, seedSettlements, seedAuditLogs, seedAllocationRules } from './seed-data';
 import { queryOne, queryRows, withTransaction } from './postgres';
 import type { PoolClient } from 'pg';
@@ -495,4 +495,35 @@ export async function updatePayout(id: string, data: Partial<any>): Promise<any 
 export async function findPayoutByOrderSeq(orderSeq: string): Promise<any | undefined> {
     const row = await queryOne('SELECT * FROM payouts WHERE id = $1', [orderSeq]); // Assuming orderSeq is the Payout ID
     return row ? { ...row, amount: row.amount_cents / 100 } : undefined;
+}
+
+export async function addPayout(payout: Payout, client?: PoolClient): Promise<Payout> {
+    const query = `
+      INSERT INTO payouts (
+        id, settlement_id, merchant_account_id, settlement_destination_id, 
+        amount_cents, currency, status, provider_name, payout_channel_proc_id,
+        payout_channel_description, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`;
+      
+    const params = [
+        payout.id,
+        payout.settlementId,
+        payout.merchantAccountId,
+        payout.settlementDestinationId,
+        Math.round(payout.amount * 100),
+        payout.currency,
+        payout.status,
+        payout.providerName,
+        payout.payoutChannelProcId,
+        payout.payoutChannelDescription,
+        payout.createdAt,
+        payout.updatedAt
+    ];
+
+    if (client) {
+        await client.query(query, params);
+    } else {
+        await queryRows(query, params);
+    }
+    return payout;
 }
