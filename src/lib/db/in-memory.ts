@@ -1,80 +1,83 @@
 /**
- * @file Managed Postgres-backed repository implementation.
- *
- * NOTE: File retained as `in-memory.ts` to preserve repository import seams.
+ * @file In-memory mock database implementation for development and testing.
+ * This implementation uses seed data and operates on in-memory arrays,
+ * allowing the application to run without a live database connection.
  */
 
 import { formatISO } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
+import type { PoolClient } from 'pg';
 import type { AuditLog, Merchant, Payment, Settlement, Tenant, UATLog, UATTestCase, Entity, MerchantAccount, TenantRecord, SettlementDestination, AllocationRule, PaymentAllocation, LedgerTransaction, LedgerEntry, Payout } from '@/lib/types';
 import { uatTestCases, seedEntities, seedMerchantAccounts, seedTenants, seedSettlementDestinations, seedPayments, seedSettlements, seedAuditLogs, seedAllocationRules, seedPayouts } from './seed-data';
-import { queryOne, queryRows, withTransaction } from './postgres';
-import type { PoolClient } from 'pg';
 
-type WebhookEventState = 'received' | 'processing' | 'processed' | 'failed';
-
-const PROCESSING_LEASE_INTERVAL = '2 minutes';
+// --- In-Memory Data Stores ---
+const entities: Entity[] = [...seedEntities];
+const tenants: TenantRecord[] = [...seedTenants];
+const merchantAccounts: MerchantAccount[] = [...seedMerchantAccounts];
+const settlementDestinations: SettlementDestination[] = [...seedSettlementDestinations];
+const allocationRules: AllocationRule[] = [...seedAllocationRules];
+const payments: Payment[] = [...seedPayments];
+const settlements: Settlement[] = [...seedSettlements];
+const payouts: Payout[] = [...seedPayouts];
+const auditLogs: AuditLog[] = [...seedAuditLogs];
+const uatLogs: UATLog[] = [];
+const paymentAllocations: PaymentAllocation[] = [];
+const ledgerTransactions: LedgerTransaction[] = [];
+const ledgerEntries: LedgerEntry[] = [];
+const webhookEvents: any[] = [];
 
 
 // =================================================================
-// NEW MULTI-ENTITY DATA ACCESS
+// DATA ACCESS IMPLEMENTATION
 // =================================================================
 
 // --- Read operations ---
 
-export const getAllEntities = async (): Promise<Entity[]> => {
-  const rows = await queryRows<{ payload: Entity }>('SELECT payload FROM entities ORDER BY created_at DESC');
-  return rows.map((row) => row.payload);
-};
+export const getAllEntities = async (): Promise<Entity[]> => Promise.resolve(entities);
 
 export const findEntityById = async (id: string): Promise<Entity | undefined> => {
-  const row = await queryOne<{ payload: Entity }>('SELECT payload FROM entities WHERE id = $1', [id]);
-  return row?.payload;
+  return Promise.resolve(entities.find(e => e.id === id));
 };
 
 export const getAllTenants = async (): Promise<Tenant[]> => {
-  const rows = await queryRows<TenantRecord>('SELECT * FROM tenants ORDER BY created_at DESC');
-  const entities = await getAllEntities();
   const entityMap = new Map(entities.map(e => [e.id, e]));
 
-  return rows.map(tenantRecord => ({
+  return Promise.resolve(tenants.map(tenantRecord => ({
     ...tenantRecord,
     name: entityMap.get(tenantRecord.entityId)?.displayName || 'Unknown',
     notes: entityMap.get(tenantRecord.entityId)?.metadata?.notes || '',
     platformFeeType: entityMap.get(tenantRecord.entityId)?.metadata?.platformFeeType || 'percentage',
     platformFeeValue: entityMap.get(tenantRecord.entityId)?.metadata?.platformFeeValue || 0,
     entity: entityMap.get(tenantRecord.entityId)!,
-  }));
+  })));
 };
 
 export const findTenantById = async (id: string): Promise<Tenant | undefined> => {
-    const tenantRecord = await queryOne<TenantRecord>('SELECT * FROM tenants WHERE id = $1', [id]);
+    const tenantRecord = tenants.find(t => t.id === id);
     if (!tenantRecord) return undefined;
 
     const entity = await findEntityById(tenantRecord.entityId);
     if (!entity) return undefined;
 
-    return { 
+    return Promise.resolve({ 
         ...tenantRecord, 
         name: entity.displayName,
         notes: entity.metadata?.notes,
         platformFeeType: entity.metadata?.platformFeeType,
         platformFeeValue: entity.metadata?.platformFeeValue,
         entity 
-    };
+    });
 };
 
 export const getAllMerchants = async (): Promise<Merchant[]> => {
-    const merchantAccounts = await queryRows<MerchantAccount>('SELECT * FROM merchant_accounts ORDER BY created_at DESC');
-    const tenants = await getAllTenants();
-    const entities = await getAllEntities();
-    const settlementDests = await queryRows<SettlementDestination>('SELECT * FROM settlement_destinations');
+    const allTenants = await getAllTenants();
+    const allEntities = await getAllEntities();
+    
+    const tenantMap = new Map(allTenants.map(t => [t.id, t]));
+    const entityMap = new Map(allEntities.map(e => [e.id, e]));
+    const settlementDestMap = new Map(settlementDestinations.map(d => [d.id, d]));
 
-    const tenantMap = new Map(tenants.map(t => [t.id, t]));
-    const entityMap = new Map(entities.map(e => [e.id, e]));
-    const settlementDestMap = new Map(settlementDests.map(d => [d.id, d]));
-
-    return merchantAccounts.map(ma => {
+    return Promise.resolve(merchantAccounts.map(ma => {
         const entity = entityMap.get(ma.entityId)!;
         const defaultDest = ma.defaultSettlementDestinationId ? settlementDestMap.get(ma.defaultSettlementDestinationId) : null;
         return {
@@ -95,25 +98,25 @@ export const getAllMerchants = async (): Promise<Merchant[]> => {
             tenant: tenantMap.get(ma.tenantId)!,
             defaultSettlementDestination: defaultDest || null,
         }
-    });
+    }));
 }
 
 export const findMerchantById = async (id: string): Promise<Merchant | undefined> => {
-    const merchantAccount = await queryOne<MerchantAccount>('SELECT * FROM merchant_accounts WHERE id = $1', [id]);
+    const merchantAccount = merchantAccounts.find(m => m.id === id);
     if (!merchantAccount) return undefined;
 
-    const [tenant, entity, settlementDests] = await Promise.all([
+    const [tenant, entity] = await Promise.all([
         findTenantById(merchantAccount.tenantId),
-        findEntityById(merchantAccount.entityId),
-        queryRows<SettlementDestination>('SELECT * FROM settlement_destinations WHERE merchant_account_id = $1', [id])
+        findEntityById(merchantAccount.entityId)
     ]);
     
     if (!tenant || !entity) return undefined;
     
-    const settlementDestMap = new Map(settlementDests.map(d => [d.id, d]));
-    const defaultDest = merchantAccount.defaultSettlementDestinationId ? settlementDestMap.get(merchantAccount.defaultSettlementDestinationId) ?? null : null;
+    const defaultDest = merchantAccount.defaultSettlementDestinationId 
+        ? settlementDestinations.find(d => d.id === merchantAccount.defaultSettlementDestinationId) ?? null 
+        : null;
 
-    return {
+    return Promise.resolve({
         ...merchantAccount,
         businessName: entity.legalName,
         displayName: entity.displayName,
@@ -130,204 +133,118 @@ export const findMerchantById = async (id: string): Promise<Merchant | undefined
         entity,
         tenant,
         defaultSettlementDestination: defaultDest,
-    };
+    });
 }
 
 export const getMerchantsByTenantId = async (tenantId: string): Promise<Merchant[]> => {
     const allMerchants = await getAllMerchants();
-    return allMerchants.filter(m => m.tenantId === tenantId);
+    return Promise.resolve(allMerchants.filter(m => m.tenantId === tenantId));
 }
 
+// --- Write operations ---
 
-// Tenants
 export const addTenant = async (tenant: Tenant): Promise<Tenant> => {
-  await withTransaction(async client => {
-    await client.query(
-      'INSERT INTO entities (id, legal_name, display_name, entity_type, parent_entity_id, status, metadata, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-      [tenant.entity.id, tenant.entity.legalName, tenant.entity.displayName, tenant.entity.entityType, tenant.entity.parentEntityId, tenant.entity.status, tenant.entity.metadata, tenant.entity.createdAt, tenant.entity.updatedAt]
-    );
-    await client.query(
-      'INSERT INTO tenants (id, entity_id, tenant_code, status, settings, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
-      [tenant.id, tenant.entityId, tenant.tenantCode, tenant.status, tenant.settings, tenant.createdAt, tenant.updatedAt]
-    );
+  entities.push(tenant.entity);
+  tenants.push({
+      id: tenant.id,
+      entityId: tenant.entityId,
+      tenantCode: tenant.tenantCode,
+      status: tenant.status,
+      settings: tenant.settings,
+      createdAt: tenant.createdAt,
+      updatedAt: tenant.updatedAt,
   });
-  return tenant;
+  return Promise.resolve(tenant);
 };
 
-// Merchants
 export const addMerchant = async (merchant: Merchant): Promise<Merchant> => {
-  await withTransaction(async client => {
-     await client.query(
-      'INSERT INTO entities (id, legal_name, display_name, entity_type, parent_entity_id, status, metadata, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-      [merchant.entity.id, merchant.entity.legalName, merchant.entity.displayName, merchant.entity.entityType, merchant.entity.parentEntityId, merchant.entity.status, merchant.entity.metadata, merchant.entity.createdAt, merchant.entity.updatedAt]
-    );
-    await client.query(
-      'INSERT INTO merchant_accounts (id, entity_id, tenant_id, onboarding_status, kyc_status, risk_status, activation_status, settlement_status, default_settlement_destination_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-      [merchant.id, merchant.entityId, merchant.tenantId, merchant.onboardingStatus, merchant.kycStatus, merchant.riskStatus, merchant.activationStatus, merchant.settlementStatus, merchant.defaultSettlementDestinationId, merchant.createdAt, merchant.updatedAt]
-    );
-    if (merchant.defaultSettlementDestination) {
-        await client.query(
-            'INSERT INTO settlement_destinations (id, merchant_account_id, destination_type, account_name, account_number_masked, bank_code, provider_reference, verification_status, is_default, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
-            [merchant.defaultSettlementDestination.id, merchant.defaultSettlementDestination.merchantAccountId, merchant.defaultSettlementDestination.destinationType, merchant.defaultSettlementDestination.accountName, merchant.defaultSettlementDestination.accountNumberMasked, merchant.defaultSettlementDestination.bankCode, merchant.defaultSettlementDestination.providerReference, merchant.defaultSettlementDestination.verificationStatus, merchant.defaultSettlementDestination.isDefault, merchant.defaultSettlementDestination.createdAt, merchant.defaultSettlementDestination.updatedAt]
-        );
-    }
+  entities.push(merchant.entity);
+  merchantAccounts.push({
+      id: merchant.id,
+      entityId: merchant.entityId,
+      tenantId: merchant.tenantId,
+      onboardingStatus: merchant.onboardingStatus,
+      kycStatus: merchant.kycStatus,
+      riskStatus: merchant.riskStatus,
+      activationStatus: merchant.activationStatus,
+      settlementStatus: merchant.settlementStatus,
+      defaultSettlementDestinationId: merchant.defaultSettlementDestinationId,
+      createdAt: merchant.createdAt,
+      updatedAt: merchant.updatedAt,
   });
-  return merchant;
+  if (merchant.defaultSettlementDestination) {
+      settlementDestinations.push(merchant.defaultSettlementDestination);
+  }
+  return Promise.resolve(merchant);
 };
 
 // Payments
-export const getAllPayments = async (): Promise<Payment[]> => {
-  const rows = await queryRows<{ payload: Payment }>('SELECT payload FROM payments ORDER BY created_at DESC');
-  return rows.map((row) => row.payload);
-};
-
-export const findPaymentById = async (id: string): Promise<Payment | undefined> => {
-  const row = await queryOne<{ payload: Payment }>('SELECT payload FROM payments WHERE id = $1', [id]);
-  return row?.payload;
-};
+export const getAllPayments = async (): Promise<Payment[]> => Promise.resolve([...payments].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+export const findPaymentById = async (id: string): Promise<Payment | undefined> => Promise.resolve(payments.find(p => p.id === id));
 
 export const addPayment = async (payment: Payment, client?: PoolClient): Promise<Payment> => {
-  const query = 'INSERT INTO payments (id, tenant_id, merchant_id, created_at, payload, merchant_account_id) VALUES ($1, $2, $3, $4::timestamptz, $5::jsonb, $3)';
-  const params = [payment.id, payment.tenantId, payment.merchantId, payment.createdAt, JSON.stringify(payment)];
-  
-  if (client) {
-      await client.query(query, params);
-  } else {
-      await queryRows(query, params);
-  }
-  return payment;
+  payments.unshift(payment);
+  return Promise.resolve(payment);
 };
 
 export const updatePayment = async (id: string, updatedData: Partial<Payment>, client?: PoolClient): Promise<Payment | undefined> => {
-  const current = await findPaymentById(id);
-  if (!current) return undefined;
-  const updated: Payment = { ...current, ...updatedData, updatedAt: formatISO(new Date()) };
-  
-  const query = 'UPDATE payments SET tenant_id = $1, merchant_id = $2, created_at = $3::timestamptz, payload = $4::jsonb, merchant_account_id = $2 WHERE id = $5';
-  const params = [updated.tenantId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id];
-
-  if (client) {
-    await client.query(query, params);
-  } else {
-    await queryRows(query, params);
-  }
-
-  return updated;
+  const index = payments.findIndex(p => p.id === id);
+  if (index === -1) return undefined;
+  payments[index] = { ...payments[index], ...updatedData, updatedAt: formatISO(new Date()) };
+  return Promise.resolve(payments[index]);
 };
 
 // Settlements
-export const getAllSettlements = async (): Promise<Settlement[]> => {
-  const rows = await queryRows<{ payload: Settlement }>('SELECT payload FROM settlements ORDER BY created_at DESC');
-  return rows.map((row) => row.payload);
-};
-
-export const findSettlementById = async (id: string): Promise<Settlement | undefined> => {
-  const row = await queryOne<{ payload: Settlement }>('SELECT payload FROM settlements WHERE id = $1', [id]);
-  return row?.payload;
-};
-
-export const findSettlementByPaymentId = async (paymentId: string): Promise<Settlement | undefined> => {
-  const row = await queryOne<{ payload: Settlement }>('SELECT payload FROM settlements WHERE payment_id = $1', [paymentId]);
-  return row?.payload;
-};
+export const getAllSettlements = async (): Promise<Settlement[]> => Promise.resolve([...settlements].sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+export const findSettlementById = async (id: string): Promise<Settlement | undefined> => Promise.resolve(settlements.find(s => s.id === id));
+export const findSettlementByPaymentId = async (paymentId: string): Promise<Settlement | undefined> => Promise.resolve(settlements.find(s => s.paymentId === paymentId));
 
 export const addSettlement = async (settlement: Settlement, client?: PoolClient): Promise<Settlement> => {
-  const query = 'INSERT INTO settlements (id, tenant_id, payment_id, merchant_id, created_at, payload, merchant_account_id) VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb, $4)';
-  const params = [settlement.id, settlement.tenantId, settlement.paymentId, settlement.merchantId, settlement.createdAt, JSON.stringify(settlement)];
-  
-  if (client) {
-    await client.query(query, params);
-  } else {
-    await queryRows(query, params);
-  }
-
-  return settlement;
+  settlements.unshift(settlement);
+  return Promise.resolve(settlement);
 };
 
 export const updateSettlement = async (id: string, updatedData: Partial<Settlement>, client?: PoolClient): Promise<Settlement | undefined> => {
-  const current = await findSettlementById(id);
-  if (!current) return undefined;
-  const updated: Settlement = { ...current, ...updatedData, updatedAt: formatISO(new Date()) };
-
-  const query = 'UPDATE settlements SET tenant_id = $1, payment_id = $2, merchant_id = $3, created_at = $4::timestamptz, payload = $5::jsonb, merchant_account_id = $3, status = $7 WHERE id = $6';
-  const params = [updated.tenantId, updated.paymentId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id, updated.status];
-
-  if (client) {
-    await client.query(query, params);
-  } else {
-    await queryRows(query, params);
-  }
-
-  return updated;
+  const index = settlements.findIndex(s => s.id === id);
+  if (index === -1) return undefined;
+  settlements[index] = { ...settlements[index], ...updatedData, updatedAt: formatISO(new Date()) };
+  return Promise.resolve(settlements[index]);
 };
 
 // Audit Logs
-export const getAllAuditLogs = async (): Promise<AuditLog[]> => {
-  const rows = await queryRows<{ payload: AuditLog }>('SELECT payload FROM audit_logs ORDER BY timestamp DESC');
-  return rows.map((row) => row.payload);
-};
+export const getAllAuditLogs = async (): Promise<AuditLog[]> => Promise.resolve([...auditLogs].sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
 
 export const findAuditLogByEventIdentifier = async (eventIdentifier: string): Promise<AuditLog | undefined> => {
-  const row = await queryOne<{ payload: AuditLog }>('SELECT payload FROM audit_logs WHERE event_identifier = $1 LIMIT 1', [eventIdentifier]);
-  return row?.payload;
+    return Promise.resolve(auditLogs.find(l => l.eventIdentifier === eventIdentifier));
 };
 
 export const addAuditLog = async (log: Omit<AuditLog, 'id' | 'timestamp'>): Promise<AuditLog> => {
-  const now = formatISO(new Date());
   const newLog: AuditLog = {
     ...log,
     id: `log-${uuidv4()}`,
-    timestamp: now,
+    timestamp: formatISO(new Date()),
   };
-
-  await queryRows(
-    'INSERT INTO audit_logs (id, timestamp, event_identifier, entity_id, payload) VALUES ($1, $2::timestamptz, $3, $4, $5::jsonb)',
-    [newLog.id, newLog.timestamp, newLog.eventIdentifier ?? null, newLog.entityId, JSON.stringify(newLog)]
-  );
-
-  return newLog;
+  auditLogs.unshift(newLog);
+  return Promise.resolve(newLog);
 };
 
-// --- Allocation Engine ---
-export const getAllocationRules = async(): Promise<AllocationRule[]> => {
-    return queryRows<AllocationRule>('SELECT * FROM allocation_rules WHERE active = true ORDER BY priority ASC');
-}
+// Allocation Engine
+export const getAllocationRules = async(): Promise<AllocationRule[]> => Promise.resolve(allocationRules.filter(r => r.active).sort((a,b) => a.priority - b.priority));
+export const getPaymentAllocationsByPaymentId = async (paymentId: string): Promise<PaymentAllocation[]> => Promise.resolve(paymentAllocations.filter(pa => pa.paymentId === paymentId));
 
-export const getPaymentAllocationsByPaymentId = async (paymentId: string): Promise<PaymentAllocation[]> => {
-    const rows = await queryRows<{amount_cents: number} & Omit<PaymentAllocation, 'amount'>>('SELECT * FROM payment_allocations WHERE payment_id = $1 ORDER BY created_at ASC', [paymentId]);
-    return rows.map(r => ({ ...r, amount: r.amount_cents / 100 }));
-}
-
-export const addPaymentAllocations = async (allocations: Omit<PaymentAllocation, 'id'|'createdAt'>[], client?: PoolClient): Promise<void> => {
+export const addPaymentAllocations = async (allocations: Omit<PaymentAllocation, 'id' | 'createdAt'>[], client?: PoolClient): Promise<void> => {
     const now = new Date();
-    const query = 'INSERT INTO payment_allocations (id, payment_id, allocation_type, recipient_entity_id, basis_type, amount_cents, currency, rule_reference, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)';
-    
     for (const alloc of allocations) {
-        const fullAlloc: PaymentAllocation = {
+        paymentAllocations.push({
             ...alloc,
             id: `alloc-${uuidv4()}`,
             createdAt: formatISO(now),
-        };
-        const params = [
-            fullAlloc.id,
-            fullAlloc.paymentId,
-            fullAlloc.allocationType,
-            fullAlloc.recipientEntityId,
-            fullAlloc.basisType,
-            Math.round(fullAlloc.amount * 100), // Store as cents
-            fullAlloc.currency,
-            fullAlloc.ruleReference,
-            fullAlloc.createdAt
-        ];
-        if (client) {
-            await client.query(query, params);
-        } else {
-            await queryRows(query, params);
-        }
+        });
     }
+    return Promise.resolve();
 }
 
-// --- Ledger ---
+// Ledger
 export async function addLedgerTransactionAndEntries(
     transaction: Omit<LedgerTransaction, 'id' | 'createdAt' | 'updatedAt'>,
     entries: Omit<LedgerEntry, 'id' | 'createdAt'>[],
@@ -340,207 +257,112 @@ export async function addLedgerTransactionAndEntries(
         createdAt: now,
         updatedAt: now,
     };
+    ledgerTransactions.push(fullTransaction);
 
-    const transactionQuery = 'INSERT INTO ledger_transactions (id, payment_id, payout_id, transaction_type, status, reference, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)';
-    const transactionParams = [fullTransaction.id, fullTransaction.paymentId, fullTransaction.payoutId, fullTransaction.transactionType, fullTransaction.status, fullTransaction.reference, fullTransaction.createdAt, fullTransaction.updatedAt];
-
-    if (client) {
-        await client.query(transactionQuery, transactionParams);
-    } else {
-        await queryRows(transactionQuery, transactionParams);
-    }
-
-    const entryQuery = 'INSERT INTO ledger_entries (id, ledger_transaction_id, entity_id, account_code, entry_type, amount_cents, currency, description, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)';
     for (const entry of entries) {
-        const fullEntry: LedgerEntry = {
+        ledgerEntries.push({
             ...entry,
             id: `lgr-ent-${uuidv4()}`,
             ledgerTransactionId: fullTransaction.id,
             createdAt: now,
-        };
-        const entryParams = [
-            fullEntry.id,
-            fullEntry.ledgerTransactionId,
-            fullEntry.entityId,
-            fullEntry.accountCode,
-            fullEntry.entryType,
-            Math.round(fullEntry.amount * 100), // Store as cents
-            fullEntry.currency,
-            fullEntry.description,
-            fullEntry.createdAt,
-        ];
-        if (client) {
-            await client.query(entryQuery, entryParams);
-        } else {
-            await queryRows(entryQuery, entryParams);
-        }
+        });
     }
+    return Promise.resolve();
 }
 
 
-// Webhook events (durable idempotency)
+// Webhook events
 export const claimWebhookEventForProcessing = async (
   eventIdentifier: string,
   orderSeq?: string,
   transSeq?: string
 ): Promise<'started' | 'already-processed' | 'in-progress'> => {
-  return withTransaction(async (client) => {
-    const existing = await client.query<{ state: WebhookEventState; lease_expires_at: string | null }>(
-      'SELECT state, lease_expires_at FROM webhook_events WHERE event_identifier = $1 FOR UPDATE',
-      [eventIdentifier]
-    );
+  const existing = webhookEvents.find(e => e.eventIdentifier === eventIdentifier);
+  if (existing) {
+      if (existing.state === 'processed') return Promise.resolve('already-processed');
+      if (existing.state === 'processing' && new Date(existing.lease_expires_at).getTime() > Date.now()) {
+          return Promise.resolve('in-progress');
+      }
+  }
 
-    if (existing.rows.length === 0) {
-      await client.query(
-        `INSERT INTO webhook_events (event_identifier, state, order_seq, trans_seq, received_at, updated_at, lease_expires_at)
-         VALUES ($1, 'processing', $2, $3, NOW(), NOW(), NOW() + INTERVAL '${PROCESSING_LEASE_INTERVAL}')`,
-        [eventIdentifier, orderSeq ?? null, transSeq ?? null]
-      );
-      return 'started';
-    }
+  const newEvent = {
+      eventIdentifier,
+      state: 'processing',
+      orderSeq,
+      transSeq,
+      receivedAt: new Date(),
+      updatedAt: new Date(),
+      lease_expires_at: new Date(Date.now() + 2 * 60 * 1000), // 2 minute lease
+      last_error: null,
+  };
 
-    const row = existing.rows[0];
-    if (row.state === 'processed') {
-      return 'already-processed';
-    }
+  if (existing) {
+      const index = webhookEvents.findIndex(e => e.eventIdentifier === eventIdentifier);
+      webhookEvents[index] = newEvent;
+  } else {
+      webhookEvents.push(newEvent);
+  }
 
-    const leaseExpired = row.lease_expires_at ? new Date(row.lease_expires_at).getTime() <= Date.now() : true;
-    if (row.state === 'failed' || leaseExpired) {
-      await client.query(
-        `UPDATE webhook_events
-         SET state = 'processing',
-             order_seq = COALESCE(order_seq, $2),
-             trans_seq = COALESCE(trans_seq, $3),
-             updated_at = NOW(),
-             lease_expires_at = NOW() + INTERVAL '${PROCESSING_LEASE_INTERVAL}',
-             last_error = NULL
-         WHERE event_identifier = $1`,
-        [eventIdentifier, orderSeq ?? null, transSeq ?? null]
-      );
-      return 'started';
-    }
-
-    return 'in-progress';
-  });
+  return Promise.resolve('started');
 };
 
 export const markWebhookEventProcessed = async (eventIdentifier: string): Promise<void> => {
-  await queryRows(
-    "UPDATE webhook_events SET state = 'processed', updated_at = NOW(), lease_expires_at = NULL, last_error = NULL WHERE event_identifier = $1",
-    [eventIdentifier]
-  );
+  const index = webhookEvents.findIndex(e => e.eventIdentifier === eventIdentifier);
+  if (index !== -1) {
+      webhookEvents[index].state = 'processed';
+      webhookEvents[index].updatedAt = new Date();
+      webhookEvents[index].lease_expires_at = null;
+  }
+  return Promise.resolve();
 };
 
 export const releaseWebhookEventClaim = async (eventIdentifier: string, errorMessage?: string): Promise<void> => {
-  await queryRows(
-    "UPDATE webhook_events SET state = 'failed', updated_at = NOW(), lease_expires_at = NULL, last_error = $2 WHERE event_identifier = $1",
-    [eventIdentifier, errorMessage ?? null]
-  );
+  const index = webhookEvents.findIndex(e => e.eventIdentifier === eventIdentifier);
+  if (index !== -1) {
+      webhookEvents[index].state = 'failed';
+      webhookEvents[index].updatedAt = new Date();
+      webhookEvents[index].lease_expires_at = null;
+      webhookEvents[index].last_error = errorMessage;
+  }
+  return Promise.resolve();
 };
 
 // UAT
-export const getAllUATLogs = async (): Promise<UATLog[]> => {
-  const rows = await queryRows<{ payload: UATLog }>('SELECT payload FROM uat_logs ORDER BY timestamp DESC');
-  return rows.map((row) => row.payload);
-};
-
+export const getAllUATLogs = async (): Promise<UATLog[]> => Promise.resolve([...uatLogs].sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
 export const getUATTestCases = (): UATTestCase[] => uatTestCases;
-
 export const addUATLog = async (log: Omit<UATLog, 'id' | 'timestamp'>): Promise<UATLog> => {
   const newLog: UATLog = {
     ...log,
     id: `uatlog-${uuidv4()}`,
     timestamp: formatISO(new Date()),
   };
-
-  await queryRows(
-    'INSERT INTO uat_logs (id, timestamp, payload) VALUES ($1, $2::timestamptz, $3::jsonb)',
-    [newLog.id, newLog.timestamp, JSON.stringify(newLog)]
-  );
-
-  return newLog;
+  uatLogs.unshift(newLog);
+  return Promise.resolve(newLog);
 };
 
 // Payouts
 export async function findPayoutById(id: string): Promise<Payout | undefined> {
-    const row = await queryOne('SELECT * FROM payouts WHERE id = $1', [id]);
-    return row ? { ...row, amount: row.amount_cents / 100 } : undefined;
+    return Promise.resolve(payouts.find(p => p.id === id));
 }
 
 export async function updatePayout(id: string, data: Partial<Payout>, client?: PoolClient): Promise<Payout | undefined> {
-    const current = await findPayoutById(id);
-    if (!current) return undefined;
-
-    const updated = { ...current, ...data, updatedAt: formatISO(new Date()) };
-    
-    const query = `UPDATE payouts SET
-        status = $1,
-        provider_trans_seq = $2,
-        provider_resp_code = $3,
-        provider_resp_message = $4,
-        provider_trans_state = $5,
-        provider_trans_state_label = $6,
-        signature_verified = $7,
-        provider_timestamp = $8,
-        failure_reason = $9,
-        updated_at = $10
-        WHERE id = $11`;
-
-    const params = [
-        updated.status,
-        updated.providerTransSeq,
-        updated.providerRespCode,
-        updated.providerRespMessage,
-        updated.providerTransState,
-        updated.providerTransStateLabel,
-        updated.signatureVerified,
-        updated.providerTimestamp,
-        updated.failureReason,
-        updated.updatedAt,
-        id,
-    ];
-
-    if (client) {
-      await client.query(query, params);
-    } else {
-      await queryRows(query, params);
-    }
-
-    return updated;
+    const index = payouts.findIndex(p => p.id === id);
+    if (index === -1) return undefined;
+    payouts[index] = { ...payouts[index], ...data, updatedAt: formatISO(new Date()) };
+    return Promise.resolve(payouts[index]);
 }
 
 export async function findPayoutByOrderSeq(orderSeq: string): Promise<Payout | undefined> {
-    const row = await queryOne('SELECT * FROM payouts WHERE id = $1', [orderSeq]); // Assuming orderSeq is the Payout ID
-    return row ? { ...row, amount: row.amount_cents / 100 } : undefined;
+    return Promise.resolve(payouts.find(p => p.id === orderSeq));
 }
 
 export async function addPayout(payout: Payout, client?: PoolClient): Promise<Payout> {
-    const query = `
-      INSERT INTO payouts (
-        id, settlement_id, merchant_account_id, settlement_destination_id, 
-        amount_cents, currency, status, provider_name, payout_channel_proc_id,
-        payout_channel_description, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`;
-      
-    const params = [
-        payout.id,
-        payout.settlementId,
-        payout.merchantAccountId,
-        payout.settlementDestinationId,
-        Math.round(payout.amount * 100),
-        payout.currency,
-        payout.status,
-        payout.providerName,
-        payout.payoutChannelProcId,
-        payout.payoutChannelDescription,
-        payout.createdAt,
-        payout.updatedAt
-    ];
+    payouts.unshift(payout);
+    return Promise.resolve(payout);
+}
 
-    if (client) {
-        await client.query(query, params);
-    } else {
-        await queryRows(query, params);
-    }
-    return payout;
+export async function withTransaction<T>(fn: (client?: PoolClient) => Promise<T>): Promise<T> {
+  // In-memory does not have transactions, so just execute the function.
+  // The optional client argument is handled by the in-memory data functions.
+  return fn();
 }

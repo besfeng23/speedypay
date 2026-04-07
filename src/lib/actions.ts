@@ -23,6 +23,7 @@ import {
   getPaymentById,
   getTenantById,
   findEntityById,
+  withTransaction,
 } from './data';
 import type { Merchant, Settlement, Payment, Tenant, UATTestPayload, Entity, TenantRecord, MerchantAccount, SettlementDestination, PaymentAllocation, LedgerTransaction, LedgerEntry, Payout, InternalSettlementStatus } from './types';
 import { cashOut, qryOrder, qryBalance, createCollectionPayment as apiCreateCollectionPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
@@ -34,7 +35,6 @@ import { verifySignature } from './speedypay/crypto';
 import { requireAdminSession } from './auth/session';
 import { calculateAllocations } from './allocation';
 import { createLedgerEntriesForPaymentCapture } from './ledger';
-import { withTransaction } from './db/postgres';
 
 
 interface ActionResult<TData = unknown> {

@@ -215,3 +215,5 @@ export async function updatePayment(id: string, updatedData: Partial<Payment>, c
 export async function updatePayout(id: string, updatedData: Partial<Payout>, client?: PoolClient): Promise<Payout | undefined> {
   return db.updatePayout(id, updatedData, client);
 }
+
+export const withTransaction = db.withTransaction;
