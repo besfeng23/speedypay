@@ -43,17 +43,24 @@ const statusToVariantMap: Record<string, StatusVariant> = {
     completed: 'success',
     active: 'success',
     sent: 'success',
+    approved: 'success',
+    paid: 'success',
+    low: 'success',
 
     // Warning/Pending states
     pending: 'warning',
     'in-review': 'warning',
     'to-be-paid': 'warning',
+    unpaid: 'warning',
+    restricted: 'warning',
+    medium: 'warning',
 
     // Danger/Failed states
     failed: 'danger',
     rejected: 'danger',
     suspended: 'danger',
     expired: 'danger',
+    high: 'danger',
     
     // Info/Processing states
     processing: 'info',
@@ -63,6 +70,8 @@ const statusToVariantMap: Record<string, StatusVariant> = {
     inactive: 'neutral',
     cancelled: 'neutral',
     'N/A': 'neutral',
+    'not_started': 'neutral',
+    'not-assessed': 'neutral',
 };
 
 export interface StatusBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -71,7 +80,7 @@ export interface StatusBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function StatusBadge({ className, status, ...props }: StatusBadgeProps) {
   const statusString = status || 'N/A';
-  const variant = statusToVariantMap[statusString.toLowerCase().replace(/ /g, '-')] || 'neutral';
+  const variant = statusToVariantMap[statusString.toLowerCase().replace(/_/g, '-')] || 'neutral';
   
   return (
     <div

@@ -151,7 +151,9 @@ export async function createMerchant(values: MerchantFormValues): Promise<Action
       entityId: entity.id,
       tenantId: validatedData.tenantId,
       onboardingStatus: validatedData.onboardingStatus,
-      kycStatus: 'pending',
+      kycStatus: 'not_started',
+      riskStatus: 'not_assessed',
+      activationStatus: 'inactive',
       settlementStatus: 'active',
       defaultSettlementDestinationId: null, // This would be created in a separate step
       createdAt: formatISO(now),
@@ -264,21 +266,17 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
     const newPayment: Payment = {
         id: orderSeq,
         tenantId: merchant.tenantId,
+        merchantId: merchantId,
         externalReference: 'N/A',
         bookingReferenceOrInvoiceReference: description,
         customerName: 'N/A (Generated Link)',
         customerEmail: 'N/A',
-        merchantId: merchantId,
         grossAmount: amount,
         currency: 'PHP',
-        feeType: 'percentage', // This field is becoming less relevant.
-        feeValue: 0, // This field is becoming less relevant.
         platformFeeAmount: totalFees,
         merchantNetAmount,
         paymentStatus: 'pending',
         settlementStatus: 'pending',
-        remittanceStatus: 'pending',
-        sourceChannel: 'Manual',
         createdAt: formatISO(now),
         updatedAt: formatISO(now),
         providerPaymentUrl: response.url,
@@ -363,11 +361,8 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
     if (!settlement) {
         return { success: false, message: "Settlement not found." };
     }
-    if (settlement.remittanceStatus !== 'pending') {
-        return { success: false, message: `Cannot initiate remittance with status: ${settlement.remittanceStatus}`};
-    }
-    if (settlement.providerOrderSeq) {
-        return { success: false, message: "Remittance already initiated. Query status instead." };
+    if (settlement.status !== 'unpaid') {
+        return { success: false, message: `Cannot initiate payout for settlement with status: ${settlement.status}`};
     }
 
     const merchant = await getMerchantById(settlement.merchantId);
@@ -401,23 +396,10 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
             remark: `Payout for settlement ${settlement.id}`,
         });
 
-        const internalRemittanceStatus = mapProviderStateToInternal(response.transState);
-        const previousRemittanceStatus = settlement.remittanceStatus;
-
+        // This action only INITIATES. The webhook will finalize the status.
+        // For now, we update our internal state to 'processing'.
         const updatedSettlement: Partial<Settlement> = {
-            providerName: 'SpeedyPay',
-            remittanceStatus: internalRemittanceStatus,
-            providerOrderSeq: response.orderSeq,
-            providerTransSeq: response.transSeq,
-            providerRespCode: response.respCode,
-            providerRespMessage: response.respMessage,
-            providerTransState: response.transState,
-            providerTransStateLabel: providerStateLabels[response.transState] || 'Unknown',
-            signatureVerified: verifySignature(response, getSpeedyPaySecretOrThrow()),
-            payoutChannelProcId: merchant.defaultSettlementDestination.bankCode,
-            payoutChannelDescription: channelInfo.description,
-            providerTimestamp: response.timestamp,
-            failureReason: response.respCode !== '00000000' ? response.respMessage : null,
+            status: 'processing',
             updatedAt: formatISO(new Date()),
         }
         
@@ -452,35 +434,27 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
 export async function querySettlementStatus(settlementId: string): Promise<ActionResult> {
     const actorEmail = await getAdminActorEmail();
      const settlement = await getSettlementById(settlementId);
-    if (!settlement || !settlement.providerOrderSeq) {
+    if (!settlement || !settlement.payoutId) {
         return { success: false, message: "Settlement not found or has no provider order sequence." };
     }
 
     try {
         const orderDate = format(parseISO(settlement.createdAt), 'yyyy-MM-dd');
+        // Payout and Settlement share the same ID for the provider orderSeq
         const response = await qryOrder({ 
-            orderSeq: settlement.providerOrderSeq,
+            orderSeq: settlement.payoutId,
             orderDate: orderDate
         });
         
-        const internalRemittanceStatus = mapProviderStateToInternal(response.transState);
-        const previousRemittanceStatus = settlement.remittanceStatus;
+        // This is a manual query, so we can directly update the settlement state
+        // In a real scenario, this logic would be in the webhook handler
+        const internalStatus = mapProviderStateToInternal(response.transState);
+        const finalSettlementStatus: InternalSettlementStatus = internalStatus === 'sent' ? 'paid' : internalStatus === 'failed' ? 'failed' : 'processing';
 
-        const updatedSettlement: Partial<Settlement> = {
-            remittanceStatus: internalRemittanceStatus,
-            providerTransSeq: response.transSeq,
-            providerRespCode: response.respCode,
-            providerRespMessage: response.respMessage,
-            providerTransState: response.transState,
-            providerTransStateLabel: providerStateLabels[response.transState] || 'Unknown',
-            signatureVerified: verifySignature(response, getSpeedyPaySecretOrThrow()),
-            providerTimestamp: response.timestamp,
-            lastQueryAt: formatISO(new Date()),
-            failureReason: response.respCode !== '00000000' ? response.respMessage : settlement.failureReason,
+        await dbUpdateSettlement(settlement.id, {
+            status: finalSettlementStatus,
             updatedAt: formatISO(new Date()),
-        }
-
-        await dbUpdateSettlement(settlement.id, updatedSettlement);
+        });
 
          await addAuditLog({
             eventType: 'payout.status.queried',
@@ -490,8 +464,8 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
             entityType: 'settlement',
             source: 'admin',
             action: 'query_payout_status',
-            previousState: previousRemittanceStatus,
-            newState: internalRemittanceStatus,
+            previousState: settlement.status,
+            newState: finalSettlementStatus,
             outcome: 'success',
             correlationId: response.transSeq,
         });

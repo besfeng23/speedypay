@@ -76,6 +76,7 @@ export const getAllMerchants = async (): Promise<Merchant[]> => {
 
     return merchantAccounts.map(ma => {
         const entity = entityMap.get(ma.entityId)!;
+        const defaultDest = ma.defaultSettlementDestinationId ? settlementDestMap.get(ma.defaultSettlementDestinationId) : null;
         return {
             ...ma,
             businessName: entity.legalName,
@@ -85,15 +86,14 @@ export const getAllMerchants = async (): Promise<Merchant[]> => {
             mobile: entity.metadata.mobile,
             notes: entity.metadata.notes,
             status: entity.status as 'active' | 'inactive' | 'suspended',
-            propertyAssociations: entity.metadata.propertyAssociations || [],
             defaultFeeType: entity.metadata.defaultFeeType || 'percentage',
             defaultFeeValue: entity.metadata.defaultFeeValue || 0,
-            settlementAccountName: settlementDestMap.get(ma.defaultSettlementDestinationId || '')?.accountName || '',
-            settlementAccountNumberOrWalletId: settlementDestMap.get(ma.defaultSettlementDestinationId || '')?.accountNumberMasked || '',
-            defaultPayoutChannel: settlementDestMap.get(ma.defaultSettlementDestinationId || '')?.bankCode || '',
+            settlementAccountName: defaultDest?.accountName || '',
+            settlementAccountNumberOrWalletId: defaultDest?.accountNumberMasked || '',
+            defaultPayoutChannel: defaultDest?.bankCode || '',
             entity,
             tenant: tenantMap.get(ma.tenantId)!,
-            defaultSettlementDestination: ma.defaultSettlementDestinationId ? settlementDestMap.get(ma.defaultSettlementDestinationId) ?? null : null,
+            defaultSettlementDestination: defaultDest || null,
         }
     });
 }
@@ -122,7 +122,6 @@ export const findMerchantById = async (id: string): Promise<Merchant | undefined
         mobile: entity.metadata.mobile,
         notes: entity.metadata.notes,
         status: entity.status as 'active' | 'inactive' | 'suspended',
-        propertyAssociations: entity.metadata.propertyAssociations || [],
         defaultFeeType: entity.metadata.defaultFeeType || 'percentage',
         defaultFeeValue: entity.metadata.defaultFeeValue || 0,
         settlementAccountName: defaultDest?.accountName || '',
@@ -163,9 +162,15 @@ export const addMerchant = async (merchant: Merchant): Promise<Merchant> => {
       [merchant.entity.id, merchant.entity.legalName, merchant.entity.displayName, merchant.entity.entityType, merchant.entity.parentEntityId, merchant.entity.status, merchant.entity.metadata, merchant.entity.createdAt, merchant.entity.updatedAt]
     );
     await client.query(
-      'INSERT INTO merchant_accounts (id, entity_id, tenant_id, onboarding_status, kyc_status, settlement_status, default_settlement_destination_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
-      [merchant.id, merchant.entityId, merchant.tenantId, merchant.onboardingStatus, merchant.kycStatus, merchant.settlementStatus, merchant.defaultSettlementDestinationId, merchant.createdAt, merchant.updatedAt]
+      'INSERT INTO merchant_accounts (id, entity_id, tenant_id, onboarding_status, kyc_status, risk_status, activation_status, settlement_status, default_settlement_destination_id, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+      [merchant.id, merchant.entityId, merchant.tenantId, merchant.onboardingStatus, merchant.kycStatus, merchant.riskStatus, merchant.activationStatus, merchant.settlementStatus, merchant.defaultSettlementDestinationId, merchant.createdAt, merchant.updatedAt]
     );
+    if (merchant.defaultSettlementDestination) {
+        await client.query(
+            'INSERT INTO settlement_destinations (id, merchant_account_id, destination_type, account_name, account_number_masked, bank_code, provider_reference, verification_status, is_default, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+            [merchant.defaultSettlementDestination.id, merchant.defaultSettlementDestination.merchantAccountId, merchant.defaultSettlementDestination.destinationType, merchant.defaultSettlementDestination.accountName, merchant.defaultSettlementDestination.accountNumberMasked, merchant.defaultSettlementDestination.bankCode, merchant.defaultSettlementDestination.providerReference, merchant.defaultSettlementDestination.verificationStatus, merchant.defaultSettlementDestination.isDefault, merchant.defaultSettlementDestination.createdAt, merchant.defaultSettlementDestination.updatedAt]
+        );
+    }
   });
   return merchant;
 };
@@ -237,8 +242,8 @@ export const updateSettlement = async (id: string, updatedData: Partial<Settleme
   const updated: Settlement = { ...current, ...updatedData, updatedAt: formatISO(new Date()) };
 
   await queryRows(
-    'UPDATE settlements SET tenant_id = $1, payment_id = $2, merchant_id = $3, created_at = $4::timestamptz, payload = $5::jsonb, merchant_account_id = $3 WHERE id = $6',
-    [updated.tenantId, updated.paymentId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id]
+    'UPDATE settlements SET tenant_id = $1, payment_id = $2, merchant_id = $3, created_at = $4::timestamptz, payload = $5::jsonb, merchant_account_id = $3, status = $7 WHERE id = $6',
+    [updated.tenantId, updated.paymentId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id, updated.status]
   );
 
   return updated;
@@ -277,8 +282,8 @@ export const getAllocationRules = async(): Promise<AllocationRule[]> => {
 }
 
 export const getPaymentAllocationsByPaymentId = async (paymentId: string): Promise<PaymentAllocation[]> => {
-    const rows = await queryRows<{payload: any}>('SELECT payload FROM payment_allocations WHERE payment_id = $1 ORDER BY created_at ASC', [paymentId]);
-    return rows.map(r => ({ ...r.payload, amount: r.payload.amount_cents / 100 }));
+    const rows = await queryRows<{amount_cents: number} & Omit<PaymentAllocation, 'amount'>>('SELECT * FROM payment_allocations WHERE payment_id = $1 ORDER BY created_at ASC', [paymentId]);
+    return rows.map(r => ({ ...r, amount: r.amount_cents / 100 }));
 }
 
 export const addPaymentAllocations = async (allocations: Omit<PaymentAllocation, 'id'|'createdAt'>[], client?: PoolClient): Promise<void> => {
@@ -443,3 +448,51 @@ export const addUATLog = async (log: Omit<UATLog, 'id' | 'timestamp'>): Promise<
 
   return newLog;
 };
+
+// Payouts
+export async function findPayoutById(id: string): Promise<any | undefined> {
+    const row = await queryOne('SELECT * FROM payouts WHERE id = $1', [id]);
+    return row ? { ...row, amount: row.amount_cents / 100 } : undefined;
+}
+
+export async function updatePayout(id: string, data: Partial<any>): Promise<any | undefined> {
+    const current = await findPayoutById(id);
+    if (!current) return undefined;
+
+    const updated = { ...current, ...data, updatedAt: formatISO(new Date()) };
+    
+    // Manual mapping for now
+    const query = `UPDATE payouts SET
+        status = $1,
+        provider_trans_seq = $2,
+        provider_resp_code = $3,
+        provider_resp_message = $4,
+        provider_trans_state = $5,
+        provider_trans_state_label = $6,
+        signature_verified = $7,
+        provider_timestamp = $8,
+        failure_reason = $9,
+        updated_at = $10
+        WHERE id = $11`;
+
+    await queryRows(query, [
+        updated.status,
+        updated.providerTransSeq,
+        updated.providerRespCode,
+        updated.providerRespMessage,
+        updated.providerTransState,
+        updated.providerTransStateLabel,
+        updated.signatureVerified,
+        updated.providerTimestamp,
+        updated.failureReason,
+        updated.updatedAt,
+        id,
+    ]);
+
+    return updated;
+}
+
+export async function findPayoutByOrderSeq(orderSeq: string): Promise<any | undefined> {
+    const row = await queryOne('SELECT * FROM payouts WHERE id = $1', [orderSeq]); // Assuming orderSeq is the Payout ID
+    return row ? { ...row, amount: row.amount_cents / 100 } : undefined;
+}

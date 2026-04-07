@@ -86,7 +86,7 @@ function RecentSettlements({ settlements }: { settlements: Settlement[] }) {
                             <Link href={`/settlements/${s.id}`} className="font-mono text-xs hover:underline">{s.id}</Link>
                              <div className="text-xs text-muted-foreground font-sans">{format(new Date(s.createdAt), "PP")}</div>
                         </TableCell>
-                        <TableCell><StatusBadge status={s.settlementStatus} /></TableCell>
+                        <TableCell><StatusBadge status={s.status} /></TableCell>
                         <TableCell className="text-right font-mono text-sm">{formatCurrency(s.merchantNetAmount)}</TableCell>
                     </TableRow>
                 ))}
@@ -114,7 +114,7 @@ export default async function MerchantDetailPage({
     getSettlementsByMerchantId(merchant.id, 5),
   ]);
 
-  const payoutChannel = payoutChannelMap.get(merchant.defaultPayoutChannel);
+  const payoutChannel = payoutChannelMap.get(merchant.defaultSettlementDestination?.bankCode || '');
 
   return (
     <>
@@ -160,9 +160,9 @@ export default async function MerchantDetailPage({
             </CardHeader>
             <CardContent>
               <dl className="divide-y">
-                <DetailItem label="Default Payout Channel" value={<div className="flex flex-col"><Badge variant="secondary" className="w-fit">{payoutChannel?.description || merchant.defaultPayoutChannel}</Badge><span className="text-xs text-muted-foreground font-mono mt-1">{merchant.defaultPayoutChannel}</span></div>} />
-                <DetailItem label="Recipient Account Name" value={merchant.settlementAccountName} />
-                <DetailItem label="Recipient Account Number" value={merchant.settlementAccountNumberOrWalletId} />
+                <DetailItem label="Default Payout Channel" value={<div className="flex flex-col"><Badge variant="secondary" className="w-fit">{payoutChannel?.description || merchant.defaultSettlementDestination?.bankCode}</Badge><span className="text-xs text-muted-foreground font-mono mt-1">{merchant.defaultSettlementDestination?.bankCode}</span></div>} />
+                <DetailItem label="Recipient Account Name" value={merchant.defaultSettlementDestination?.accountName} />
+                <DetailItem label="Recipient Account Number" value={merchant.defaultSettlementDestination?.accountNumberMasked} />
                 <DetailItem label="Default Fee Type" value={<Badge variant="outline" className="capitalize">{merchant.defaultFeeType}</Badge>} />
                 <DetailItem label="Default Fee Value" value={merchant.defaultFeeType === 'percentage' ? `${merchant.defaultFeeValue}%` : `PHP ${merchant.defaultFeeValue.toFixed(2)}`} />
               </dl>
@@ -195,9 +195,23 @@ export default async function MerchantDetailPage({
               <CardTitle>Status</CardTitle>
               <CardDescription>Current operational status of the merchant.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <DetailItem label="Overall Status" value={<StatusBadge status={merchant.status} />} />
-              <DetailItem label="Onboarding" value={<StatusBadge status={merchant.onboardingStatus} />} />
+            <CardContent className="space-y-2">
+                <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-sm text-muted-foreground">Activation Status</span>
+                    <StatusBadge status={merchant.activationStatus} />
+                </div>
+                <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-sm text-muted-foreground">Onboarding Status</span>
+                    <StatusBadge status={merchant.onboardingStatus} />
+                </div>
+                 <div className="flex justify-between items-center py-2 border-b">
+                    <span className="text-sm text-muted-foreground">KYC Status</span>
+                    <StatusBadge status={merchant.kycStatus} />
+                </div>
+                 <div className="flex justify-between items-center py-2">
+                    <span className="text-sm text-muted-foreground">Risk Status</span>
+                    <StatusBadge status={merchant.riskStatus} />
+                </div>
             </CardContent>
           </Card>
           <Card>
@@ -207,8 +221,8 @@ export default async function MerchantDetailPage({
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {merchant.propertyAssociations.length > 0 ? (
-                  merchant.propertyAssociations.map(prop => <Badge key={prop} variant="secondary">{prop}</Badge>)
+                {merchant.entity.metadata.propertyAssociations && merchant.entity.metadata.propertyAssociations.length > 0 ? (
+                  merchant.entity.metadata.propertyAssociations.map((prop: string) => <Badge key={prop} variant="secondary">{prop}</Badge>)
                 ) : (
                   <p className="text-sm text-muted-foreground">No associated properties.</p>
                 )}

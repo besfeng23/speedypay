@@ -269,5 +269,53 @@ export const dbMigrations: DbMigration[] = [
       -- Modify payments table to simplify settlement status
       ALTER TABLE payments ALTER COLUMN payload DROP NOT NULL;
     `
+  },
+  {
+    version: 7,
+    name: 'add_compliance_module',
+    sql: `
+      ALTER TABLE merchant_accounts
+        ADD COLUMN IF NOT EXISTS risk_status TEXT NOT NULL DEFAULT 'not_assessed',
+        ADD COLUMN IF NOT EXISTS activation_status TEXT NOT NULL DEFAULT 'inactive';
+
+      CREATE TABLE IF NOT EXISTS onboarding_cases (
+        id TEXT PRIMARY KEY,
+        entity_id TEXT NOT NULL,
+        tenant_id TEXT,
+        onboarding_type TEXT NOT NULL,
+        status TEXT NOT NULL,
+        assigned_to TEXT,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_onboarding_cases_entity_id ON onboarding_cases(entity_id);
+      CREATE INDEX IF NOT EXISTS idx_onboarding_cases_status ON onboarding_cases(status);
+
+      CREATE TABLE IF NOT EXISTS compliance_documents (
+        id TEXT PRIMARY KEY,
+        onboarding_case_id TEXT NOT NULL,
+        document_type TEXT NOT NULL,
+        file_reference TEXT NOT NULL,
+        status TEXT NOT NULL,
+        reviewed_by TEXT,
+        reviewed_at TIMESTAMPTZ,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_compliance_documents_onboarding_case_id ON compliance_documents(onboarding_case_id);
+
+      CREATE TABLE IF NOT EXISTS compliance_checks (
+        id TEXT PRIMARY KEY,
+        onboarding_case_id TEXT NOT NULL,
+        check_type TEXT NOT NULL,
+        check_status TEXT NOT NULL,
+        result_summary TEXT,
+        raw_reference TEXT,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_compliance_checks_onboarding_case_id ON compliance_checks(onboarding_case_id);
+    `
   }
 ];

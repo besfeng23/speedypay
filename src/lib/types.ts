@@ -3,6 +3,16 @@
 export const MERCHANT_STATUSES = ['active', 'inactive', 'suspended'] as const;
 export const ONBOARDING_STATUSES = ['completed', 'pending', 'in-review', 'rejected'] as const;
 export const KYC_STATUSES = ['not_started', 'pending', 'in_review', 'approved', 'rejected'] as const;
+export const RISK_STATUSES = ['not_assessed', 'low', 'medium', 'high'] as const;
+export const ACTIVATION_STATUSES = ['active', 'inactive', 'restricted'] as const;
+
+export const ONBOARDING_CASE_STATUSES = ['open', 'in_progress', 'awaiting_documents', 'in_review', 'approved', 'rejected', 'closed'] as const;
+export const ONBOARDING_TYPES = ['merchant', 'beneficiary', 'submerchant'] as const;
+export const DOCUMENT_STATUSES = ['pending', 'uploaded', 'in_review', 'approved', 'rejected', 'expired'] as const;
+export const DOCUMENT_TYPES = ['business_registration', 'proof_of_address', 'owner_id', 'bank_statement'] as const;
+export const CHECK_STATUSES = ['pending', 'passed', 'failed', 'warning'] as const;
+export const CHECK_TYPES = ['sanctions_screening', 'credit_check', 'business_verification'] as const;
+
 export const MERCHANT_SETTLEMENT_STATUSES = ['active', 'paused', 'banned'] as const;
 
 export const PAYMENT_STATUSES = ['pending', 'succeeded', 'failed', 'expired', 'processing'] as const;
@@ -38,6 +48,16 @@ export const ACCOUNT_CODES = [
 export type MerchantStatus = (typeof MERCHANT_STATUSES)[number];
 export type OnboardingStatus = (typeof ONBOARDING_STATUSES)[number];
 export type KYStatus = (typeof KYC_STATUSES)[number];
+export type RiskStatus = (typeof RISK_STATUSES)[number];
+export type ActivationStatus = (typeof ACTIVATION_STATUSES)[number];
+
+export type OnboardingCaseStatus = (typeof ONBOARDING_CASE_STATUSES)[number];
+export type OnboardingType = (typeof ONBOARDING_TYPES)[number];
+export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
+export type DocumentType = (typeof DOCUMENT_TYPES)[number];
+export type CheckStatus = (typeof CHECK_STATUSES)[number];
+export type CheckType = (typeof CHECK_TYPES)[number];
+
 export type MerchantSettlementStatus = (typeof MERCHANT_SETTLEMENT_STATUSES)[number];
 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
@@ -88,6 +108,8 @@ export type MerchantAccount = {
   tenantId: string; // Foreign key to Tenant table
   onboardingStatus: OnboardingStatus;
   kycStatus: KYStatus;
+  riskStatus: RiskStatus;
+  activationStatus: ActivationStatus;
   settlementStatus: MerchantSettlementStatus;
   defaultSettlementDestinationId: string | null;
   createdAt: string;
@@ -251,6 +273,44 @@ export type Settlement = {
 
   // This is a hydrated property, not in DB
   payout?: Payout | null;
+};
+
+
+// --- Onboarding & Compliance ---
+
+export type OnboardingCase = {
+  id: string;
+  entityId: string; // The entity being onboarded (e.g., a merchant entity)
+  tenantId: string | null;
+  onboardingType: OnboardingType;
+  status: OnboardingCaseStatus;
+  assignedTo: string | null; // User ID of the compliance officer
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ComplianceDocument = {
+  id: string;
+  onboardingCaseId: string;
+  documentType: DocumentType;
+  fileReference: string; // e.g., a path to a file in cloud storage
+  status: DocumentStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ComplianceCheck = {
+  id: string;
+  onboardingCaseId: string;
+  checkType: CheckType;
+  checkStatus: CheckStatus;
+  resultSummary: string; // A human-readable summary of the check result
+  rawReference: string | null; // e.g., an ID from an external verification service
+  createdAt: string;
+  updatedAt: string;
 };
 
 
