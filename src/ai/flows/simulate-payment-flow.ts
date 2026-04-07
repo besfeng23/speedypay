@@ -10,7 +10,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
 import { v4 as uuidv4 } from 'uuid';
-import { PAYMENT_STATUSES, REMITTANCE_STATUSES, SETTLEMENT_STATUSES } from '@/lib/types';
+import { PAYMENT_STATUSES, SETTLEMENT_STATUSES, PAYOUT_STATUSES } from '@/lib/types';
 
 
 const SimulatePaymentInputSchema = z.object({
@@ -34,13 +34,10 @@ const PaymentRecordSchema = z.object({
   merchantId: z.string().describe('ID of the merchant.'),
   grossAmount: z.number().describe('Gross amount of the payment.'),
   currency: z.string().length(3).describe('Currency code (e.g., USD).'),
-  feeType: z.enum(['percentage', 'fixed']).describe('Type of fee applied.'),
-  feeValue: z.number().describe('Value of the fee.'),
   platformFeeAmount: z.number().describe('Amount deducted as platform fee.'),
   merchantNetAmount: z.number().describe('Net amount remitted to the merchant.'),
   paymentStatus: z.enum(PAYMENT_STATUSES).describe('Current status of the payment.'),
-  settlementStatus: z.enum(SETTLEMENT_STATUSES).describe('Current status of settlement. Use N/A if not applicable.'),
-  remittanceStatus: z.enum(REMITTANCE_STATUSES).describe('Current status of remittance. Use N/A if not applicable.'),
+  settlementStatus: z.enum(['pending', 'completed', 'N/A']).describe('Current status of internal settlement creation.'),
   sourceChannel: z.enum(['Web', 'Mobile', 'API', 'Manual']).describe('Source channel of the payment.'),
   createdAt: z.string().datetime().describe('Timestamp when the payment record was created.'),
   updatedAt: z.string().datetime().describe('Timestamp when the payment record was last updated.'),
@@ -49,25 +46,39 @@ const PaymentRecordSchema = z.object({
 export type PaymentRecord = z.infer<typeof PaymentRecordSchema>;
 
 const SettlementRecordSchema = z.object({
-  id: z.string().describe('Unique identifier for the settlement.'),
+  id: z.string().describe('Unique identifier for the internal settlement record.'),
   paymentId: z.string().describe('ID of the associated payment.'),
   merchantId: z.string().describe('ID of the merchant.'),
+  status: z.enum(SETTLEMENT_STATUSES).describe('Current status of the settlement.'),
   grossAmount: z.number().describe('Gross amount of the payment.'),
   currency: z.string().length(3).describe('Currency code (e.g., USD).'),
   platformFeeAmount: z.number().describe('Amount deducted as platform fee.'),
   merchantNetAmount: z.number().describe('Net amount remitted to the merchant.'),
-  settlementStatus: z.enum(['pending', 'completed']).describe('Current status of the settlement.'),
-  remittanceStatus: z.enum(['pending', 'processing', 'sent', 'failed']).describe('Current status of remittance.'),
-  payoutReference: z.string().nullable().describe('Reference for the payout transaction (e.g., po_xxxxxxxx). Use null when unavailable.'),
-  failureReason: z.string().nullable().describe('Reason for settlement or remittance failure. Use null if not applicable.'),
+  payoutId: z.string().nullable().describe('Reference ID to the Payout record. Should be null if no payout has been created.'),
   createdAt: z.string().datetime().describe('Timestamp when the settlement record was created.'),
   updatedAt: z.string().datetime().describe('Timestamp when the settlement record was last updated.'),
 });
 export type SettlementRecord = z.infer<typeof SettlementRecordSchema>;
 
+const PayoutRecordSchema = z.object({
+    id: z.string().describe('Unique identifier for the payout, should match payoutId in SettlementRecord.'),
+    settlementId: z.string().describe('ID of the parent settlement record.'),
+    merchantAccountId: z.string().describe('ID of the merchant.'),
+    amount: z.number().describe('The net amount to be paid out.'),
+    currency: z.string().length(3).describe('Currency code (e.g., USD).'),
+    status: z.enum(PAYOUT_STATUSES).describe('Status of the external payout process.'),
+    providerName: z.string().describe('Name of the payout provider, e.g., "SpeedyPay".'),
+    failureReason: z.string().nullable().describe('Reason for payout failure. Use null if not applicable.'),
+    createdAt: z.string().datetime().describe('Timestamp when the payout record was created.'),
+    updatedAt: z.string().datetime().describe('Timestamp when the payout record was last updated.'),
+});
+export type PayoutRecord = z.infer<typeof PayoutRecordSchema>;
+
+
 const SimulatePaymentOutputSchema = z.object({
   paymentRecord: PaymentRecordSchema,
   settlementRecord: SettlementRecordSchema.optional(),
+  payoutRecord: PayoutRecordSchema.optional(),
 });
 export type SimulatePaymentOutput = z.infer<typeof SimulatePaymentOutputSchema>;
 
@@ -79,8 +90,8 @@ const simulatePaymentPrompt = ai.definePrompt({
   name: 'simulatePaymentPrompt',
   input: { schema: SimulatePaymentInputSchema },
   output: { schema: SimulatePaymentOutputSchema },
-  prompt: `You are an AI assistant tasked with simulating payment and settlement scenarios for the SpeedyPay Marketplace Console.
-Your goal is to generate realistic JSON output conforming to the provided schemas for a PaymentRecord and an optional SettlementRecord, based on the input parameters.
+  prompt: `You are an AI assistant tasked with simulating payment, settlement, and payout scenarios for the SpeedyPay Marketplace Console.
+Your goal is to generate realistic JSON output conforming to the provided schemas for a PaymentRecord, an optional SettlementRecord, and an optional PayoutRecord based on the input parameters.
 
 Here are the details for the simulation:
 - Scenario Type: {{{scenarioType}}}
@@ -95,41 +106,39 @@ Here are the details for the simulation:
 Follow these rules for generating the output:
 1.  **Unique IDs:** Generate unique and realistic-looking string IDs:
     - 'id' in paymentRecord: "pay-" + 8 random hex characters.
-    - 'id' in settlementRecord (if applicable): "set-" + 8 random hex characters.
+    - 'id' in settlementRecord: "set-" + 8 random hex characters.
+    - 'id' in payoutRecord: "po-" + 8 random hex characters.
     - 'externalReference': "ch_" + 12 random alphanumeric characters.
     - 'bookingReferenceOrInvoiceReference': "inv-2024-" + 5 random digits.
-    - 'payoutReference': "po_" + 12 random alphanumeric characters.
 2.  **Dates:** Use current or slightly past ISO 8601 formatted timestamps for 'createdAt' and 'updatedAt'. 'updatedAt' should be slightly after 'createdAt'.
-3.  **Customer Email:** Generate a plausible customer email based on the 'customerName' (e.g., lowercase name, replace spaces with dots, add @example.com).
-4.  **Source Channel:** Choose a plausible source channel (e.g., 'Web', 'Mobile App', 'POS').
+3.  **Customer Email:** Generate a plausible customer email based on 'customerName'.
+4.  **Source Channel:** Choose a plausible source channel (e.g., 'Web', 'API').
 5.  **Fee Calculation (CRITICAL):**
     - Calculate 'platformFeeAmount'. If 'feeType' is 'percentage', 'platformFeeAmount' = (grossAmount * feeValue / 100). If 'feeType' is 'fixed', 'platformFeeAmount' = feeValue.
     - 'merchantNetAmount' = grossAmount - platformFeeAmount.
-    - **All currency amounts ('grossAmount', 'platformFeeAmount', 'merchantNetAmount') must be numbers rounded to exactly two decimal places.** For example, 12.3 must be 12.30, and 15 must be 15.00.
-6.  **Currency:** The currency for the settlement record must be the same as the payment record.
-7.  **Status Determination:** Based on 'scenarioType', use the exact lowercase status strings as defined in the schemas.
+    - **All currency amounts must be numbers rounded to exactly two decimal places.**
+6.  **Scenario Logic:**
     - **'success'**: All systems go.
-        - 'paymentStatus': 'succeeded'
-        - 'settlementStatus' (in both records): 'completed'
-        - 'remittanceStatus' (in both records): 'sent'
-        - 'failureReason' (in settlementRecord): Omit or set to null.
-    - **'payment_failed'**: Payment was not successful at the very beginning.
-        - 'paymentStatus': 'failed'
-        - 'settlementStatus': 'N/A'
-        - 'remittanceStatus': 'N/A'
-        - **Do not generate a settlementRecord.**
-        - A realistic failure reason should be included in the 'paymentRecord' in a new 'failureReason' field, e.g., "Payment declined by customer\'s bank due to insufficient funds."
-    - **'settlement_failed'**: Payment succeeded, but settlement failed.
-        - 'paymentStatus': 'succeeded'
-        - 'settlementStatus': 'completed'
-        - 'remittanceStatus': 'pending'
-        - 'failureReason' (in settlementRecord): "Issue with merchant\'s settlement account details or bank processing."
-    - **'remittance_failed'**: Payment and settlement succeeded, but remittance to merchant failed.
-        - 'paymentStatus': 'succeeded'
-        - 'settlementStatus': 'completed'
-        - 'remittanceStatus': 'failed'
-        - 'failureReason' (in settlementRecord): "Remittance transfer failed due to invalid beneficiary details or network error."
-8.  Ensure that if 'scenarioType' is 'payment_failed', the 'settlementRecord' field is entirely omitted from the output. For other scenarios, it must be present. Do not use an empty object for an optional field.
+        - paymentRecord: 'paymentStatus': 'succeeded', 'settlementStatus': 'completed'.
+        - settlementRecord: 'status': 'paid'. 'payoutId' must link to the payoutRecord's ID.
+        - payoutRecord: 'status': 'sent'.
+    - **'payment_failed'**: Payment failed at the start.
+        - paymentRecord: 'paymentStatus': 'failed', 'settlementStatus': 'N/A', include a realistic 'failureReason'.
+        - **Do not generate settlementRecord or payoutRecord.**
+    - **'settlement_failed'**: This scenario is now equivalent to a remittance_failed, as internal settlement creation is atomic. Simulate a remittance failure instead.
+        - paymentRecord: 'paymentStatus': 'succeeded', 'settlementStatus': 'completed'.
+        - settlementRecord: 'status': 'failed'. 'payoutId' must link to the payoutRecord's ID.
+        - payoutRecord: 'status': 'failed'. Include a 'failureReason', e.g., "Remittance transfer failed due to invalid beneficiary details."
+    - **'remittance_failed'**: Payment succeeded, but the final payout failed.
+        - paymentRecord: 'paymentStatus': 'succeeded', 'settlementStatus': 'completed'.
+        - settlementRecord: 'status': 'failed'. 'payoutId' must link to the payoutRecord's ID.
+        - payoutRecord: 'status': 'failed'. Include a 'failureReason', e.g., "Remittance transfer failed due to invalid beneficiary details."
+8.  **Relationships:**
+    - `settlementRecord.paymentId` must match `paymentRecord.id`.
+    - `payoutRecord.settlementId` must match `settlementRecord.id`.
+    - `settlementRecord.payoutId` must match `payoutRecord.id`.
+    - `payoutRecord.merchantAccountId` must match `paymentRecord.merchantId`.
+9.  Omit optional records ('settlementRecord', 'payoutRecord') entirely if they are not generated. Do not use empty objects.
 `,
 });
 
@@ -141,9 +150,10 @@ const simulatePaymentFlow = ai.defineFlow(
     outputSchema: SimulatePaymentOutputSchema,
   },
   async (input) => {
-    // Generate IDs on the server for consistency, pass them to the prompt
+    // Generate IDs on the server for consistency
     const paymentId = `pay-${uuidv4().slice(0, 8)}`;
     const settlementId = `set-${uuidv4().slice(0, 8)}`;
+    const payoutId = `po-${uuidv4().slice(0, 8)}`;
 
     const { output } = await simulatePaymentPrompt({
       ...input,
@@ -153,13 +163,18 @@ const simulatePaymentFlow = ai.defineFlow(
       throw new Error('Failed to generate simulation output.');
     }
 
-    // Post-process to ensure IDs are what we generated, as LLM can sometimes ignore instructions.
+    // Post-process to enforce data integrity, as LLM can sometimes ignore instructions.
     output.paymentRecord.id = paymentId;
     if (output.settlementRecord) {
         output.settlementRecord.id = settlementId;
         output.settlementRecord.paymentId = paymentId;
-        output.settlementRecord.payoutReference = output.settlementRecord.payoutReference ?? null;
     }
+    if (output.payoutRecord) {
+        output.payoutRecord.id = payoutId;
+        output.payoutRecord.settlementId = settlementId;
+        output.settlementRecord!.payoutId = payoutId;
+    }
+
 
     // Enforce 2-decimal rounding post-generation
     const roundToTwo = (num: number) => Math.round(num * 100) / 100;
@@ -172,7 +187,10 @@ const simulatePaymentFlow = ai.defineFlow(
        output.settlementRecord.grossAmount = roundToTwo(output.settlementRecord.grossAmount);
        output.settlementRecord.platformFeeAmount = roundToTwo(output.settlementRecord.platformFeeAmount);
        output.settlementRecord.merchantNetAmount = roundToTwo(output.settlementRecord.merchantNetAmount);
-       output.settlementRecord.failureReason = output.settlementRecord.failureReason ?? null;
+    }
+    if (output.payoutRecord) {
+        output.payoutRecord.amount = roundToTwo(output.payoutRecord.amount);
+        output.payoutRecord.failureReason = output.payoutRecord.failureReason ?? null;
     }
 
     return output;

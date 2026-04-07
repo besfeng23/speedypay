@@ -16,9 +16,7 @@ export const CHECK_TYPES = ['sanctions_screening', 'credit_check', 'business_ver
 export const MERCHANT_SETTLEMENT_STATUSES = ['active', 'paused', 'banned'] as const;
 
 export const PAYMENT_STATUSES = ['pending', 'succeeded', 'failed', 'expired', 'processing'] as const;
-// This represents the internal state of the settlement record itself
-export const INTERNAL_SETTLEMENT_STATUSES = ['unpaid', 'processing', 'paid', 'failed'] as const;
-// This represents the state of the external payout instruction
+export const SETTLEMENT_STATUSES = ['unpaid', 'processing', 'paid', 'failed'] as const;
 export const PAYOUT_STATUSES = ['pending', 'processing', 'sent', 'failed'] as const;
 
 
@@ -67,7 +65,7 @@ export type CheckType = (typeof CHECK_TYPES)[number];
 export type MerchantSettlementStatus = (typeof MERCHANT_SETTLEMENT_STATUSES)[number];
 
 export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
-export type InternalSettlementStatus = (typeof INTERNAL_SETTLEMENT_STATUSES)[number];
+export type InternalSettlementStatus = (typeof SETTLEMENT_STATUSES)[number];
 export type PayoutStatus = (typeof PAYOUT_STATUSES)[number];
 export type ProviderTransState = (typeof PROVIDER_TRANS_STATES)[number];
 export type TenantStatus = (typeof TENANT_STATUSES)[number];

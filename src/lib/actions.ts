@@ -14,6 +14,7 @@ import {
   addMerchant,
   addTenant,
   addSettlement,
+  addPayout,
   addPaymentAllocations,
   addLedgerTransactionAndEntries,
   updateSettlement as dbUpdateSettlement,
@@ -21,10 +22,9 @@ import {
   getMerchantById,
   getPaymentById,
   getTenantById,
-  getAllocationRules,
   findEntityById,
 } from './data';
-import type { Merchant, Settlement, Payment, Tenant, UATTestPayload, Entity, TenantRecord, MerchantAccount, SettlementDestination, PaymentAllocation, LedgerTransaction, LedgerEntry } from './lib/types';
+import type { Merchant, Settlement, Payment, Tenant, UATTestPayload, Entity, TenantRecord, MerchantAccount, SettlementDestination, PaymentAllocation, LedgerTransaction, LedgerEntry, Payout, InternalSettlementStatus } from './types';
 import { cashOut, qryOrder, qryBalance, createCollectionPayment as apiCreateCollectionPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
 import type { QrPayResponse, QryBalanceResponse, QryCollectionBalanceResponse } from './speedypay/types';
 import { mapProviderStateToInternal, providerStateLabels, mapCollectionStateToPaymentStatus } from './speedypay/mappers';
@@ -181,10 +181,10 @@ export async function createMerchant(values: MerchantFormValues): Promise<Action
         businessName: entity.legalName,
         ...validatedData,
         status: entity.status as 'active' | 'inactive' | 'suspended',
-        propertyAssociations: [],
         entity,
         tenant,
-        defaultSettlementDestination: settlementDestination
+        defaultSettlementDestination: settlementDestination,
+        propertyAssociations: []
     }
 
     await addMerchant(merchant);
@@ -227,19 +227,16 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
     }
 
     const orderSeq = `pay-${uuidv4()}`;
+    const now = new Date();
 
-    // --- Start Transactional Logic ---
-    
-    // Step 1: Call the external provider API FIRST.
     const response = await apiCreateCollectionPayment({
         orderSeq: orderSeq,
         amount: amount,
         busiName: merchant.entity.displayName,
-        dueTime: 60, // 60 minutes
+        dueTime: 60,
         remark: description
     });
     
-    // Step 2: Check for a successful response from the provider.
     if (response.respCode !== '00000000' || !response.url) {
       await addAuditLog({ eventType: 'payment.provider.failed', user: 'System', details: `Provider failed to create payment link: ${response.respMessage}`, entityId: orderSeq, entityType: 'payment' });
       throw new Error(response.respMessage || 'Failed to create payment link at provider.');
@@ -247,63 +244,57 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
     
     const isSignatureVerified = verifySignature(response, getSpeedyPaySecretOrThrow());
 
-    // Step 3: Use the new allocation engine to calculate the fee breakdown
-    const allocations = await calculateAllocations({
-        grossAmount: amount,
-        currency: 'PHP',
-        merchantAccountId: merchant.id,
-        tenantId: merchant.tenantId,
-    });
-    
-    const merchantNet = allocations.find(a => a.allocationType === 'merchant_net');
-    const totalFees = allocations
-        .filter(a => a.allocationType !== 'merchant_net')
-        .reduce((sum, a) => sum + a.amount, 0);
-
-    const merchantNetAmount = merchantNet?.amount ?? 0;
-    
-    const now = new Date();
-    const newPayment: Payment = {
-        id: orderSeq,
-        tenantId: merchant.tenantId,
-        merchantId: merchantId,
-        externalReference: 'N/A',
-        bookingReferenceOrInvoiceReference: description,
-        customerName: 'N/A (Generated Link)',
-        customerEmail: 'N/A',
-        grossAmount: amount,
-        currency: 'PHP',
-        platformFeeAmount: totalFees,
-        merchantNetAmount,
-        paymentStatus: 'pending',
-        settlementStatus: 'pending',
-        createdAt: formatISO(now),
-        updatedAt: formatISO(now),
-        providerPaymentUrl: response.url,
-        providerCollectionRespCode: response.respCode,
-        providerCollectionRespMessage: response.respMessage,
-        providerCollectionSignatureVerified: isSignatureVerified,
-    };
-    
-    // Step 4: Generate balanced ledger entries for this payment capture.
-    const ledgerEntries = await createLedgerEntriesForPaymentCapture(newPayment, allocations);
-    const ledgerTransaction: Omit<LedgerTransaction, 'id' | 'createdAt' | 'updatedAt'> = {
-        paymentId: newPayment.id,
-        payoutId: null,
-        transactionType: 'payment_capture',
-        status: 'completed',
-        reference: `Payment from ${newPayment.customerName}`,
-    };
-
-
-    // Step 5: Create all internal records within a single database transaction.
     await withTransaction(async (client) => {
+        const allocations = await calculateAllocations({
+            grossAmount: amount,
+            currency: 'PHP',
+            merchantAccountId: merchant.id,
+            tenantId: merchant.tenantId,
+        });
+        
+        const merchantNet = allocations.find(a => a.allocationType === 'merchant_net');
+        const totalFees = allocations
+            .filter(a => a.allocationType !== 'merchant_net')
+            .reduce((sum, a) => sum + a.amount, 0);
+
+        const merchantNetAmount = merchantNet?.amount ?? 0;
+        
+        const newPayment: Payment = {
+            id: orderSeq,
+            tenantId: merchant.tenantId,
+            merchantId: merchantId,
+            externalReference: 'N/A',
+            bookingReferenceOrInvoiceReference: description,
+            customerName: 'N/A (Generated Link)',
+            customerEmail: 'N/A',
+            grossAmount: amount,
+            currency: 'PHP',
+            platformFeeAmount: totalFees,
+            merchantNetAmount,
+            paymentStatus: 'pending',
+            settlementStatus: 'pending',
+            createdAt: formatISO(now),
+            updatedAt: formatISO(now),
+            providerPaymentUrl: response.url,
+            providerCollectionRespCode: response.respCode,
+            providerCollectionRespMessage: response.respMessage,
+            providerCollectionSignatureVerified: isSignatureVerified,
+        };
+        
+        const ledgerEntries = await createLedgerEntriesForPaymentCapture(newPayment, allocations);
+        const ledgerTransaction: Omit<LedgerTransaction, 'id' | 'createdAt' | 'updatedAt'> = {
+            paymentId: newPayment.id,
+            payoutId: null,
+            transactionType: 'payment_capture',
+            status: 'completed',
+            reference: `Payment from ${newPayment.customerName}`,
+        };
+
         await addPayment(newPayment, client);
         await addPaymentAllocations(allocations.map(alloc => ({ ...alloc, paymentId: orderSeq })), client);
         await addLedgerTransactionAndEntries(ledgerTransaction, ledgerEntries, client);
     });
     
-    // Step 6: Log the successful creation and provider interaction.
     await addAuditLog({ eventType: 'payment.created', user: actorEmail, details: `Created manual payment link for ${merchant.entity.displayName}`, entityId: orderSeq, entityType: 'payment' });
     await addAuditLog({ eventType: 'payment.provider.sent', user: 'System', details: `Successfully created payment link at provider. URL: ${response.url}`, entityId: orderSeq, entityType: 'payment' });
 
@@ -320,7 +311,7 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
   }
 }
 
-export async function addSimulatedData(data: { paymentRecord: Payment, settlementRecord?: Settlement }): Promise<ActionResult> {
+export async function addSimulatedData(data: { paymentRecord: Payment, settlementRecord?: Settlement, payoutRecord?: Payout }): Promise<ActionResult> {
     try {
         const actorEmail = await getAdminActorEmail();
         
@@ -337,6 +328,9 @@ export async function addSimulatedData(data: { paymentRecord: Payment, settlemen
         await addPayment(data.paymentRecord);
         if (data.settlementRecord) {
             await addSettlement(data.settlementRecord);
+        }
+        if (data.payoutRecord) {
+            await addPayout(data.payoutRecord);
         }
         await addAuditLog({
             eventType: 'simulation.created',
@@ -370,25 +364,49 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
         return { success: false, message: "Merchant not found or has no default settlement destination." };
     }
     
-    // Use unique internal settlement ID as the provider's orderSeq for idempotency
-    const orderSeq = settlement.id;
+    const orderSeq = `po-${uuidv4().slice(0,12)}`;
     const channelInfo = payoutChannelMap.get(merchant.defaultSettlementDestination.bankCode);
     if (!channelInfo) {
         return { success: false, message: `Invalid payout channel configured for merchant: ${merchant.defaultSettlementDestination.bankCode}` };
     }
-
-    // Use contact name for first/last name as it's more reliable than account name
+    
     const names = (merchant.entity.metadata.contactName as string).split(' ');
     const firstName = names[0];
     const lastName = names.length > 1 ? names.slice(1).join(' ') : names[0];
 
-
     try {
+        const now = new Date();
+        
+        await withTransaction(async (client) => {
+            const payout: Payout = {
+                id: orderSeq,
+                settlementId: settlement.id,
+                merchantAccountId: merchant.id,
+                settlementDestinationId: merchant.defaultSettlementDestination!.id,
+                amount: settlement.merchantNetAmount,
+                currency: settlement.currency,
+                status: 'processing',
+                providerName: 'SpeedyPay',
+                payoutChannelProcId: channelInfo.procId,
+                payoutChannelDescription: channelInfo.description,
+                createdAt: formatISO(now),
+                updatedAt: formatISO(now),
+            };
+            
+            await addPayout(payout, client);
+            
+            await dbUpdateSettlement(settlement.id, {
+                status: 'processing',
+                payoutId: payout.id,
+                updatedAt: formatISO(now),
+            }, client);
+        });
+
         const response = await cashOut({
             orderSeq,
             amount: settlement.merchantNetAmount,
             procId: merchant.defaultSettlementDestination.bankCode,
-            procDetail: merchant.defaultSettlementDestination.accountNumberMasked, // NOTE: In production, this should be the real, unmasked number.
+            procDetail: merchant.defaultSettlementDestination.accountNumberMasked,
             firstName,
             lastName,
             email: merchant.entity.metadata.email,
@@ -396,21 +414,12 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
             remark: `Payout for settlement ${settlement.id}`,
         });
 
-        // This action only INITIATES. The webhook will finalize the status.
-        // For now, we update our internal state to 'processing'.
-        const updatedSettlement: Partial<Settlement> = {
-            status: 'processing',
-            updatedAt: formatISO(new Date()),
-        }
-        
-        await dbUpdateSettlement(settlement.id, updatedSettlement);
-
         await addAuditLog({
             eventType: 'payout.initiated',
             user: actorEmail,
             details: `Initiated payout to provider. OrderSeq: ${orderSeq}. Provider response: ${response.respMessage}`,
-            entityId: settlement.id,
-            entityType: 'settlement'
+            entityId: orderSeq,
+            entityType: 'payout'
         });
 
         revalidatePath(`/settlements/${settlement.id}`);
@@ -427,6 +436,8 @@ export async function initiateRemittance(settlementId: string): Promise<ActionRe
             entityId: settlement.id,
             entityType: 'settlement'
         });
+        // Rollback the settlement status if API call fails
+        await dbUpdateSettlement(settlement.id, { status: 'unpaid', payoutId: null });
         return { success: false, message };
     }
 }
@@ -440,14 +451,11 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
 
     try {
         const orderDate = format(parseISO(settlement.createdAt), 'yyyy-MM-dd');
-        // Payout and Settlement share the same ID for the provider orderSeq
         const response = await qryOrder({ 
             orderSeq: settlement.payoutId,
             orderDate: orderDate
         });
         
-        // This is a manual query, so we can directly update the settlement state
-        // In a real scenario, this logic would be in the webhook handler
         const internalStatus = mapProviderStateToInternal(response.transState);
         const finalSettlementStatus: InternalSettlementStatus = internalStatus === 'sent' ? 'paid' : internalStatus === 'failed' ? 'failed' : 'processing';
 
@@ -460,8 +468,8 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
             eventType: 'payout.status.queried',
             user: actorEmail,
             details: `Queried payout status. New provider state: ${response.transState} (${response.respMessage})`,
-            entityId: settlement.id,
-            entityType: 'settlement',
+            entityId: settlement.payoutId,
+            entityType: 'payout',
             source: 'admin',
             action: 'query_payout_status',
             previousState: settlement.status,
@@ -482,7 +490,7 @@ export async function querySettlementStatus(settlementId: string): Promise<Actio
             user: 'System',
             details: `Payout query failed. Error: ${message}`,
             entityId: settlement.id,
-            entityType: 'settlement'
+            entityType: 'payout'
         });
         return { success: false, message };
     }
@@ -617,7 +625,7 @@ export async function runUATTestAction(testCaseId: string, payload?: UATTestPayl
     await getAdminActorEmail();
     let result: ActionResult = { success: false, message: "Test case not found." };
     let entityId: string | null = null;
-    let entityType: 'payment' | 'settlement' | 'merchant' | null = null;
+    let entityType: 'payment' | 'settlement' | 'merchant' | 'payout' | null = null;
     const user = 'UAT Tester';
 
     try {
@@ -656,7 +664,7 @@ export async function runUATTestAction(testCaseId: string, payload?: UATTestPayl
                 const { entityId: settlementId } = payload;
                 result = await querySettlementStatus(settlementId);
                 entityId = settlementId;
-                entityType = 'settlement';
+                entityType = 'payout';
                 break;
             }
             case 'SYS-01':
@@ -701,7 +709,7 @@ export async function runUATTestAction(testCaseId: string, payload?: UATTestPayl
             notes: errorMessage,
             entityId,
             entityType,
-            providerResponse: JSON.stringify(result.data, null, 2), // log the result even on failure
+            providerResponse: JSON.stringify(result.data, null, 2),
         });
         await addAuditLog({
             eventType: 'uat.test.failed',
@@ -711,7 +719,6 @@ export async function runUATTestAction(testCaseId: string, payload?: UATTestPayl
             entityType,
         });
         revalidatePath('/testing');
-        // Return a failed action result so the client knows it failed
         return { success: false, message: errorMessage, data: e };
     }
 }

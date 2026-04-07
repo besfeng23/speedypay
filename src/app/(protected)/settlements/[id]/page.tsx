@@ -18,7 +18,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { PayoutActions } from "./payout-actions";
 import { Separator } from "@/components/ui/separator";
-import type { AuditLog } from "@/lib/types";
+import type { AuditLog, Payout } from "@/lib/types";
 
 function DetailItem({ label, value }: { label: string; value: React.ReactNode }) {
     return (
@@ -67,9 +67,13 @@ export default async function SettlementDetailPage({
     notFound();
   }
   
-  const merchant = await getMerchantById(settlement.merchantId);
-  const payment = await getPaymentById(settlement.paymentId);
-  const events = await getAuditLogsByEntity('settlement', settlement.id);
+  const [merchant, payment, events] = await Promise.all([
+    getMerchantById(settlement.merchantId),
+    getPaymentById(settlement.paymentId),
+    getAuditLogsByEntity('settlement', settlement.id)
+  ]);
+  
+  const payout = settlement.payout;
 
   const formatCurrency = (amount: number, currency: string = "PHP") => {
     return new Intl.NumberFormat("en-US", {
@@ -78,7 +82,7 @@ export default async function SettlementDetailPage({
     }).format(amount);
   };
 
-  const hasPayoutError = settlement.remittanceStatus === 'failed' || (settlement.providerTransState && settlement.providerTransState !== '00');
+  const hasPayoutError = payout?.status === 'failed';
 
   return (
     <>
@@ -90,12 +94,12 @@ export default async function SettlementDetailPage({
         <PayoutActions settlement={settlement} />
       </PageHeader>
       
-      {hasPayoutError && (
+      {hasPayoutError && payout?.failureReason && (
           <Alert variant="destructive" className="mb-6">
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Payout Error</AlertTitle>
               <AlertDescription>
-                  {settlement.failureReason || settlement.providerRespMessage || "An error occurred during the payout process."}
+                  {payout.failureReason || "An error occurred during the payout process."}
               </AlertDescription>
           </Alert>
       )}
@@ -117,8 +121,8 @@ export default async function SettlementDetailPage({
                         <DetailItem label="Platform Fee" value={formatCurrency(settlement.platformFeeAmount, settlement.currency)} />
                         <DetailItem label="Merchant Net Amount" value={<span className="font-bold">{formatCurrency(settlement.merchantNetAmount, settlement.currency)}</span>} />
                          <Separator className="my-2"/>
-                        <DetailItem label="Internal Settlement Status" value={<StatusBadge status={settlement.settlementStatus} />} />
-                        <DetailItem label="Internal Remittance Status" value={<StatusBadge status={settlement.remittanceStatus} />} />
+                        <DetailItem label="Settlement Status" value={<StatusBadge status={settlement.status} />} />
+                        <DetailItem label="Resulting Payout ID" value={settlement.payoutId ? <span className="font-mono text-xs">{settlement.payoutId}</span> : <span className="text-muted-foreground">Not created</span>} />
                     </dl>
                 </CardContent>
             </Card>
@@ -140,26 +144,28 @@ export default async function SettlementDetailPage({
                     <CardDescription>Data from the external payout provider (SpeedyPay).</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {settlement.providerOrderSeq ? (
+                    {payout ? (
                          <dl className="divide-y">
-                            <DetailItem label="Provider Name" value={settlement.providerName} />
-                            <DetailItem label="Payout Channel" value={<div className="flex flex-col"><span className="font-medium">{settlement.payoutChannelDescription || 'N/A'}</span><span className="text-xs text-muted-foreground font-mono">{settlement.payoutChannelProcId}</span></div>} />
-                            <DetailItem label="Provider Order Seq" value={<span className="font-mono text-xs">{settlement.providerOrderSeq}</span>} />
-                            <DetailItem label="Provider Trans Seq" value={<span className="font-mono text-xs">{settlement.providerTransSeq || 'N/A'}</span>} />
+                            <DetailItem label="Payout Status" value={<StatusBadge status={payout.status} />} />
                              <Separator className="my-2"/>
-                            <DetailItem label="Provider State" value={<StatusBadge status={settlement.providerTransStateLabel} />} />
-                            <DetailItem label="Provider Message" value={settlement.providerRespMessage} />
-                            <DetailItem label="Provider Code" value={<Badge variant="secondary">{settlement.providerRespCode}</Badge>} />
-                            <DetailItem label="Signature Verified" value={settlement.signatureVerified ? <CheckCircle className="text-green-500"/> : <AlertCircle className="text-red-500" />} />
+                            <DetailItem label="Provider Name" value={payout.providerName} />
+                            <DetailItem label="Payout Channel" value={<div className="flex flex-col"><span className="font-medium">{payout.payoutChannelDescription || 'N/A'}</span><span className="text-xs text-muted-foreground font-mono">{payout.payoutChannelProcId}</span></div>} />
+                            <DetailItem label="Provider Order Seq" value={<span className="font-mono text-xs">{payout.id}</span>} />
+                            <DetailItem label="Provider Trans Seq" value={<span className="font-mono text-xs">{payout.providerTransSeq || 'N/A'}</span>} />
                              <Separator className="my-2"/>
-                            <DetailItem label="Provider Timestamp" value={settlement.providerTimestamp ? format(new Date(settlement.providerTimestamp), "PPpp") : 'N/A'} />
-                            <DetailItem label="Last Queried" value={settlement.lastQueryAt ? format(new Date(settlement.lastQueryAt), "PPpp") : 'Never'} />
+                            <DetailItem label="Provider State" value={<StatusBadge status={payout.providerTransStateLabel} />} />
+                            <DetailItem label="Provider Message" value={payout.providerRespMessage} />
+                            <DetailItem label="Provider Code" value={<Badge variant="secondary">{payout.providerRespCode}</Badge>} />
+                            <DetailItem label="Signature Verified" value={payout.signatureVerified ? <CheckCircle className="text-green-500"/> : <AlertCircle className="text-red-500" />} />
+                             <Separator className="my-2"/>
+                            <DetailItem label="Provider Timestamp" value={payout.providerTimestamp ? format(new Date(payout.providerTimestamp), "PPpp") : 'N/A'} />
+                            <DetailItem label="Last Queried" value={payout.lastQueryAt ? format(new Date(payout.lastQueryAt), "PPpp") : 'Never'} />
                          </dl>
                     ) : (
                         <div className="text-center py-8 text-muted-foreground">
                             <Clock className="mx-auto h-8 w-8 mb-2" />
                             <p className="font-semibold">Payout Not Initiated</p>
-                            <p className="text-sm">This settlement has not been sent to the provider yet.</p>
+                            <p className="text-sm">This settlement is unpaid and has not been sent to the provider yet.</p>
                         </div>
                     )}
                 </CardContent>

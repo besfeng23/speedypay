@@ -26,8 +26,8 @@ export function PayoutActions({ settlement }: { settlement: Settlement }) {
     const { toast } = useToast();
     const router = useRouter();
 
-    const canInitiate = settlement.settlementStatus === 'completed' && settlement.remittanceStatus === 'pending';
-    const canQuery = !!settlement.providerOrderSeq;
+    const canInitiate = settlement.status === 'unpaid';
+    const canQuery = !!settlement.payoutId;
     const isLiveEnv = process.env.NEXT_PUBLIC_SPEEDYPAY_ENV === 'production';
 
     const handleInitiate = () => {
