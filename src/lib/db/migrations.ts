@@ -104,7 +104,7 @@ export const dbMigrations: DbMigration[] = [
 
       CREATE TABLE IF NOT EXISTS tenants (
         id TEXT PRIMARY KEY,
-        entity_id TEXT NOT NULL UNIQUE REFERENCES entities(id),
+        entity_id TEXT NOT NULL UNIQUE,
         tenant_code TEXT NOT NULL UNIQUE,
         status TEXT NOT NULL,
         settings JSONB,
@@ -115,13 +115,12 @@ export const dbMigrations: DbMigration[] = [
 
       CREATE TABLE IF NOT EXISTS merchant_accounts (
         id TEXT PRIMARY KEY,
-        entity_id TEXT NOT NULL UNIQUE REFERENCES entities(id),
-        tenant_id TEXT NOT NULL REFERENCES tenants(id),
+        entity_id TEXT NOT NULL UNIQUE,
+        tenant_id TEXT NOT NULL,
         onboarding_status TEXT NOT NULL,
         kyc_status TEXT NOT NULL,
         settlement_status TEXT NOT NULL,
         default_settlement_destination_id TEXT,
-        fee_profile_id TEXT,
         created_at TIMESTAMPTZ NOT NULL,
         updated_at TIMESTAMPTZ NOT NULL
       );
@@ -130,7 +129,7 @@ export const dbMigrations: DbMigration[] = [
       
       CREATE TABLE IF NOT EXISTS settlement_destinations (
         id TEXT PRIMARY KEY,
-        merchant_account_id TEXT NOT NULL REFERENCES merchant_accounts(id),
+        merchant_account_id TEXT NOT NULL,
         destination_type TEXT NOT NULL,
         account_name TEXT NOT NULL,
         account_number_masked TEXT NOT NULL,
@@ -143,22 +142,6 @@ export const dbMigrations: DbMigration[] = [
       );
       CREATE INDEX IF NOT EXISTS idx_settlement_destinations_merchant_account_id ON settlement_destinations(merchant_account_id);
 
-      CREATE TABLE IF NOT EXISTS fee_profiles (
-        id TEXT PRIMARY KEY,
-        owner_entity_id TEXT NOT NULL REFERENCES entities(id),
-        tenant_id TEXT REFERENCES tenants(id),
-        merchant_account_id TEXT REFERENCES merchant_accounts(id),
-        fee_type TEXT NOT NULL,
-        payment_method TEXT NOT NULL,
-        percentage_value NUMERIC,
-        flat_value NUMERIC,
-        priority INTEGER NOT NULL,
-        active BOOLEAN NOT NULL DEFAULT true,
-        created_at TIMESTAMPTZ NOT NULL,
-        updated_at TIMESTAMPTZ NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_fee_profiles_owner_entity_id ON fee_profiles(owner_entity_id);
-
       -- Add foreign key constraint to payments and settlements table to link to new merchant_accounts table
       -- We keep the old merchant_id column for now for a gradual migration if needed, but new logic will use merchant_account_id
       ALTER TABLE payments ADD COLUMN IF NOT EXISTS merchant_account_id TEXT;
@@ -169,10 +152,6 @@ export const dbMigrations: DbMigration[] = [
     version: 4,
     name: 'add_allocation_engine',
     sql: `
-      DROP TABLE IF EXISTS fee_profiles;
-      
-      ALTER TABLE merchant_accounts DROP COLUMN IF EXISTS fee_profile_id;
-      
       CREATE TABLE IF NOT EXISTS allocation_rules (
         id TEXT PRIMARY KEY,
         tenant_id TEXT,
@@ -192,7 +171,7 @@ export const dbMigrations: DbMigration[] = [
 
       CREATE TABLE IF NOT EXISTS payment_allocations (
         id TEXT PRIMARY KEY,
-        payment_id TEXT NOT NULL REFERENCES payments(id),
+        payment_id TEXT NOT NULL,
         allocation_type TEXT NOT NULL,
         recipient_entity_id TEXT NOT NULL,
         basis_type TEXT NOT NULL,
@@ -202,6 +181,38 @@ export const dbMigrations: DbMigration[] = [
         created_at TIMESTAMPTZ NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_payment_allocations_payment_id ON payment_allocations(payment_id);
+    `
+  },
+  {
+    version: 5,
+    name: 'add_ledger_layer',
+    sql: `
+      CREATE TABLE IF NOT EXISTS ledger_transactions (
+        id TEXT PRIMARY KEY,
+        payment_id TEXT,
+        payout_id TEXT,
+        transaction_type TEXT NOT NULL,
+        status TEXT NOT NULL,
+        reference TEXT,
+        created_at TIMESTAMPTZ NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_ledger_transactions_payment_id ON ledger_transactions(payment_id);
+      CREATE INDEX IF NOT EXISTS idx_ledger_transactions_transaction_type ON ledger_transactions(transaction_type);
+
+      CREATE TABLE IF NOT EXISTS ledger_entries (
+        id TEXT PRIMARY KEY,
+        ledger_transaction_id TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        account_code TEXT NOT NULL,
+        entry_type TEXT NOT NULL, -- 'debit' or 'credit'
+        amount_cents BIGINT NOT NULL,
+        currency TEXT NOT NULL,
+        description TEXT,
+        created_at TIMESTAMPTZ NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_ledger_entries_ledger_transaction_id ON ledger_entries(ledger_transaction_id);
+      CREATE INDEX IF NOT EXISTS idx_ledger_entries_account_code ON ledger_entries(account_code);
     `
   }
 ];

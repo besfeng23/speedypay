@@ -17,6 +17,20 @@ export const FEE_TYPES = ['percentage', 'flat', 'blended'] as const;
 export const VERIFICATION_STATUSES = ['unverified', 'pending', 'verified', 'failed'] as const;
 export const ALLOCATION_TYPES = ['processing_fee', 'platform_fee', 'tenant_fee', 'merchant_net', 'reserve'] as const;
 
+export const LEDGER_TRANSACTION_TYPES = ['payment_capture', 'fee_allocation', 'settlement_payable', 'payout_release', 'refund', 'reversal', 'adjustment'] as const;
+export const LEDGER_ENTRY_TYPES = ['debit', 'credit'] as const;
+export const LEDGER_TRANSACTION_STATUSES = ['pending', 'completed', 'failed'] as const;
+export const ACCOUNT_CODES = [
+    'customer_clearing',
+    'processor_fee_revenue',
+    'platform_fee_revenue',
+    'tenant_fee_revenue',
+    'merchant_settlement_payable',
+    'reserve_payable',
+    'payout_clearing',
+    'refund_clearing',
+] as const;
+
 
 // --- Core Domain Types ---
 
@@ -36,6 +50,11 @@ export type DestinationType = (typeof DESTINATION_TYPES)[number];
 export type FeeType = (typeof FEE_TYPES)[number];
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
 export type AllocationType = (typeof ALLOCATION_TYPES)[number];
+
+export type LedgerTransactionType = (typeof LEDGER_TRANSACTION_TYPES)[number];
+export type LedgerEntryType = (typeof LEDGER_ENTRY_TYPES)[number];
+export type LedgerTransactionStatus = (typeof LEDGER_TRANSACTION_STATUSES)[number];
+export type AccountCode = (typeof ACCOUNT_CODES)[number];
 
 
 // --- Base Models (reflecting DB tables) ---
@@ -113,6 +132,29 @@ export type PaymentAllocation = {
   currency: string;
   ruleReference: string | null; // ID of the AllocationRule that generated this
   createdAt: string;
+};
+
+export type LedgerTransaction = {
+    id: string;
+    paymentId: string | null;
+    payoutId: string | null;
+    transactionType: LedgerTransactionType;
+    status: LedgerTransactionStatus;
+    reference: string | null;
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type LedgerEntry = {
+    id: string;
+    ledgerTransactionId: string;
+    entityId: string;
+    accountCode: AccountCode;
+    entryType: LedgerEntryType;
+    amount: number;
+    currency: string;
+    description: string;
+    createdAt: string;
 };
 
 

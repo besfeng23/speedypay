@@ -15,6 +15,7 @@ import {
   addTenant,
   addSettlement,
   addPaymentAllocations,
+  addLedgerTransactionAndEntries,
   updateSettlement as dbUpdateSettlement,
   getSettlementById,
   getMerchantById,
@@ -23,7 +24,7 @@ import {
   getAllocationRules,
   findEntityById,
 } from './data';
-import type { Merchant, Settlement, Payment, Tenant, UATTestPayload, Entity, TenantRecord, MerchantAccount, SettlementDestination, PaymentAllocation } from './lib/types';
+import type { Merchant, Settlement, Payment, Tenant, UATTestPayload, Entity, TenantRecord, MerchantAccount, SettlementDestination, PaymentAllocation, LedgerTransaction, LedgerEntry } from './lib/types';
 import { cashOut, qryOrder, qryBalance, createCollectionPayment as apiCreateCollectionPayment, qryCollectionOrder, qryCollectionBalance } from './speedypay/api';
 import type { QrPayResponse, QryBalanceResponse, QryCollectionBalanceResponse } from './speedypay/types';
 import { mapProviderStateToInternal, providerStateLabels, mapCollectionStateToPaymentStatus } from './speedypay/mappers';
@@ -32,6 +33,7 @@ import { speedypayConfig } from './speedypay/config';
 import { verifySignature } from './speedypay/crypto';
 import { requireAdminSession } from './auth/session';
 import { calculateAllocations } from './allocation';
+import { createLedgerEntriesForPaymentCapture } from './ledger';
 import { withTransaction } from './db/postgres';
 
 
@@ -66,7 +68,11 @@ export async function createTenant(values: TenantFormValues): Promise<ActionResu
         entityType: 'tenant',
         parentEntityId: 'ent-platform',
         status: 'active',
-        metadata: {},
+        metadata: {
+            notes: validatedData.notes,
+            platformFeeType: validatedData.platformFeeType,
+            platformFeeValue: validatedData.platformFeeValue,
+        },
         createdAt: formatISO(now),
         updatedAt: formatISO(now),
     };
@@ -81,7 +87,8 @@ export async function createTenant(values: TenantFormValues): Promise<ActionResu
       updatedAt: formatISO(now),
     };
 
-    await addTenant({ ...tenantRecord, entity });
+    const tenant: Tenant = { ...tenantRecord, name: entity.displayName, ...validatedData, entity };
+    await addTenant(tenant);
 
     await addAuditLog({
       eventType: 'tenant.created',
@@ -131,6 +138,9 @@ export async function createMerchant(values: MerchantFormValues): Promise<Action
             contactName: validatedData.contactName,
             email: validatedData.email,
             mobile: validatedData.mobile,
+            notes: validatedData.notes,
+            defaultFeeType: validatedData.defaultFeeType,
+            defaultFeeValue: validatedData.defaultFeeValue,
         },
         createdAt: formatISO(now),
         updatedAt: formatISO(now),
@@ -148,10 +158,34 @@ export async function createMerchant(values: MerchantFormValues): Promise<Action
       updatedAt: formatISO(now),
     };
     
-    // In a real app, you'd create the SettlementDestination and link its ID here.
-    // For now, we are creating the merchant without a default destination.
+    const settlementDestination: SettlementDestination = {
+        id: `sd-${uuidv4().slice(0, 8)}`,
+        merchantAccountId: merchantAccount.id,
+        destinationType: payoutChannelMap.get(validatedData.defaultPayoutChannel)?.type === 'Bank' ? 'bank' : 'wallet',
+        accountName: validatedData.settlementAccountName,
+        accountNumberMasked: validatedData.settlementAccountNumberOrWalletId,
+        bankCode: validatedData.defaultPayoutChannel,
+        providerReference: null,
+        verificationStatus: 'unverified',
+        isDefault: true,
+        createdAt: formatISO(now),
+        updatedAt: formatISO(now),
+    }
 
-    await addMerchant({ ...merchantAccount, entity, tenant, defaultSettlementDestination: null });
+    merchantAccount.defaultSettlementDestinationId = settlementDestination.id;
+
+    const merchant: Merchant = {
+        ...merchantAccount,
+        businessName: entity.legalName,
+        ...validatedData,
+        status: entity.status as 'active' | 'inactive' | 'suspended',
+        propertyAssociations: [],
+        entity,
+        tenant,
+        defaultSettlementDestination: settlementDestination
+    }
+
+    await addMerchant(merchant);
 
     await addAuditLog({
       eventType: 'merchant.created',
@@ -225,44 +259,53 @@ export async function createCollectionPayment(values: CreatePaymentFormValues): 
         .reduce((sum, a) => sum + a.amount, 0);
 
     const merchantNetAmount = merchantNet?.amount ?? 0;
+    
+    const now = new Date();
+    const newPayment: Payment = {
+        id: orderSeq,
+        tenantId: merchant.tenantId,
+        externalReference: 'N/A',
+        bookingReferenceOrInvoiceReference: description,
+        customerName: 'N/A (Generated Link)',
+        customerEmail: 'N/A',
+        merchantId: merchantId,
+        grossAmount: amount,
+        currency: 'PHP',
+        feeType: 'percentage', // This field is becoming less relevant.
+        feeValue: 0, // This field is becoming less relevant.
+        platformFeeAmount: totalFees,
+        merchantNetAmount,
+        paymentStatus: 'pending',
+        settlementStatus: 'pending',
+        remittanceStatus: 'pending',
+        sourceChannel: 'Manual',
+        createdAt: formatISO(now),
+        updatedAt: formatISO(now),
+        providerPaymentUrl: response.url,
+        providerCollectionRespCode: response.respCode,
+        providerCollectionRespMessage: response.respMessage,
+        providerCollectionSignatureVerified: isSignatureVerified,
+    };
+    
+    // Step 4: Generate balanced ledger entries for this payment capture.
+    const ledgerEntries = await createLedgerEntriesForPaymentCapture(newPayment, allocations);
+    const ledgerTransaction: Omit<LedgerTransaction, 'id' | 'createdAt' | 'updatedAt'> = {
+        paymentId: newPayment.id,
+        payoutId: null,
+        transactionType: 'payment_capture',
+        status: 'completed',
+        reference: `Payment from ${newPayment.customerName}`,
+    };
 
-    // Step 4: Create the internal records within a database transaction.
+
+    // Step 5: Create all internal records within a single database transaction.
     await withTransaction(async (client) => {
-        const now = new Date();
-        const newPayment: Payment = {
-            id: orderSeq,
-            tenantId: merchant.tenantId,
-            externalReference: 'N/A',
-            bookingReferenceOrInvoiceReference: description,
-            customerName: 'N/A (Generated Link)',
-            customerEmail: 'N/A',
-            merchantId: merchantId,
-            grossAmount: amount,
-            currency: 'PHP',
-            // These fee fields are now summary fields for quick reference.
-            // The source of truth is the payment_allocations table.
-            feeType: 'percentage', // This field is becoming less relevant.
-            feeValue: 0, // This field is becoming less relevant.
-            platformFeeAmount: totalFees,
-            merchantNetAmount,
-            paymentStatus: 'pending',
-            settlementStatus: 'pending',
-            remittanceStatus: 'pending',
-            sourceChannel: 'Manual',
-            createdAt: formatISO(now),
-            updatedAt: formatISO(now),
-            providerPaymentUrl: response.url,
-            providerCollectionRespCode: response.respCode,
-            providerCollectionRespMessage: response.respMessage,
-            providerCollectionSignatureVerified: isSignatureVerified,
-        };
         await addPayment(newPayment, client);
-
-        const allocationsForDb = allocations.map(alloc => ({ ...alloc, paymentId: orderSeq }));
-        await addPaymentAllocations(allocationsForDb, client);
+        await addPaymentAllocations(allocations.map(alloc => ({ ...alloc, paymentId: orderSeq })), client);
+        await addLedgerTransactionAndEntries(ledgerTransaction, ledgerEntries, client);
     });
     
-    // Step 5: Log the successful creation and provider interaction.
+    // Step 6: Log the successful creation and provider interaction.
     await addAuditLog({ eventType: 'payment.created', user: actorEmail, details: `Created manual payment link for ${merchant.entity.displayName}`, entityId: orderSeq, entityType: 'payment' });
     await addAuditLog({ eventType: 'payment.provider.sent', user: 'System', details: `Successfully created payment link at provider. URL: ${response.url}`, entityId: orderSeq, entityType: 'payment' });
 

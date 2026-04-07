@@ -6,7 +6,7 @@
 
 import { formatISO } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
-import type { AuditLog, Merchant, Payment, Settlement, Tenant, UATLog, UATTestCase, Entity, MerchantAccount, TenantRecord, SettlementDestination, AllocationRule, PaymentAllocation } from '@/lib/types';
+import type { AuditLog, Merchant, Payment, Settlement, Tenant, UATLog, UATTestCase, Entity, MerchantAccount, TenantRecord, SettlementDestination, AllocationRule, PaymentAllocation, LedgerTransaction, LedgerEntry } from '@/lib/types';
 import { uatTestCases, seedEntities, seedMerchantAccounts, seedTenants, seedSettlementDestinations, seedPayments, seedSettlements, seedAuditLogs, seedAllocationRules } from './seed-data';
 import { queryOne, queryRows, withTransaction } from './postgres';
 import type { PoolClient } from 'pg';
@@ -39,6 +39,10 @@ export const getAllTenants = async (): Promise<Tenant[]> => {
 
   return rows.map(tenantRecord => ({
     ...tenantRecord,
+    name: entityMap.get(tenantRecord.entityId)?.displayName || 'Unknown',
+    notes: entityMap.get(tenantRecord.entityId)?.metadata?.notes || '',
+    platformFeeType: entityMap.get(tenantRecord.entityId)?.metadata?.platformFeeType || 'percentage',
+    platformFeeValue: entityMap.get(tenantRecord.entityId)?.metadata?.platformFeeValue || 0,
     entity: entityMap.get(tenantRecord.entityId)!,
   }));
 };
@@ -50,7 +54,14 @@ export const findTenantById = async (id: string): Promise<Tenant | undefined> =>
     const entity = await findEntityById(tenantRecord.entityId);
     if (!entity) return undefined;
 
-    return { ...tenantRecord, entity };
+    return { 
+        ...tenantRecord, 
+        name: entity.displayName,
+        notes: entity.metadata?.notes,
+        platformFeeType: entity.metadata?.platformFeeType,
+        platformFeeValue: entity.metadata?.platformFeeValue,
+        entity 
+    };
 };
 
 export const getAllMerchants = async (): Promise<Merchant[]> => {
@@ -63,12 +74,28 @@ export const getAllMerchants = async (): Promise<Merchant[]> => {
     const entityMap = new Map(entities.map(e => [e.id, e]));
     const settlementDestMap = new Map(settlementDests.map(d => [d.id, d]));
 
-    return merchantAccounts.map(ma => ({
-        ...ma,
-        entity: entityMap.get(ma.entityId)!,
-        tenant: tenantMap.get(ma.tenantId)!,
-        defaultSettlementDestination: ma.defaultSettlementDestinationId ? settlementDestMap.get(ma.defaultSettlementDestinationId) ?? null : null,
-    }));
+    return merchantAccounts.map(ma => {
+        const entity = entityMap.get(ma.entityId)!;
+        return {
+            ...ma,
+            businessName: entity.legalName,
+            displayName: entity.displayName,
+            contactName: entity.metadata.contactName,
+            email: entity.metadata.email,
+            mobile: entity.metadata.mobile,
+            notes: entity.metadata.notes,
+            status: entity.status as 'active' | 'inactive' | 'suspended',
+            propertyAssociations: entity.metadata.propertyAssociations || [],
+            defaultFeeType: entity.metadata.defaultFeeType || 'percentage',
+            defaultFeeValue: entity.metadata.defaultFeeValue || 0,
+            settlementAccountName: settlementDestMap.get(ma.defaultSettlementDestinationId || '')?.accountName || '',
+            settlementAccountNumberOrWalletId: settlementDestMap.get(ma.defaultSettlementDestinationId || '')?.accountNumberMasked || '',
+            defaultPayoutChannel: settlementDestMap.get(ma.defaultSettlementDestinationId || '')?.bankCode || '',
+            entity,
+            tenant: tenantMap.get(ma.tenantId)!,
+            defaultSettlementDestination: ma.defaultSettlementDestinationId ? settlementDestMap.get(ma.defaultSettlementDestinationId) ?? null : null,
+        }
+    });
 }
 
 export const findMerchantById = async (id: string): Promise<Merchant | undefined> => {
@@ -84,12 +111,26 @@ export const findMerchantById = async (id: string): Promise<Merchant | undefined
     if (!tenant || !entity) return undefined;
     
     const settlementDestMap = new Map(settlementDests.map(d => [d.id, d]));
+    const defaultDest = merchantAccount.defaultSettlementDestinationId ? settlementDestMap.get(merchantAccount.defaultSettlementDestinationId) ?? null : null;
 
     return {
         ...merchantAccount,
+        businessName: entity.legalName,
+        displayName: entity.displayName,
+        contactName: entity.metadata.contactName,
+        email: entity.metadata.email,
+        mobile: entity.metadata.mobile,
+        notes: entity.metadata.notes,
+        status: entity.status as 'active' | 'inactive' | 'suspended',
+        propertyAssociations: entity.metadata.propertyAssociations || [],
+        defaultFeeType: entity.metadata.defaultFeeType || 'percentage',
+        defaultFeeValue: entity.metadata.defaultFeeValue || 0,
+        settlementAccountName: defaultDest?.accountName || '',
+        settlementAccountNumberOrWalletId: defaultDest?.accountNumberMasked || '',
+        defaultPayoutChannel: defaultDest?.bankCode || '',
         entity,
         tenant,
-        defaultSettlementDestination: merchantAccount.defaultSettlementDestinationId ? settlementDestMap.get(merchantAccount.defaultSettlementDestinationId) ?? null : null
+        defaultSettlementDestination: defaultDest,
     };
 }
 
@@ -237,7 +278,7 @@ export const getAllocationRules = async(): Promise<AllocationRule[]> => {
 
 export const getPaymentAllocationsByPaymentId = async (paymentId: string): Promise<PaymentAllocation[]> => {
     const rows = await queryRows<{payload: any}>('SELECT payload FROM payment_allocations WHERE payment_id = $1 ORDER BY created_at ASC', [paymentId]);
-    return rows.map(r => ({ ...r.payload, amount: r.payload.amount / 100 }));
+    return rows.map(r => ({ ...r.payload, amount: r.payload.amount_cents / 100 }));
 }
 
 export const addPaymentAllocations = async (allocations: Omit<PaymentAllocation, 'id'|'createdAt'>[], client?: PoolClient): Promise<void> => {
@@ -265,6 +306,56 @@ export const addPaymentAllocations = async (allocations: Omit<PaymentAllocation,
             await client.query(query, params);
         } else {
             await queryRows(query, params);
+        }
+    }
+}
+
+// --- Ledger ---
+export async function addLedgerTransactionAndEntries(
+    transaction: Omit<LedgerTransaction, 'id' | 'createdAt' | 'updatedAt'>,
+    entries: Omit<LedgerEntry, 'id' | 'createdAt'>[],
+    client?: PoolClient
+): Promise<void> {
+    const now = formatISO(new Date());
+    const fullTransaction: LedgerTransaction = {
+        ...transaction,
+        id: `lgr-txn-${uuidv4()}`,
+        createdAt: now,
+        updatedAt: now,
+    };
+
+    const transactionQuery = 'INSERT INTO ledger_transactions (id, payment_id, payout_id, transaction_type, status, reference, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)';
+    const transactionParams = [fullTransaction.id, fullTransaction.paymentId, fullTransaction.payoutId, fullTransaction.transactionType, fullTransaction.status, fullTransaction.reference, fullTransaction.createdAt, fullTransaction.updatedAt];
+
+    if (client) {
+        await client.query(transactionQuery, transactionParams);
+    } else {
+        await queryRows(transactionQuery, transactionParams);
+    }
+
+    const entryQuery = 'INSERT INTO ledger_entries (id, ledger_transaction_id, entity_id, account_code, entry_type, amount_cents, currency, description, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)';
+    for (const entry of entries) {
+        const fullEntry: LedgerEntry = {
+            ...entry,
+            id: `lgr-ent-${uuidv4()}`,
+            ledgerTransactionId: fullTransaction.id,
+            createdAt: now,
+        };
+        const entryParams = [
+            fullEntry.id,
+            fullEntry.ledgerTransactionId,
+            fullEntry.entityId,
+            fullEntry.accountCode,
+            fullEntry.entryType,
+            Math.round(fullEntry.amount * 100), // Store as cents
+            fullEntry.currency,
+            fullEntry.description,
+            fullEntry.createdAt,
+        ];
+        if (client) {
+            await client.query(entryQuery, entryParams);
+        } else {
+            await queryRows(entryQuery, entryParams);
         }
     }
 }

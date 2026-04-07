@@ -3,7 +3,7 @@
  * Keeps a stable seam while delegating persistence to the current DB adapter.
  */
 
-import type { Merchant, Payment, Settlement, AuditLog, DashboardStats, UATTestCase, UATLog, Tenant, PaymentAllocation, AllocationRule } from '@/lib/types';
+import type { Merchant, Payment, Settlement, AuditLog, DashboardStats, UATTestCase, UATLog, Tenant, PaymentAllocation, AllocationRule, LedgerTransaction, LedgerEntry } from '@/lib/types';
 import * as db from './db/in-memory';
 
 const SIMULATED_LATENCY_MS = 200;
@@ -29,7 +29,7 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     totalGrossVolume: allPayments.filter((p) => p.paymentStatus === 'succeeded').reduce((sum, p) => sum + p.grossAmount, 0),
     totalPlatformFees: allPayments.filter((p) => p.paymentStatus === 'succeeded').reduce((sum, p) => sum + p.platformFeeAmount, 0),
     totalMerchantNetRemittances: allSettlements.filter((s) => s.remittanceStatus === 'sent').reduce((sum, s) => sum + s.merchantNetAmount, 0),
-    activeMerchants: allMerchants.filter((m) => m.status === 'active').length,
+    activeMerchants: allMerchants.filter((m) => m.entity.status === 'active').length,
     pendingSettlements: allSettlements.filter((s) => s.remittanceStatus === 'pending').length,
     failedSettlements: allSettlements.filter((s) => s.remittanceStatus === 'failed').length,
     processingPayments: allPayments.filter((p) => p.paymentStatus === 'processing').length,
@@ -45,6 +45,8 @@ export const getMerchants = async (): Promise<Merchant[]> => withLatency(() => d
 export const getMerchantsByTenantId = async (tenantId: string): Promise<Merchant[]> => withLatency(() => db.getMerchantsByTenantId(tenantId));
 
 export const getMerchantById = async (id: string): Promise<Merchant | undefined> => withLatency(() => db.findMerchantById(id));
+export const findEntityById = async (id: string): Promise<any> => withLatency(() => db.findEntityById(id));
+
 
 export const getPayments = async (): Promise<Payment[]> => withLatency(() => db.getAllPayments());
 
@@ -156,6 +158,15 @@ export async function addPayment(payment: Payment, client?: any): Promise<Paymen
 export async function addPaymentAllocations(allocations: Omit<PaymentAllocation, 'id' | 'createdAt'>[], client?: any): Promise<void> {
     return db.addPaymentAllocations(allocations, client);
 }
+
+export async function addLedgerTransactionAndEntries(
+    transaction: Omit<LedgerTransaction, 'id' | 'createdAt' | 'updatedAt'>,
+    entries: Omit<LedgerEntry, 'id' | 'createdAt'>[],
+    client?: any
+): Promise<void> {
+    return db.addLedgerTransactionAndEntries(transaction, entries, client);
+}
+
 
 export async function addSettlement(settlement: Settlement): Promise<Settlement> {
   return db.addSettlement(settlement);
