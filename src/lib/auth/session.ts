@@ -3,6 +3,8 @@ import 'server-only';
 import { SignJWT, jwtVerify, createRemoteJWKSet, JWTPayload } from 'jose';
 import { cookies } from 'next/headers';
 import { getServerEnv } from '@/lib/env/server';
+import type { Role } from '@/lib/types';
+import { ROLES } from '@/lib/types';
 
 const SESSION_COOKIE_NAME = 'sp_admin_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8h
@@ -10,12 +12,24 @@ const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8h
 const env = getServerEnv();
 const sessionSecret = env.AUTH_SESSION_SECRET;
 const firebaseProjectId = env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-const adminEmailSet = new Set(
-  (env.ADMIN_EMAILS ?? '')
+
+// A simple structure to hold role definitions from environment variables
+const roleEmailSets: Map<Role, Set<string>> = new Map();
+
+// Initialize role sets from environment variables
+function initializeRoleSets() {
+  const platformAdminEmails = (env.ROLE_PLATFORM_ADMIN_EMAILS ?? '')
     .split(',')
     .map((email) => email.trim().toLowerCase())
-    .filter(Boolean)
-);
+    .filter(Boolean);
+  
+  if (platformAdminEmails.length > 0) {
+      roleEmailSets.set('platform_admin', new Set(platformAdminEmails));
+  }
+  // This can be expanded for other roles, e.g., finance_ops, compliance_ops
+}
+
+initializeRoleSets();
 
 function getSessionSecret(): Uint8Array {
   if (!sessionSecret || sessionSecret.length < 32) {
@@ -26,12 +40,11 @@ function getSessionSecret(): Uint8Array {
 
 const firebaseJwks = createRemoteJWKSet(new URL('https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'));
 
-export type AdminRole = 'admin' | 'viewer';
-
 export type AdminSession = {
   uid: string;
   email: string;
-  role: AdminRole;
+  role: Role;
+  tenantId?: string; // For tenant-scoped roles
 };
 
 export async function verifyFirebaseIdToken(idToken: string): Promise<{ uid: string; email: string }> {
@@ -54,12 +67,23 @@ export async function verifyFirebaseIdToken(idToken: string): Promise<{ uid: str
   return { uid, email };
 }
 
-export function resolveRole(email: string): AdminRole {
-  if (adminEmailSet.size === 0) return 'viewer';
-  return adminEmailSet.has(email.toLowerCase()) ? 'admin' : 'viewer';
+export function resolveRole(email: string): Omit<AdminSession, 'uid'> {
+  const lowerCaseEmail = email.toLowerCase();
+  
+  // Check for platform-level roles first
+  for (const [role, emailSet] of roleEmailSets.entries()) {
+    if (emailSet.has(lowerCaseEmail)) {
+      return { email, role };
+    }
+  }
+
+  // TODO: Implement logic for tenant_admin roles, which would likely involve a DB lookup.
+  // For now, we default to the safest possible role.
+  
+  return { email, role: 'read_only_auditor' };
 }
 
-export async function createSessionCookie(session: AdminSession): Promise<string> {
+export async function createSessionCookie(session: Omit<AdminSession, 'iat' | 'exp'>): Promise<string> {
   const secret = getSessionSecret();
   return new SignJWT(session as unknown as JWTPayload)
     .setProtectedHeader({ alg: 'HS256' })
@@ -78,10 +102,16 @@ export async function readServerSession(): Promise<AdminSession | null> {
       algorithms: ['HS256'],
     });
 
-    if (typeof payload.uid !== 'string' || typeof payload.email !== 'string') return null;
+    if (typeof payload.uid !== 'string' || typeof payload.email !== 'string' || typeof payload.role !== 'string' || !ROLES.includes(payload.role as Role)) {
+        return null;
+    }
 
-    const role: AdminRole = payload.role === 'admin' ? 'admin' : 'viewer';
-    return { uid: payload.uid, email: payload.email, role };
+    return {
+        uid: payload.uid,
+        email: payload.email,
+        role: payload.role as Role,
+        tenantId: payload.tenantId as string | undefined,
+    };
   } catch {
     return null;
   }
@@ -89,8 +119,8 @@ export async function readServerSession(): Promise<AdminSession | null> {
 
 export async function requireAdminSession(): Promise<AdminSession> {
   const session = await readServerSession();
-  if (!session || session.role !== 'admin') {
-    throw new Error('Unauthorized: admin session required.');
+  if (!session || !session.role) { // Check for any valid role
+    throw new Error('Unauthorized: session required.');
   }
   return session;
 }

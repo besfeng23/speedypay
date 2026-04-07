@@ -12,13 +12,15 @@ export async function POST(request: NextRequest) {
     }
 
     const { uid, email } = await verifyFirebaseIdToken(idToken);
-    const role = resolveRole(email);
+    const { role, tenantId } = resolveRole(email);
 
-    if (role !== 'admin') {
+    // Any valid role is allowed to create a session.
+    // Specific permissions are handled by the middleware and application logic.
+    if (!role) {
       await addAuditLog({
         eventType: 'auth.session.denied',
         user: email,
-        details: 'Session denied: user is not in ADMIN_EMAILS allowlist.',
+        details: 'Session denied: user has no assigned role.',
         entityType: 'user',
         entityId: uid,
         outcome: 'denied',
@@ -26,9 +28,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const sessionToken = await createSessionCookie({ uid, email, role });
+    const sessionPayload = { uid, email, role, tenantId };
+    const sessionToken = await createSessionCookie(sessionPayload);
 
-    const response = NextResponse.json({ ok: true, role });
+    const response = NextResponse.json({ ok: true, role, tenantId });
     response.cookies.set(sessionCookieConfig.name, sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -40,7 +43,7 @@ export async function POST(request: NextRequest) {
     await addAuditLog({
       eventType: 'auth.session.created',
       user: email,
-      details: 'Admin session established via Firebase ID token verification.',
+      details: `Admin session established with role: ${role}.`,
       entityType: 'user',
       entityId: uid,
       outcome: 'success',

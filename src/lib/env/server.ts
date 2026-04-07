@@ -17,7 +17,7 @@ const serverEnvSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     AUTH_SESSION_SECRET: z.string().optional(),
-    ADMIN_EMAILS: z.string().optional(),
+    ROLE_PLATFORM_ADMIN_EMAILS: z.string().optional(),
     DATABASE_URL: z.string().optional(),
     DATABASE_REQUIRE_SSL: z.enum(['true', 'false']).default('false'),
     DATABASE_POOL_MAX: z.string().optional().refine((value) => value === undefined || Number.isInteger(Number(value)), 'DATABASE_POOL_MAX must be an integer when provided.').refine((value) => value === undefined || Number(value) > 0, 'DATABASE_POOL_MAX must be greater than 0 when provided.'),
@@ -39,8 +39,8 @@ const serverEnvSchema = z
       if (!env.AUTH_SESSION_SECRET || env.AUTH_SESSION_SECRET.length < 32) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['AUTH_SESSION_SECRET'], message: 'AUTH_SESSION_SECRET must be set and at least 32 characters long.' });
       }
-      if (!env.ADMIN_EMAILS) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ADMIN_EMAILS'], message: 'ADMIN_EMAILS is required in production.' });
+      if (!env.ROLE_PLATFORM_ADMIN_EMAILS) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ROLE_PLATFORM_ADMIN_EMAILS'], message: 'ROLE_PLATFORM_ADMIN_EMAILS is required in production.' });
       }
       if (!env.DATABASE_URL) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['DATABASE_URL'], message: 'DATABASE_URL is required in production.' });
@@ -56,9 +56,9 @@ const serverEnvSchema = z
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['SPEEDYPAY_NOTIFY_URL'], message: 'SPEEDYPAY_NOTIFY_URL must use https:// in production.' });
       }
 
-      const parsedAdminEmails = (env.ADMIN_EMAILS ?? '').split(',').map((email) => email.trim()).filter(Boolean);
+      const parsedAdminEmails = (env.ROLE_PLATFORM_ADMIN_EMAILS ?? '').split(',').map((email) => email.trim()).filter(Boolean);
       if (parsedAdminEmails.length === 0) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ADMIN_EMAILS'], message: 'ADMIN_EMAILS must contain at least one admin email in production.' });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ROLE_PLATFORM_ADMIN_EMAILS'], message: 'ROLE_PLATFORM_ADMIN_EMAILS must contain at least one admin email in production.' });
       }
     }
   });

@@ -8,7 +8,7 @@ import {
 } from '@/firebase/auth/auth';
 
 export const useAuth = () => {
-  const { user, loading } = useUser();
+  const { user, loading, role, tenantId } = useUser();
 
   const signInWithGoogle = async () => {
     return firebaseSignInWithGoogle();
@@ -22,5 +22,5 @@ export const useAuth = () => {
     await firebaseSignOut();
   };
 
-  return { user, loading, signInWithGoogle, signInWithEmail, logout };
+  return { user, loading, role, tenantId, signInWithGoogle, signInWithEmail, logout };
 };

@@ -17,9 +17,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/hooks/use-auth";
 import { CreditCard, LogOut, User as UserIcon } from "lucide-react";
+import { Badge } from "./ui/badge";
 
 export function UserNav() {
-  const { user, logout } = useAuth();
+  const { user, role, logout } = useAuth();
 
   if (!user) {
     return null;
@@ -61,6 +62,11 @@ export function UserNav() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
+          {role && (
+              <div className="px-2 py-1.5">
+                  <Badge variant="secondary" className="capitalize">{role.replace(/_/g, ' ')}</Badge>
+              </div>
+          )}
           <DropdownMenuItem>
             <UserIcon className="mr-2 h-4 w-4" />
             <span>Profile</span>

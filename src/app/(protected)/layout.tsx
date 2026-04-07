@@ -34,17 +34,17 @@ export default function ProtectedLayout({
   children: React.ReactNode;
 }) {
   const [isCollapsed, setIsCollapsed] = useState(true);
-  const { user, loading } = useAuth();
+  const { user, loading, role } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && (!user || !role)) {
       router.push(`/login?redirect=${pathname}`);
     }
-  }, [user, loading, router, pathname]);
+  }, [user, loading, role, router, pathname]);
 
-  if (loading || !user) {
+  if (loading || !user || !role) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
         <div className="flex flex-col items-center gap-4">

@@ -15,15 +15,16 @@ import {
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import type { NavItem } from "@/lib/types";
+import type { NavItem, Role } from "@/lib/types";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
   TooltipProvider
 } from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/use-auth";
 
-const navItems: NavItem[] = [
+const allNavItems: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Tenants", href: "/tenants", icon: Building },
   { title: "Merchants", href: "/merchants", icon: Users },
@@ -34,8 +35,23 @@ const navItems: NavItem[] = [
   { title: "Settings", href: "/settings", icon: Settings },
 ];
 
+const rolePermissions: Record<Role, string[]> = {
+    super_admin: allNavItems.map(i => i.href),
+    platform_admin: allNavItems.map(i => i.href),
+    speedypay_ops: allNavItems.map(i => i.href),
+    tenant_admin: ['/dashboard', '/merchants', '/transactions', '/settlements'],
+    finance_ops: ['/dashboard', '/transactions', '/settlements', '/audit-logs'],
+    compliance_ops: ['/tenants', '/merchants', '/audit-logs'],
+    read_only_auditor: ['/audit-logs', '/transactions', '/settlements'],
+};
+
+
 export function SidebarNav({ isCollapsed }: { isCollapsed: boolean }) {
   const pathname = usePathname();
+  const { role } = useAuth();
+  
+  const accessibleHrefs = role ? rolePermissions[role] : [];
+  const navItems = allNavItems.filter(item => accessibleHrefs.includes(item.href));
 
   return (
     <TooltipProvider delayDuration={0}>

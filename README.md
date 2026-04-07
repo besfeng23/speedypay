@@ -40,7 +40,7 @@ NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-LHYT01DLCN
 
 ```bash
 AUTH_SESSION_SECRET=replace-with-a-32-char-plus-secret
-ADMIN_EMAILS=admin1@example.com,admin2@example.com
+ROLE_PLATFORM_ADMIN_EMAILS=markjohnsonbanatao88@gmail.com,admin2@example.com
 DATABASE_URL=postgresql://...
 DATABASE_REQUIRE_SSL=true
 SPEEDYPAY_MERCH_SEQ=...

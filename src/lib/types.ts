@@ -45,6 +45,9 @@ export const ACCOUNT_CODES = [
     'refund_clearing',
 ] as const;
 
+export const ROLES = ['super_admin', 'speedypay_ops', 'platform_admin', 'tenant_admin', 'finance_ops', 'compliance_ops', 'read_only_auditor'] as const;
+export type Role = (typeof ROLES)[number];
+
 
 // --- Core Domain Types ---
 

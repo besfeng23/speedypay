@@ -5,7 +5,7 @@
 ### Server-only (must NOT be prefixed with `NEXT_PUBLIC_`)
 
 - `AUTH_SESSION_SECRET` (minimum 32 chars)
-- `ADMIN_EMAILS` (comma-separated admin allowlist)
+- `ROLE_PLATFORM_ADMIN_EMAILS` (comma-separated platform admin allowlist)
 - `DATABASE_URL` (`postgres://` or `postgresql://`)
 - `DATABASE_REQUIRE_SSL` (`true` or `false`)
 - `DATABASE_POOL_MAX` (optional integer > 0)
@@ -58,7 +58,7 @@ This command is idempotent and safe for repeated runs due to `schema_migrations`
 
 ## 4) Post-deploy checks
 
-- Confirm login works for an allowlisted admin (`ADMIN_EMAILS`).
+- Confirm login works for an allowlisted admin (`ROLE_PLATFORM_ADMIN_EMAILS`).
 - Confirm protected routes reject unauthenticated and non-admin users.
 - Confirm payment creation flow succeeds and records audit logs.
 - Confirm settlement/remittance transitions execute and log outcomes.
