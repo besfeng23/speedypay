@@ -2,8 +2,8 @@
  * @file Repository facade for application data access.
  * Keeps a stable seam while delegating persistence to the current DB adapter.
  */
-
-import type { Merchant, Payment, Settlement, AuditLog, DashboardStats, UATTestCase, UATLog, Tenant, PaymentAllocation, AllocationRule, LedgerTransaction, LedgerEntry, Payout } from '@/lib/types';
+import type { PoolClient } from 'pg';
+import type { Merchant, Payment, Settlement, AuditLog, DashboardStats, UATTestCase, UATLog, Tenant, PaymentAllocation, AllocationRule, LedgerTransaction, LedgerEntry, Payout, Entity } from '@/lib/types';
 import * as db from './db/in-memory';
 
 const SIMULATED_LATENCY_MS = 200;
@@ -45,7 +45,7 @@ export const getMerchants = async (): Promise<Merchant[]> => withLatency(() => d
 export const getMerchantsByTenantId = async (tenantId: string): Promise<Merchant[]> => withLatency(() => db.getMerchantsByTenantId(tenantId));
 
 export const getMerchantById = async (id: string): Promise<Merchant | undefined> => withLatency(() => db.findMerchantById(id));
-export const findEntityById = async (id: string): Promise<any> => withLatency(() => db.findEntityById(id));
+export const findEntityById = async (id: string): Promise<Entity | undefined> => withLatency(() => db.findEntityById(id));
 
 
 export const getPayments = async (): Promise<Payment[]> => withLatency(() => db.getAllPayments());
@@ -175,28 +175,28 @@ export async function addAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>): Prom
   return db.addAuditLog(log);
 }
 
-export async function addPayment(payment: Payment, client?: any): Promise<Payment> {
+export async function addPayment(payment: Payment, client?: PoolClient): Promise<Payment> {
   return db.addPayment(payment, client);
 }
 
-export async function addPaymentAllocations(allocations: Omit<PaymentAllocation, 'id' | 'createdAt'>[], client?: any): Promise<void> {
+export async function addPaymentAllocations(allocations: Omit<PaymentAllocation, 'id' | 'createdAt'>[], client?: PoolClient): Promise<void> {
     return db.addPaymentAllocations(allocations, client);
 }
 
 export async function addLedgerTransactionAndEntries(
     transaction: Omit<LedgerTransaction, 'id' | 'createdAt' | 'updatedAt'>,
     entries: Omit<LedgerEntry, 'id' | 'createdAt'>[],
-    client?: any
+    client?: PoolClient
 ): Promise<void> {
     return db.addLedgerTransactionAndEntries(transaction, entries, client);
 }
 
 
-export async function addSettlement(settlement: Settlement, client?: any): Promise<Settlement> {
+export async function addSettlement(settlement: Settlement, client?: PoolClient): Promise<Settlement> {
   return db.addSettlement(settlement, client);
 }
 
-export async function addPayout(payout: Payout, client?: any): Promise<Payout> {
+export async function addPayout(payout: Payout, client?: PoolClient): Promise<Payout> {
     return db.addPayout(payout, client);
 }
 
@@ -204,14 +204,14 @@ export async function addUATLog(log: Omit<UATLog, 'id' | 'timestamp'>): Promise<
   return db.addUATLog(log);
 }
 
-export async function updateSettlement(id: string, updatedData: Partial<Settlement>, client?: any): Promise<Settlement | undefined> {
+export async function updateSettlement(id: string, updatedData: Partial<Settlement>, client?: PoolClient): Promise<Settlement | undefined> {
   return db.updateSettlement(id, updatedData, client);
 }
 
-export async function updatePayment(id: string, updatedData: Partial<Payment>, client?: any): Promise<Payment | undefined> {
+export async function updatePayment(id: string, updatedData: Partial<Payment>, client?: PoolClient): Promise<Payment | undefined> {
   return db.updatePayment(id, updatedData, client);
 }
 
-export async function updatePayout(id: string, updatedData: Partial<Payout>, client?: any): Promise<Payout | undefined> {
+export async function updatePayout(id: string, updatedData: Partial<Payout>, client?: PoolClient): Promise<Payout | undefined> {
   return db.updatePayout(id, updatedData, client);
 }

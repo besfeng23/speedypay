@@ -4,7 +4,7 @@
  * THIS IS FOR DEMONSTRATION PURPOSES ONLY.
  */
 
-import type { Payment, Settlement, AuditLog, UATTestCase, Entity, TenantRecord, MerchantAccount, SettlementDestination, AllocationRule } from '@/lib/types';
+import type { Payment, Settlement, AuditLog, UATTestCase, Entity, TenantRecord, MerchantAccount, SettlementDestination, AllocationRule, Payout } from '@/lib/types';
 import { subDays, subHours, subMinutes, formatISO } from 'date-fns';
 
 const now = new Date();
@@ -239,8 +239,6 @@ export const seedPayments: Payment[] = [
     customerEmail: 'david.miller@example.com',
     grossAmount: 1250.00,
     currency: 'PHP',
-    feeType: 'percentage',
-    feeValue: 3.2,
     platformFeeAmount: 40.00,
     merchantNetAmount: 1210.00,
     paymentStatus: 'succeeded',
@@ -385,6 +383,34 @@ export const seedSettlements: Settlement[] = [
     updatedAt: formatISO(subDays(now, 2)),
   }
 ];
+
+export const seedPayouts: Payout[] = [
+    {
+        id: 'payout-1',
+        settlementId: 'set-a1b2c3d4',
+        merchantAccountId: 'mer-1',
+        settlementDestinationId: 'sd-1',
+        amount: 1210.00,
+        currency: 'PHP',
+        status: 'sent',
+        providerName: 'SpeedyPay',
+        createdAt: formatISO(subHours(now, 22)),
+        updatedAt: formatISO(subHours(now, 20)),
+    },
+    {
+        id: 'payout-2',
+        settlementId: 'set-d4e5f6g7',
+        merchantAccountId: 'mer-2',
+        settlementDestinationId: 'sd-2',
+        amount: 149.50,
+        currency: 'PHP',
+        status: 'failed',
+        providerName: 'SpeedyPay',
+        failureReason: 'Invalid beneficiary account details',
+        createdAt: formatISO(subDays(now, 2)),
+        updatedAt: formatISO(subDays(now, 2)),
+    }
+]
 
 export const seedAuditLogs: AuditLog[] = [
     {

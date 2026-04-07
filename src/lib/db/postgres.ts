@@ -3,7 +3,7 @@ import 'server-only';
 import { Pool, PoolClient, QueryResultRow } from 'pg';
 import { getDatabaseUrlOrThrow, validateDatabaseConfig } from './config';
 import { dbMigrations } from './migrations';
-import { seedAuditLogs, seedEntities, seedMerchantAccounts, seedPayments, seedSettlementDestinations, seedSettlements, seedTenants, seedAllocationRules } from './seed-data';
+import { seedAuditLogs, seedEntities, seedMerchantAccounts, seedPayments, seedSettlementDestinations, seedSettlements, seedTenants, seedAllocationRules, seedPayouts } from './seed-data';
 
 type MigrationRow = { version: number };
 
@@ -157,8 +157,15 @@ async function seedCoreData(client: PoolClient): Promise<void> {
 
   for (const settlement of seedSettlements) {
     await client.query(
-      'INSERT INTO settlements(id, tenant_id, payment_id, merchant_id, created_at, payload, merchant_account_id) VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb, $4) ON CONFLICT (id) DO NOTHING',
-      [settlement.id, settlement.tenantId, settlement.paymentId, settlement.merchantId, settlement.createdAt, JSON.stringify(settlement)]
+      'INSERT INTO settlements(id, tenant_id, payment_id, merchant_id, created_at, payload, merchant_account_id, status) VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb, $4, $7) ON CONFLICT (id) DO NOTHING',
+      [settlement.id, settlement.tenantId, settlement.paymentId, settlement.merchantId, settlement.createdAt, JSON.stringify(settlement), settlement.status]
+    );
+  }
+  
+  for (const payout of seedPayouts) {
+    await client.query(
+      'INSERT INTO payouts(id, settlement_id, merchant_account_id, settlement_destination_id, amount_cents, currency, status, provider_name, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (id) DO NOTHING',
+      [payout.id, payout.settlementId, payout.merchantAccountId, payout.settlementDestinationId, Math.round(payout.amount * 100), payout.currency, payout.status, payout.providerName, payout.createdAt, payout.updatedAt]
     );
   }
 

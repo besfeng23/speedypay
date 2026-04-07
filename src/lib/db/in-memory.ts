@@ -7,7 +7,7 @@
 import { formatISO } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 import type { AuditLog, Merchant, Payment, Settlement, Tenant, UATLog, UATTestCase, Entity, MerchantAccount, TenantRecord, SettlementDestination, AllocationRule, PaymentAllocation, LedgerTransaction, LedgerEntry, Payout } from '@/lib/types';
-import { uatTestCases, seedEntities, seedMerchantAccounts, seedTenants, seedSettlementDestinations, seedPayments, seedSettlements, seedAuditLogs, seedAllocationRules } from './seed-data';
+import { uatTestCases, seedEntities, seedMerchantAccounts, seedTenants, seedSettlementDestinations, seedPayments, seedSettlements, seedAuditLogs, seedAllocationRules, seedPayouts } from './seed-data';
 import { queryOne, queryRows, withTransaction } from './postgres';
 import type { PoolClient } from 'pg';
 
@@ -198,15 +198,19 @@ export const addPayment = async (payment: Payment, client?: PoolClient): Promise
   return payment;
 };
 
-export const updatePayment = async (id: string, updatedData: Partial<Payment>): Promise<Payment | undefined> => {
+export const updatePayment = async (id: string, updatedData: Partial<Payment>, client?: PoolClient): Promise<Payment | undefined> => {
   const current = await findPaymentById(id);
   if (!current) return undefined;
   const updated: Payment = { ...current, ...updatedData, updatedAt: formatISO(new Date()) };
+  
+  const query = 'UPDATE payments SET tenant_id = $1, merchant_id = $2, created_at = $3::timestamptz, payload = $4::jsonb, merchant_account_id = $2 WHERE id = $5';
+  const params = [updated.tenantId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id];
 
-  await queryRows(
-    'UPDATE payments SET tenant_id = $1, merchant_id = $2, created_at = $3::timestamptz, payload = $4::jsonb, merchant_account_id = $2 WHERE id = $5',
-    [updated.tenantId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id]
-  );
+  if (client) {
+    await client.query(query, params);
+  } else {
+    await queryRows(query, params);
+  }
 
   return updated;
 };
@@ -227,24 +231,32 @@ export const findSettlementByPaymentId = async (paymentId: string): Promise<Sett
   return row?.payload;
 };
 
-export const addSettlement = async (settlement: Settlement): Promise<Settlement> => {
-  await queryRows(
-    'INSERT INTO settlements (id, tenant_id, payment_id, merchant_id, created_at, payload, merchant_account_id) VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb, $4)',
-    [settlement.id, settlement.tenantId, settlement.paymentId, settlement.merchantId, settlement.createdAt, JSON.stringify(settlement)]
-  );
+export const addSettlement = async (settlement: Settlement, client?: PoolClient): Promise<Settlement> => {
+  const query = 'INSERT INTO settlements (id, tenant_id, payment_id, merchant_id, created_at, payload, merchant_account_id) VALUES ($1, $2, $3, $4, $5::timestamptz, $6::jsonb, $4)';
+  const params = [settlement.id, settlement.tenantId, settlement.paymentId, settlement.merchantId, settlement.createdAt, JSON.stringify(settlement)];
+  
+  if (client) {
+    await client.query(query, params);
+  } else {
+    await queryRows(query, params);
+  }
 
   return settlement;
 };
 
-export const updateSettlement = async (id: string, updatedData: Partial<Settlement>): Promise<Settlement | undefined> => {
+export const updateSettlement = async (id: string, updatedData: Partial<Settlement>, client?: PoolClient): Promise<Settlement | undefined> => {
   const current = await findSettlementById(id);
   if (!current) return undefined;
   const updated: Settlement = { ...current, ...updatedData, updatedAt: formatISO(new Date()) };
 
-  await queryRows(
-    'UPDATE settlements SET tenant_id = $1, payment_id = $2, merchant_id = $3, created_at = $4::timestamptz, payload = $5::jsonb, merchant_account_id = $3, status = $7 WHERE id = $6',
-    [updated.tenantId, updated.paymentId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id, updated.status]
-  );
+  const query = 'UPDATE settlements SET tenant_id = $1, payment_id = $2, merchant_id = $3, created_at = $4::timestamptz, payload = $5::jsonb, merchant_account_id = $3, status = $7 WHERE id = $6';
+  const params = [updated.tenantId, updated.paymentId, updated.merchantId, updated.createdAt, JSON.stringify(updated), id, updated.status];
+
+  if (client) {
+    await client.query(query, params);
+  } else {
+    await queryRows(query, params);
+  }
 
   return updated;
 };
@@ -450,18 +462,17 @@ export const addUATLog = async (log: Omit<UATLog, 'id' | 'timestamp'>): Promise<
 };
 
 // Payouts
-export async function findPayoutById(id: string): Promise<any | undefined> {
+export async function findPayoutById(id: string): Promise<Payout | undefined> {
     const row = await queryOne('SELECT * FROM payouts WHERE id = $1', [id]);
     return row ? { ...row, amount: row.amount_cents / 100 } : undefined;
 }
 
-export async function updatePayout(id: string, data: Partial<any>): Promise<any | undefined> {
+export async function updatePayout(id: string, data: Partial<Payout>, client?: PoolClient): Promise<Payout | undefined> {
     const current = await findPayoutById(id);
     if (!current) return undefined;
 
     const updated = { ...current, ...data, updatedAt: formatISO(new Date()) };
     
-    // Manual mapping for now
     const query = `UPDATE payouts SET
         status = $1,
         provider_trans_seq = $2,
@@ -475,7 +486,7 @@ export async function updatePayout(id: string, data: Partial<any>): Promise<any 
         updated_at = $10
         WHERE id = $11`;
 
-    await queryRows(query, [
+    const params = [
         updated.status,
         updated.providerTransSeq,
         updated.providerRespCode,
@@ -487,12 +498,18 @@ export async function updatePayout(id: string, data: Partial<any>): Promise<any 
         updated.failureReason,
         updated.updatedAt,
         id,
-    ]);
+    ];
+
+    if (client) {
+      await client.query(query, params);
+    } else {
+      await queryRows(query, params);
+    }
 
     return updated;
 }
 
-export async function findPayoutByOrderSeq(orderSeq: string): Promise<any | undefined> {
+export async function findPayoutByOrderSeq(orderSeq: string): Promise<Payout | undefined> {
     const row = await queryOne('SELECT * FROM payouts WHERE id = $1', [orderSeq]); // Assuming orderSeq is the Payout ID
     return row ? { ...row, amount: row.amount_cents / 100 } : undefined;
 }

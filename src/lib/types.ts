@@ -233,7 +233,6 @@ export type Payment = {
   merchantNetAmount: number; // Stored for quick reference
   paymentStatus: PaymentStatus;
   settlementStatus: 'pending' | 'completed' | 'N/A'; // Simplified status
-  remittanceStatus: 'pending' | 'sent' | 'failed' | 'N/A';
   createdAt: string;
   updatedAt: string;
   
