@@ -155,7 +155,7 @@ export default function NewMerchantPageClient({ tenants }: NewMerchantPageClient
                     <FormField control={form.control} name="defaultPayoutChannel" render={({ field }) => ( 
                         <FormItem> 
                             <FormLabel>Default Payout Channel</FormLabel> 
-                            <FormControl>
+                             <FormControl>
                                 <Select onValueChange={field.onChange} defaultValue={field.value}> 
                                     <SelectTrigger> <SelectValue placeholder="Select a channel"/> </SelectTrigger>
                                     <SelectContent> {payoutChannels.map(channel => ( <SelectItem key={channel.procId} value={channel.procId}>{channel.description}</SelectItem> ))} </SelectContent> 
