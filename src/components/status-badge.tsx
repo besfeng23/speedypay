@@ -46,14 +46,15 @@ const statusToVariantMap: Record<string, StatusVariant> = {
     approved: 'success',
     paid: 'success',
     low: 'success',
+    verified: 'success',
 
     // Warning/Pending states
     pending: 'warning',
     'in-review': 'warning',
-    'to-be-paid': 'warning',
     unpaid: 'warning',
     restricted: 'warning',
     medium: 'warning',
+    unverified: 'warning',
 
     // Danger/Failed states
     failed: 'danger',
@@ -64,7 +65,6 @@ const statusToVariantMap: Record<string, StatusVariant> = {
     
     // Info/Processing states
     processing: 'info',
-    'in-process': 'info',
 
     // Neutral states
     inactive: 'neutral',

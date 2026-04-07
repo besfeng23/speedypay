@@ -108,8 +108,7 @@ export default async function MerchantDetailPage({
     notFound();
   }
 
-  const [tenant, recentTransactions, recentSettlements] = await Promise.all([
-    getTenantById(merchant.tenantId),
+  const [recentTransactions, recentSettlements] = await Promise.all([
     getPaymentsByMerchantId(merchant.id, 5),
     getSettlementsByMerchantId(merchant.id, 5),
   ]);
@@ -138,9 +137,9 @@ export default async function MerchantDetailPage({
             <CardContent>
               <dl className="divide-y">
                 <DetailItem label="Parent Tenant" value={
-                  <Link href={`/tenants/${tenant?.id}`} className="flex items-center gap-2 text-primary hover:underline">
+                  <Link href={`/tenants/${merchant.tenant?.id}`} className="flex items-center gap-2 text-primary hover:underline">
                     <Building className="h-4 w-4"/>
-                    {tenant?.name || 'Unknown'}
+                    {merchant.tenant?.name || 'Unknown'}
                   </Link>
                 }/>
                 <DetailItem label="Business Name" value={merchant.businessName} />

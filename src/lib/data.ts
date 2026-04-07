@@ -3,7 +3,7 @@
  * Keeps a stable seam while delegating persistence to the current DB adapter.
  */
 
-import type { Merchant, Payment, Settlement, AuditLog, DashboardStats, UATTestCase, UATLog, Tenant, PaymentAllocation, AllocationRule, LedgerTransaction, LedgerEntry } from '@/lib/types';
+import type { Merchant, Payment, Settlement, AuditLog, DashboardStats, UATTestCase, UATLog, Tenant, PaymentAllocation, AllocationRule, LedgerTransaction, LedgerEntry, Payout } from '@/lib/types';
 import * as db from './db/in-memory';
 
 const SIMULATED_LATENCY_MS = 200;
@@ -28,10 +28,10 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
   return withLatency(async () => ({
     totalGrossVolume: allPayments.filter((p) => p.paymentStatus === 'succeeded').reduce((sum, p) => sum + p.grossAmount, 0),
     totalPlatformFees: allPayments.filter((p) => p.paymentStatus === 'succeeded').reduce((sum, p) => sum + p.platformFeeAmount, 0),
-    totalMerchantNetRemittances: allSettlements.filter((s) => s.remittanceStatus === 'sent').reduce((sum, s) => sum + s.merchantNetAmount, 0),
+    totalMerchantNetRemittances: allSettlements.filter((s) => s.status === 'paid').reduce((sum, s) => sum + s.merchantNetAmount, 0),
     activeMerchants: allMerchants.filter((m) => m.entity.status === 'active').length,
-    pendingSettlements: allSettlements.filter((s) => s.remittanceStatus === 'pending').length,
-    failedSettlements: allSettlements.filter((s) => s.remittanceStatus === 'failed').length,
+    pendingSettlements: allSettlements.filter((s) => s.status === 'unpaid').length,
+    failedSettlements: allSettlements.filter((s) => s.status === 'failed').length,
     processingPayments: allPayments.filter((p) => p.paymentStatus === 'processing').length,
     failedPayments: allPayments.filter((p) => p.paymentStatus === 'failed').length,
     recentTransactionsCount: recentPayments.length,
@@ -65,7 +65,17 @@ export const getPaymentsByMerchantId = async (merchantId: string, limit?: number
 
 export const getSettlements = async (): Promise<Settlement[]> => withLatency(() => db.getAllSettlements());
 
-export const getSettlementById = async (id: string): Promise<Settlement | undefined> => withLatency(() => db.findSettlementById(id));
+export const getSettlementById = async (id: string): Promise<Settlement | undefined> => withLatency(async () => {
+    const settlement = await db.findSettlementById(id);
+    if (!settlement) {
+        return undefined;
+    }
+    if (settlement.payoutId) {
+        settlement.payout = await db.findPayoutById(settlement.payoutId);
+    }
+    return settlement;
+});
+
 
 export const getSettlementByPaymentId = async (paymentId: string): Promise<Settlement | undefined> =>
   withLatency(() => db.findSettlementByPaymentId(paymentId));
@@ -83,15 +93,26 @@ export const getSettlementsByMerchantId = async (merchantId: string, limit?: num
 
 export const getAuditLogs = async (): Promise<AuditLog[]> => withLatency(() => db.getAllAuditLogs());
 
-export const getAuditLogsByEntity = async (entityType: 'payment' | 'settlement' | 'tenant' | 'merchant', entityId: string): Promise<AuditLog[]> => {
+export const getAuditLogsByEntity = async (entityType: 'payment' | 'settlement' | 'tenant' | 'merchant' | 'payout', entityId: string): Promise<AuditLog[]> => {
   const relatedIds: string[] = [entityId];
+  
   if (entityType === 'settlement') {
     const settlement = await getSettlementById(entityId);
-    if (settlement) relatedIds.push(settlement.paymentId);
+    if (settlement) {
+      relatedIds.push(settlement.paymentId);
+      if (settlement.payoutId) {
+        relatedIds.push(settlement.payoutId);
+      }
+    }
   }
   if (entityType === 'payment') {
     const settlement = await getSettlementByPaymentId(entityId);
-    if (settlement) relatedIds.push(settlement.id);
+    if (settlement) {
+        relatedIds.push(settlement.id);
+        if (settlement.payoutId) {
+            relatedIds.push(settlement.payoutId);
+        }
+    }
   }
 
   const allLogs = await getAuditLogs();
@@ -136,6 +157,9 @@ export const getAllocationRules = async (): Promise<AllocationRule[]> => withLat
 
 export const getPaymentAllocations = async (paymentId: string): Promise<PaymentAllocation[]> => withLatency(() => db.getPaymentAllocationsByPaymentId(paymentId));
 
+export const findPayoutById = async (id: string): Promise<Payout | undefined> => withLatency(() => db.findPayoutById(id));
+export const findPayoutByOrderSeq = async (orderSeq: string): Promise<Payout | undefined> => withLatency(() => db.findPayoutByOrderSeq(orderSeq));
+
 
 // --- Data Mutation Functions ---
 
@@ -168,18 +192,26 @@ export async function addLedgerTransactionAndEntries(
 }
 
 
-export async function addSettlement(settlement: Settlement): Promise<Settlement> {
-  return db.addSettlement(settlement);
+export async function addSettlement(settlement: Settlement, client?: any): Promise<Settlement> {
+  return db.addSettlement(settlement, client);
+}
+
+export async function addPayout(payout: Payout, client?: any): Promise<Payout> {
+    return db.addPayout(payout, client);
 }
 
 export async function addUATLog(log: Omit<UATLog, 'id' | 'timestamp'>): Promise<UATLog> {
   return db.addUATLog(log);
 }
 
-export async function updateSettlement(id: string, updatedData: Partial<Settlement>): Promise<Settlement | undefined> {
-  return db.updateSettlement(id, updatedData);
+export async function updateSettlement(id: string, updatedData: Partial<Settlement>, client?: any): Promise<Settlement | undefined> {
+  return db.updateSettlement(id, updatedData, client);
 }
 
-export async function updatePayment(id: string, updatedData: Partial<Payment>): Promise<Payment | undefined> {
-  return db.updatePayment(id, updatedData);
+export async function updatePayment(id: string, updatedData: Partial<Payment>, client?: any): Promise<Payment | undefined> {
+  return db.updatePayment(id, updatedData, client);
+}
+
+export async function updatePayout(id: string, updatedData: Partial<Payout>, client?: any): Promise<Payout | undefined> {
+  return db.updatePayout(id, updatedData, client);
 }

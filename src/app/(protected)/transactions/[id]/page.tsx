@@ -13,9 +13,8 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Wallet, Landmark, HandCoins, Minus, Equal, Link as LinkIcon, CheckCircle, AlertCircle, Clock, Building, User } from "lucide-react";
+import { Wallet, HandCoins, Building, User, Link as LinkIcon, CheckCircle, AlertCircle, Clock } from "lucide-react";
 import Link from "next/link";
-import { StatCard } from "@/components/stat-card";
 import { Separator } from "@/components/ui/separator";
 import { CollectionActions } from "./collection-actions";
 import type { AuditLog, PaymentAllocation } from "@/lib/types";
@@ -55,7 +54,7 @@ function EventTimeline({ events }: { events: AuditLog[] }) {
     )
 }
 
-async function AllocationBreakdown({ allocations }: { allocations: PaymentAllocation[] }) {
+async function AllocationBreakdown({ allocations, grossAmount }: { allocations: PaymentAllocation[], grossAmount: number }) {
     const entityIds = [...new Set(allocations.map(a => a.recipientEntityId))];
     const entities = await Promise.all(entityIds.map(id => findEntityById(id)));
     const entityMap = new Map(entities.filter(Boolean).map(e => [e!.id, e]));
@@ -101,7 +100,7 @@ async function AllocationBreakdown({ allocations }: { allocations: PaymentAlloca
                 <Separator className="my-4"/>
                 <div className="flex justify-between items-center font-bold">
                     <span>Gross Payment Total</span>
-                    <span>{formatCurrency(allocations.reduce((sum, a) => sum + a.amount, 0), allocations[0]?.currency)}</span>
+                    <span>{formatCurrency(grossAmount, allocations[0]?.currency)}</span>
                 </div>
             </CardContent>
         </Card>
@@ -128,13 +127,6 @@ export default async function TransactionDetailPage({
       getPaymentAllocations(payment.id),
   ]);
 
-  const formatCurrency = (amount: number, currency: string = "PHP") => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency,
-    }).format(amount);
-  };
-
   return (
     <>
       <PageHeader
@@ -147,7 +139,7 @@ export default async function TransactionDetailPage({
       
       <div className="grid md:grid-cols-3 gap-6">
         <div className="md:col-span-2 grid gap-6">
-            <AllocationBreakdown allocations={allocations} />
+            <AllocationBreakdown allocations={allocations} grossAmount={payment.grossAmount} />
 
             <Card>
                 <CardHeader>
@@ -156,6 +148,8 @@ export default async function TransactionDetailPage({
                 </CardHeader>
                 <CardContent>
                     <dl className="divide-y">
+                        <DetailItem label="Payment Status" value={<StatusBadge status={payment.paymentStatus} />} />
+                        <DetailItem label="Settlement Status" value={<StatusBadge status={payment.settlementStatus} />} />
                         <DetailItem label="Customer" value={payment.customerName} />
                         <DetailItem label="Customer Email" value={payment.customerEmail} />
                         <DetailItem label="Merchant" value={<Link href={`/merchants/${payment.merchantId}`} className="text-primary hover:underline">{merchant?.entity.displayName || 'Unknown'}</Link>} />
@@ -211,24 +205,10 @@ export default async function TransactionDetailPage({
         <div className="space-y-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Status Timeline</CardTitle>
-                    <CardDescription>The progression of the transaction through the system.</CardDescription>
+                    <CardTitle>Status</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center gap-4">
-                        <div className="flex-1"><StatusBadge status={payment.paymentStatus} /></div>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                        <div className="flex-1"><StatusBadge status={payment.settlementStatus} /></div>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                        <div className="flex-1"><StatusBadge status={payment.remittanceStatus} /></div>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <div className="flex-1 text-center">Payment</div>
-                        <div className="w-4"></div>
-                        <div className="flex-1 text-center">Settlement</div>
-                        <div className="w-4"></div>
-                        <div className="flex-1 text-center">Remittance</div>
-                    </div>
+                <CardContent>
+                    <StatusBadge status={payment.paymentStatus} />
                 </CardContent>
             </Card>
         </div>

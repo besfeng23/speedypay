@@ -16,8 +16,11 @@ export const CHECK_TYPES = ['sanctions_screening', 'credit_check', 'business_ver
 export const MERCHANT_SETTLEMENT_STATUSES = ['active', 'paused', 'banned'] as const;
 
 export const PAYMENT_STATUSES = ['pending', 'succeeded', 'failed', 'expired', 'processing'] as const;
+// This represents the internal state of the settlement record itself
 export const INTERNAL_SETTLEMENT_STATUSES = ['unpaid', 'processing', 'paid', 'failed'] as const;
+// This represents the state of the external payout instruction
 export const PAYOUT_STATUSES = ['pending', 'processing', 'sent', 'failed'] as const;
+
 
 export const PROVIDER_TRANS_STATES = ['00', '01', '03', '04', '05', '06', '07', '08', '09'] as const;
 export const TENANT_STATUSES = ['active', 'inactive'] as const;
@@ -184,13 +187,30 @@ export type LedgerEntry = {
 // --- Composite Types (for UI and business logic) ---
 
 export type Tenant = TenantRecord & {
+  name: string;
+  notes: string;
+  platformFeeType: 'percentage' | 'fixed';
+  platformFeeValue: number;
   entity: Entity;
 };
 
 export type Merchant = MerchantAccount & {
+  businessName: string,
+  displayName: string,
+  contactName: string,
+  email: string,
+  mobile: string,
+  notes?: string,
+  status: 'active' | 'inactive' | 'suspended';
+  defaultFeeType: 'percentage' | 'fixed',
+  defaultFeeValue: number,
+  settlementAccountName: string;
+  settlementAccountNumberOrWalletId: string;
+  defaultPayoutChannel: string;
   entity: Entity;
   tenant: Tenant;
   defaultSettlementDestination: SettlementDestination | null;
+  propertyAssociations: string[];
 };
 
 
@@ -209,7 +229,8 @@ export type Payment = {
   platformFeeAmount: number; // Stored for quick reference
   merchantNetAmount: number; // Stored for quick reference
   paymentStatus: PaymentStatus;
-  settlementStatus: 'pending' | 'completed'; // Simplified status
+  settlementStatus: 'pending' | 'completed' | 'N/A'; // Simplified status
+  remittanceStatus: 'pending' | 'sent' | 'failed' | 'N/A';
   createdAt: string;
   updatedAt: string;
   

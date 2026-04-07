@@ -36,7 +36,7 @@ export default async function SettlementsPage() {
     <>
       <PageHeader
         title="Settlements"
-        description="Monitor all settlement and remittance activities."
+        description="Monitor all internal settlement and external payout activities."
       />
       <Card>
          <CardHeader>
@@ -52,8 +52,7 @@ export default async function SettlementsPage() {
                             <TableHead>Tenant</TableHead>
                             <TableHead>Merchant</TableHead>
                             <TableHead className="text-right">Net Amount</TableHead>
-                            <TableHead>Settlement Status</TableHead>
-                            <TableHead>Remittance Status</TableHead>
+                            <TableHead>Status</TableHead>
                             <TableHead className="hidden sm:table-cell">Date</TableHead>
                             <TableHead><span className="sr-only">Actions</span></TableHead>
                         </TableRow>
@@ -76,8 +75,7 @@ export default async function SettlementsPage() {
                                 </TableCell>
                                 <TableCell>{merchantMap.get(settlement.merchantId) || 'Unknown'}</TableCell>
                                 <TableCell className="text-right font-mono">{formatCurrency(settlement.merchantNetAmount, settlement.currency)}</TableCell>
-                                <TableCell><StatusBadge status={settlement.settlementStatus} /></TableCell>
-                                <TableCell><StatusBadge status={settlement.remittanceStatus} /></TableCell>
+                                <TableCell><StatusBadge status={settlement.status} /></TableCell>
                                 <TableCell className="hidden sm:table-cell">{format(new Date(settlement.createdAt), 'MMM d, yyyy')}</TableCell>
                                 <TableCell className="text-right">
                                     <Link href={`/settlements/${settlement.id}`}>
