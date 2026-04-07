@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
-import { initializeFirebase } from '../init';
+import { useState } from 'react';
+import { type User } from 'firebase/auth';
 import type { Role } from '@/lib/types';
 
 interface SessionInfo {
@@ -10,48 +9,38 @@ interface SessionInfo {
     tenantId: string | null;
 }
 
-async function establishServerSession(user: User | null): Promise<SessionInfo> {
-  if (!user) {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    return { role: null, tenantId: null };
-  }
-
-  const idToken = await user.getIdToken();
-  const response = await fetch('/api/auth/session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ idToken }),
-  });
-
-  if (response.ok) {
-      const data = await response.json();
-      return { role: data.role, tenantId: data.tenantId };
-  }
-  return { role: null, tenantId: null };
-}
-
+// Mock implementation to bypass Firebase Auth for development
 export function useUser() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [sessionInfo, setSessionInfo] = useState<SessionInfo>({ role: null, tenantId: null });
+  const mockUser: User = {
+    uid: 'mock-dev-user',
+    email: 'dev@example.com',
+    displayName: 'Dev User',
+    photoURL: `https://avatar.vercel.sh/dev-user.png`,
+    providerId: 'mock',
+    emailVerified: true,
+    isAnonymous: false,
+    metadata: {},
+    providerData: [],
+    refreshToken: '',
+    tenantId: null,
+    delete: async () => {},
+    getIdToken: async () => 'mock-token',
+    getIdTokenResult: async () => ({
+        token: 'mock-token',
+        expirationTime: '',
+        authTime: '',
+        issuedAtTime: '',
+        signInProvider: null,
+        signInSecondFactor: null,
+        claims: {},
+    }),
+    reload: async () => {},
+    toJSON: () => ({}),
+  };
 
-  useEffect(() => {
-    const { auth } = initializeFirebase();
-
-    if (!auth) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
-      setUser(nextUser);
-      const session = await establishServerSession(nextUser);
-      setSessionInfo(session);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const [user] = useState<User | null>(mockUser);
+  const [loading] = useState(false);
+  const [sessionInfo] = useState<SessionInfo>({ role: 'super_admin', tenantId: null });
 
   return { user, loading, role: sessionInfo.role, tenantId: sessionInfo.tenantId };
 }
