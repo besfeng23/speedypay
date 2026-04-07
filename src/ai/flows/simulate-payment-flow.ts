@@ -133,12 +133,12 @@ Follow these rules for generating the output:
         - paymentRecord: 'paymentStatus': 'succeeded', 'settlementStatus': 'completed'.
         - settlementRecord: 'status': 'failed'. 'payoutId' must link to the payoutRecord's ID.
         - payoutRecord: 'status': 'failed'. Include a 'failureReason', e.g., "Remittance transfer failed due to invalid beneficiary details."
-8.  **Relationships:**
-    - `settlementRecord.paymentId` must match `paymentRecord.id`.
-    - `payoutRecord.settlementId` must match `settlementRecord.id`.
-    - `settlementRecord.payoutId` must match `payoutRecord.id`.
-    - `payoutRecord.merchantAccountId` must match `paymentRecord.merchantId`.
-9.  Omit optional records ('settlementRecord', 'payoutRecord') entirely if they are not generated. Do not use empty objects.
+7.  **Relationships:**
+    - settlementRecord.paymentId must match paymentRecord.id.
+    - payoutRecord.settlementId must match settlementRecord.id.
+    - settlementRecord.payoutId must match payoutRecord.id.
+    - payoutRecord.merchantAccountId must match paymentRecord.merchantId.
+8.  Omit optional records ('settlementRecord', 'payoutRecord') entirely if they are not generated. Do not use empty objects.
 `,
 });
 
